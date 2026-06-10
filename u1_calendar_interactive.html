@@ -3072,6 +3072,10 @@ function renderAll() {
 
 // INIT
 
+// Firebase sync state, declared BEFORE boot so saveState()/pushProposal() can reference
+// it safely during the initial render. The sync layer below populates it.
+let fb = { user: null, isOwner: false, isEditor: false, previewing: false, saveTimer: null };
+
 if (!state.currentMonth) state.currentMonth = TODAY_MONTH_ISO;
 populateDivisionSelects();
 renderThemeFilter();
@@ -3082,7 +3086,8 @@ renderAll();
 // ===== Firebase shared-calendar sync layer =====
 // Safe by design: if FIREBASE_ON is false (config left as placeholder), none of this
 // runs and the calendar stays on localStorage exactly as before.
-let fb = { user: null, isOwner: false, isEditor: false, previewing: false, saveTimer: null };
+// (`fb` is declared BEFORE the boot sequence above so saveState() can reference it
+//  safely during the initial render.)
 function syncEl(id) { return document.getElementById(id); }
 
 // Option A (open proposals): any signed-in user may edit their own draft; only

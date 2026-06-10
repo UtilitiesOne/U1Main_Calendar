@@ -1634,7 +1634,7 @@ function generateScheduledSlots(monthIso) {
 
 // Canonical spotlight placement (pre-override). Places +N posts per month on
 // the spotlight division's showcase page on Tue/Thu. Hard rule: a spotlight
-// never shares a day with ANY other post — scheduled, triggered, or another
+// never shares a day with ANY other post: scheduled, triggered, or another
 // spotlight. Soft rule: avoid same-division ±1 day clustering with that
 // division's other posts (Wireline-Wed + Wireline-Thu = blocked).
 function generateCanonicalSpotlightSlots(monthIso) {
@@ -2314,7 +2314,7 @@ function openDetailPanel(slot) {
 
     <div class="section">
       <div class="sec-title">Hashtag taxonomy</div>
-      <div class="sec-content" style="color:var(--mute); font-size:12px; line-height:1.5;">Full hashtag system + 8-10 worked subdivision examples — separate Marketing deliverable post-strategy-lock. Each post will carry the agreed hashtag set when the taxonomy lands.</div>
+      <div class="sec-content" style="color:var(--mute); font-size:12px; line-height:1.5;">Full hashtag system + 8-10 worked subdivision examples: separate Marketing deliverable post-strategy-lock. Each post will carry the agreed hashtag set when the taxonomy lands.</div>
     </div>
   `;
 
@@ -2517,10 +2517,10 @@ modalBackdrop.addEventListener('click', (e) => {
 // names, no specific commercial claims.
 const MODAL_NOTE_EXAMPLES = {
   t1: { // Project Delivery (triggered, divisional)
-    wireline:    'FTTH buildout milestone — homes-passed target hit in the current phase',
+    wireline:    'FTTH buildout milestone: homes-passed target hit in the current phase',
     wireless:    'Tower swap completed on a 5G densification phase',
     power:       'Substation energised on an accelerated build schedule',
-    water:       'Phase 2 LCRR — Discovery completed on the next batch of homes',
+    water:       'Phase 2 LCRR: Discovery completed on the next batch of homes',
     renewable:   'Utility tie-in coordinated across local utilities on a solar project',
     datacenters: 'Power infrastructure commissioning on a hyperscale build',
     consulting:  'Advisory engagement frame-of-reference delivered',
@@ -2546,17 +2546,17 @@ const MODAL_NOTE_EXAMPLES = {
   },
   // T4 RETIRED 2026-06-08 (council pass 2): anchored on retired lineup line #3. Modal note examples removed.
   t5: { // From Financed Paper to Delivered Field (scheduled, cross)
-    wireline:    'Mandate-to-field — broadband program phase moving from contract to commissioned',
-    wireless:    'Mandate-to-field — 5G densification phase moving from RFP to live site',
-    power:       'Mandate-to-field — utility upgrade moving from regulator approval to energised',
-    water:       'Mandate-to-field — LCRR funding moving from federal allocation to replacement complete',
-    renewable:   'Mandate-to-field — IRA allocation moving from contract to commissioned array',
-    datacenters: 'Mandate-to-field — hyperscale contract moving from groundbreak to live power',
-    fulfillment: 'Mandate-to-field — multi-trade coordination from program approval to delivery',
-    consulting:  'Mandate-to-field — advisory engagement from frame-of-reference to action plan',
-    '':          'Mandate-to-field framing — paper milestone to delivered work'
+    wireline:    'Mandate-to-field: broadband program phase moving from contract to commissioned',
+    wireless:    'Mandate-to-field: 5G densification phase moving from RFP to live site',
+    power:       'Mandate-to-field: utility upgrade moving from regulator approval to energised',
+    water:       'Mandate-to-field: LCRR funding moving from federal allocation to replacement complete',
+    renewable:   'Mandate-to-field: IRA allocation moving from contract to commissioned array',
+    datacenters: 'Mandate-to-field: hyperscale contract moving from groundbreak to live power',
+    fulfillment: 'Mandate-to-field: multi-trade coordination from program approval to delivery',
+    consulting:  'Mandate-to-field: advisory engagement from frame-of-reference to action plan',
+    '':          'Mandate-to-field framing: paper milestone to delivered work'
   },
-  t6: { // One Company, Every Utility (scheduled, cross-portfolio) — BODY ACTIVATION REQUIRED. Open to all 8 specialties per pass 2 (2026-06-08).
+  t6: { // One Company, Every Utility (scheduled, cross-portfolio): BODY ACTIVATION REQUIRED. Open to all 8 specialties per pass 2 (2026-06-08).
     wireline:    'Wireline work for a named carrier customer; body activates "utility / useful / usefulness / the use of" before tagline (e.g., "The utility of a clean fiber pass is the customer call that never happens")',
     wireless:    'Wireless work; body activates "the use of" or "what makes [X] useful" pattern (e.g., "What makes a small-cell network useful is the speed sites move from approved to active")',
     power:       'Power Delivery work for a named utility customer (NextEra, ComEd, FECA, TVA, PSEG, Georgia Transmission); body activates "the utility of [substation / circuit / hardening work] is..."',

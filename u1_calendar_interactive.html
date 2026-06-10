@@ -1,0 +1,3191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>U1 Posting Calendar · 6-month operational planner</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #14181C;
+    --ink-soft: #3B434B;
+    --mute: #6A737B;
+    --rule: #E2E5E8;
+    --rule-soft: #EEF0F2;
+    --paper: #FFFFFF;
+    --panel: #F6F7F8;
+    --panel-2: #FAFBFC;
+    --accent: #1B1C26;
+    --u1-orange: #E0621E;
+    --u1-orange-soft: #FBF1E8;
+    --u1-orange-hover: #C3571D;
+    --amber: #B86E00;
+    --amber-soft: #FFF4E0;
+
+    /* Per-theme accent colors */
+    --t1: #E0621E; --t1-soft: #FBF1E8;   /* Project Delivery (scheduled) */
+    --t2: #5D3B7A; --t2-soft: #ECE5F2;   /* Career Arc (triggered) */
+    --t3: #2E7D54; --t3-soft: #EAF4EF;   /* U1 Way On Site (triggered) */
+    --t4: #B86E00; --t4-soft: #FFF4E0;   /* Eight Specialties, One Company (scheduled) */
+    --t5: #1A6B7A; --t5-soft: #E5F2F4;   /* From Financed Paper to Delivered Field (scheduled) */
+    --t6: #1E5B8B; --t6-soft: #E8EFF6;   /* One Company, Every Utility (scheduled, utility-specialty only) */
+  }
+
+  * { box-sizing: border-box; }
+  html { scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: #B0B6BC #EEF0F2; }
+  html::-webkit-scrollbar { width: 12px; }
+  html::-webkit-scrollbar-track { background: #EEF0F2; }
+  html::-webkit-scrollbar-thumb { background: #B0B6BC; border-radius: 6px; border: 2px solid #EEF0F2; }
+  html::-webkit-scrollbar-thumb:hover { background: #8A929A; }
+
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--panel-2);
+    color: var(--ink);
+    font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+  button { font-family: inherit; cursor: pointer; }
+
+  /* ====== TOP BAR ====== */
+  header.top {
+    background: var(--accent);
+    color: white;
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 3px solid var(--u1-orange);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  header.top .brand { display: flex; align-items: baseline; gap: 18px; }
+  header.top .product {
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--u1-orange);
+    font-weight: 800;
+  }
+  header.top .name { font-size: 16px; font-weight: 700; }
+  header.top .sub { font-size: 12px; color: rgba(255,255,255,0.55); }
+
+  header.top .month-nav {
+    display: flex; align-items: center; gap: 4px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 6px;
+    padding: 4px;
+  }
+  header.top .month-nav button {
+    background: transparent;
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 4px;
+    transition: background 0.12s;
+  }
+  header.top .month-nav button:hover { background: rgba(255,255,255,0.1); }
+  header.top .month-nav .label {
+    padding: 4px 12px;
+    font-weight: 700;
+    font-size: 14px;
+    min-width: 160px;
+    text-align: center;
+    letter-spacing: 0.01em;
+  }
+  header.top .today-btn {
+    background: var(--u1-orange);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-left: 6px;
+    transition: background 0.12s;
+  }
+  header.top .today-btn:hover { background: var(--u1-orange-hover); }
+
+  header.top .view-toggle {
+    display: flex; gap: 0;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  header.top .view-toggle button {
+    background: transparent; color: rgba(255,255,255,0.7);
+    border: none; padding: 8px 14px;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    transition: background 0.12s, color 0.12s;
+  }
+  header.top .view-toggle button:hover { color: white; }
+  header.top .view-toggle button.active { background: var(--u1-orange); color: white; }
+
+  /* ====== LAYOUT ====== */
+  .layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    min-height: calc(100vh - 56px);
+  }
+
+  /* ====== SIDEBAR ====== */
+  aside.controls {
+    background: white;
+    border-right: 1.5px solid var(--rule);
+    padding: 22px 20px 32px 20px;
+    position: sticky;
+    top: 56px;
+    height: calc(100vh - 56px);
+    overflow-y: auto;
+  }
+  aside.controls .section-title {
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--u1-orange);
+    font-weight: 800;
+    margin: 0 0 10px 0;
+    display: flex; align-items: center; gap: 8px;
+  }
+  aside.controls .section-title .pill {
+    background: var(--u1-orange);
+    color: white;
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+  }
+  aside.controls .section {
+    margin-bottom: 22px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  aside.controls .section:last-child { border-bottom: none; }
+
+  aside.controls .field { margin-bottom: 10px; }
+  aside.controls label.fl {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--mute);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 4px;
+  }
+  aside.controls select, aside.controls input[type=number] {
+    width: 100%;
+    padding: 7px 10px;
+    font-family: inherit;
+    font-size: 13px;
+    border: 1.5px solid var(--rule);
+    border-radius: 4px;
+    background: white;
+    color: var(--ink);
+  }
+  aside.controls select:focus, aside.controls input[type=number]:focus {
+    outline: none; border-color: var(--u1-orange);
+  }
+
+  /* Triggered events queue */
+  .triggered-queue { display: flex; flex-direction: column; gap: 5px; }
+  .triggered-add {
+    display: flex; align-items: center; gap: 8px;
+    background: white;
+    border: 1.5px dashed var(--rule);
+    color: var(--ink-soft);
+    padding: 9px 12px;
+    border-radius: 4px;
+    font-size: 12.5px;
+    font-weight: 600;
+    text-align: left;
+    transition: border 0.12s, color 0.12s, background 0.12s;
+    width: 100%;
+  }
+  .triggered-add:hover { border-color: var(--u1-orange); color: var(--u1-orange); background: var(--u1-orange-soft); }
+  .triggered-add .plus { font-size: 16px; font-weight: 700; color: var(--u1-orange); }
+  .triggered-add .dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+  .triggered-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+  .triggered-list-empty { font-size: 11.5px; color: var(--mute); font-style: italic; padding: 6px 4px; }
+  .triggered-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px;
+    border-radius: 4px;
+    background: var(--panel-2);
+    border-left: 3px solid var(--u1-orange);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .triggered-item:hover { background: var(--u1-orange-soft); }
+  .triggered-item .date { font-weight: 700; color: var(--ink); flex-shrink: 0; }
+  .triggered-item .meta { color: var(--ink-soft); }
+  .triggered-item .remove {
+    margin-left: auto; background: transparent; border: none;
+    color: var(--mute); font-size: 14px; padding: 0 4px;
+  }
+  .triggered-item .remove:hover { color: var(--u1-orange); }
+
+  /* Theme filter */
+  .theme-list { display: flex; flex-direction: column; gap: 4px; }
+  .theme-list label.theme-check {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--ink);
+    cursor: pointer;
+    padding: 5px 7px;
+    border-radius: 4px;
+    transition: background 0.1s;
+  }
+  .theme-list label.theme-check:hover { background: var(--rule-soft); }
+  .theme-list input[type=checkbox] { accent-color: var(--u1-orange); cursor: pointer; }
+  .theme-list .theme-dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .theme-list .behavior-tag {
+    margin-left: auto;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--mute);
+  }
+  .theme-list .behavior-tag.triggered { color: var(--u1-orange); }
+
+  /* Stats block */
+  .stats {
+    background: var(--accent);
+    color: white;
+    padding: 12px 14px;
+    border-radius: 4px;
+    margin-bottom: 16px;
+  }
+  .stats .stat-line {
+    font-size: 11.5px;
+    color: rgba(255,255,255,0.7);
+    margin-bottom: 3px;
+    display: flex; justify-content: space-between; gap: 8px;
+  }
+  .stats .stat-line strong { color: var(--u1-orange); font-weight: 700; }
+  .warning {
+    background: var(--amber-soft);
+    border-left: 3px solid var(--amber);
+    padding: 8px 10px;
+    font-size: 11.5px;
+    color: var(--ink);
+    line-height: 1.4;
+    margin-top: 8px;
+    border-radius: 0 3px 3px 0;
+  }
+
+  /* Locked content (5 layers) */
+  .layers { display: flex; flex-direction: column; gap: 8px; }
+  .layer-card {
+    background: var(--panel-2);
+    border-radius: 4px;
+    padding: 9px 12px;
+    border-left: 3px solid var(--rule);
+    font-size: 11.5px;
+  }
+  .layer-card.l1 { border-left-color: var(--u1-orange); }
+  .layer-card.l2 { border-left-color: var(--accent); }
+  .layer-card.l3 { border-left-color: var(--amber); }
+  .layer-card.l4 { border-left-color: var(--mute); background: var(--rule-soft); }
+  .layer-card.l5 { border-left-color: var(--t2); }
+  .layer-card .lk {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--mute);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+  }
+  .layer-card .lt {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 3px;
+  }
+  .layer-card .ldesc { font-size: 11px; color: var(--ink-soft); line-height: 1.45; }
+  .layer-card .lmeta { font-size: 10px; color: var(--mute); margin-top: 4px; font-style: italic; }
+
+  /* Reset */
+  button.reset {
+    width: 100%;
+    padding: 8px 14px;
+    background: transparent;
+    color: var(--mute);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transition: border 0.12s, color 0.12s;
+  }
+  button.reset:hover { border-color: var(--u1-orange); color: var(--u1-orange); }
+
+  /* ====== MAIN CALENDAR ====== */
+  main.cal-main {
+    padding: 24px 28px 60px 28px;
+    max-width: 1100px;
+  }
+
+  .weekday-header {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .weekday-header .wd {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--mute);
+    font-weight: 700;
+    text-align: center;
+    padding: 6px 0;
+  }
+  .weekday-header .wd.weekend { color: var(--mute); opacity: 0.5; }
+
+  .month-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+  }
+  .day-cell {
+    background: white;
+    border: 1.5px solid var(--rule);
+    border-radius: 5px;
+    min-height: 108px;
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    transition: background 0.12s, border 0.12s;
+    cursor: pointer;
+  }
+  .day-cell:hover { background: var(--panel); border-color: #BFC4CA; }
+  .day-cell.other-month { opacity: 0.35; background: var(--panel-2); cursor: default; }
+  .day-cell.other-month:hover { background: var(--panel-2); border-color: var(--rule); }
+  .day-cell.today {
+    border-color: var(--u1-orange);
+    border-width: 2px;
+    box-shadow: 0 0 0 2px var(--u1-orange-soft);
+  }
+  .day-cell.weekend { background: var(--panel-2); }
+  .day-cell.weekend:hover { background: var(--rule-soft); }
+
+  .day-cell .dn {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+    text-align: right;
+    margin-bottom: 4px;
+    letter-spacing: 0.02em;
+  }
+  .day-cell.today .dn { color: var(--u1-orange); }
+  .day-cell.other-month .dn { color: var(--mute); font-weight: 500; }
+
+  .chip {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 6px;
+    border-radius: 3px;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: white;
+    margin-bottom: 3px;
+    cursor: pointer;
+    line-height: 1.2;
+    overflow: hidden;
+    transition: filter 0.12s, transform 0.12s;
+  }
+  .chip:hover { filter: brightness(1.1); transform: translateX(1px); }
+  .chip.dimmed { opacity: 0.22; }
+  .chip .cnum {
+    font-weight: 800;
+    background: rgba(255,255,255,0.25);
+    padding: 0 4px;
+    border-radius: 2px;
+    font-size: 9.5px;
+    flex-shrink: 0;
+  }
+  .chip .cname {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .chip .csp {
+    background: white;
+    color: var(--u1-orange);
+    font-size: 8px;
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    flex-shrink: 0;
+  }
+  .chip .ctrust {
+    display: flex; gap: 2px;
+    flex-shrink: 0;
+  }
+  .chip .ctrust span {
+    background: rgba(255,255,255,0.35);
+    border-radius: 50%;
+    width: 12px; height: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    font-weight: 800;
+    color: white;
+  }
+  .chip-t1 { background: var(--t1); }
+  .chip-t2 { background: var(--t2); }
+  .chip-t3 { background: var(--t3); }
+  .chip-t4 { background: var(--t4); }
+  .chip-t5 { background: var(--t5); }
+  .chip-t6 { background: var(--t6); }
+
+  /* Quarterly anchor banner (above calendar grid) */
+  .quarter-banner {
+    background: linear-gradient(135deg, var(--accent) 0%, #2A2C3D 100%);
+    color: white;
+    padding: 14px 22px;
+    border-radius: 6px;
+    margin-bottom: 18px;
+    border-left: 4px solid var(--u1-orange);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .quarter-banner .qb-q-tag {
+    background: var(--u1-orange);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+  .quarter-banner .qb-content { flex: 1; }
+  .quarter-banner .qb-eyebrow {
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.55);
+    font-weight: 700;
+    margin-bottom: 3px;
+  }
+  .quarter-banner .qb-label {
+    font-size: 17px;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 2px;
+  }
+  .quarter-banner .qb-desc {
+    font-size: 12px;
+    color: rgba(255,255,255,0.6);
+    line-height: 1.4;
+  }
+
+  /* Theme alternatives row in the detail panel */
+  .theme-alternatives {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .theme-alternatives .alt-label {
+    font-size: 10px;
+    color: var(--mute);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .theme-alternatives .alt-chip {
+    background: var(--rule-soft);
+    border: 1.5px solid var(--rule);
+    color: var(--ink);
+    padding: 4px 10px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: border-color 0.12s, color 0.12s, background 0.12s;
+    font-family: inherit;
+  }
+  .theme-alternatives .alt-chip:hover {
+    border-color: var(--u1-orange);
+    color: var(--u1-orange);
+    background: var(--u1-orange-soft);
+  }
+  .theme-alternatives .alt-chip.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+    cursor: default;
+  }
+  .theme-alternatives .alt-chip .dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    margin-right: 5px;
+    vertical-align: middle;
+  }
+
+  /* Skipped slot ghost: shown when a scheduled post was skipped.
+     Click to restore. */
+  .chip.chip-ghost {
+    background: transparent !important;
+    color: var(--mute) !important;
+    border: 1.5px dashed var(--mute);
+    text-decoration: line-through;
+    cursor: pointer;
+    font-weight: 500;
+    opacity: 0.7;
+    transition: opacity 0.12s, border-color 0.12s, color 0.12s, background 0.12s;
+  }
+  .chip.chip-ghost:hover {
+    opacity: 1;
+    border-color: var(--u1-orange);
+    color: var(--u1-orange) !important;
+    background: var(--u1-orange-soft) !important;
+    text-decoration: none;
+  }
+  .chip.chip-ghost .cnum {
+    background: var(--mute);
+    color: white;
+  }
+  .chip.chip-ghost:hover .cnum {
+    background: var(--u1-orange);
+  }
+  .chip.chip-ghost .ghost-icon {
+    font-size: 11px;
+    font-weight: 800;
+    margin-left: 2px;
+    color: var(--mute);
+  }
+  .chip.chip-ghost:hover .ghost-icon {
+    color: var(--u1-orange);
+  }
+
+  .day-actions {
+    position: absolute;
+    top: 4px; left: 6px;
+    display: flex;
+    gap: 3px;
+    z-index: 4;
+  }
+  .day-actions button {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: 1px solid var(--rule);
+    background: white;
+    color: var(--mute);
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 0;
+    padding: 0;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+    opacity: 0.45;
+  }
+  .day-cell:hover .day-actions button { opacity: 1; }
+  .day-actions button:hover {
+    background: var(--u1-orange);
+    color: white;
+    border-color: var(--u1-orange);
+  }
+  .day-actions .day-remove:hover {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  .day-actions .day-remove[disabled] {
+    cursor: not-allowed;
+    opacity: 0.2;
+  }
+  .day-actions .day-remove[disabled]:hover {
+    background: white;
+    color: var(--mute);
+    border-color: var(--rule);
+  }
+  .day-cell.other-month .day-actions { display: none; }
+
+  .day-remove-popup {
+    position: absolute;
+    top: 28px; left: 4px; right: 4px;
+    background: white;
+    border: 1.5px solid var(--accent);
+    border-radius: 4px;
+    box-shadow: 0 6px 18px rgba(20,24,28,0.18);
+    padding: 8px 8px 6px 8px;
+    z-index: 30;
+    display: none;
+    max-width: 240px;
+  }
+  .day-remove-popup.open { display: block; }
+  .day-remove-popup .rp-title {
+    font-size: 9px;
+    font-weight: 800;
+    color: var(--mute);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .day-remove-popup .rp-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    border-left: 3px solid var(--rule);
+    background: var(--panel-2);
+    margin-bottom: 3px;
+    color: var(--ink);
+  }
+  .day-remove-popup .rp-item.scheduled { border-left-color: var(--accent); }
+  .day-remove-popup .rp-item.triggered { border-left-color: var(--t2); }
+  .day-remove-popup .rp-item.spotlight { border-left-color: var(--u1-orange); }
+  .day-remove-popup .rp-item .rp-meta {
+    flex: 1;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .day-remove-popup .rp-item button {
+    border: none;
+    background: transparent;
+    color: var(--u1-orange);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    padding: 2px 4px;
+  }
+  .day-remove-popup .rp-item button:hover { color: var(--u1-orange-hover); text-decoration: underline; }
+  .day-remove-popup .rp-hint {
+    font-size: 10px;
+    color: var(--mute);
+    margin-top: 6px;
+    line-height: 1.4;
+    padding: 0 2px;
+  }
+
+  /* ====== DETAIL PANEL (right slide-in) ====== */
+  .detail-overlay {
+    position: fixed;
+    top: 0; right: 0;
+    width: 420px;
+    height: 100vh;
+    background: white;
+    border-left: 1.5px solid var(--rule);
+    box-shadow: -8px 0 24px rgba(20,24,28,0.08);
+    transform: translateX(420px);
+    transition: transform 0.22s ease-out;
+    z-index: 100;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .detail-overlay.open { transform: translateX(0); }
+  .detail-header {
+    background: var(--accent);
+    color: white;
+    padding: 18px 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 3px solid var(--u1-orange);
+  }
+  .detail-header .dh-title {
+    font-size: 15px; font-weight: 700;
+    margin-bottom: 3px;
+  }
+  .detail-header .dh-date {
+    font-size: 11px; color: rgba(255,255,255,0.6);
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .detail-header .close-btn {
+    background: rgba(255,255,255,0.1);
+    border: none;
+    color: white;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    font-size: 16px;
+    line-height: 0;
+  }
+  .detail-header .close-btn:hover { background: rgba(255,255,255,0.2); }
+
+  .detail-body { padding: 20px 22px; }
+  .detail-body .section {
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .detail-body .section:last-child { border-bottom: none; }
+  .detail-body .sec-title {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--mute);
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .detail-body .sec-content { font-size: 13px; color: var(--ink); line-height: 1.5; }
+  .detail-body .sec-content.italic { font-style: italic; color: var(--ink-soft); }
+  .detail-body .theme-strip {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px;
+    border-radius: 4px;
+    color: white;
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .detail-body .trust-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .detail-body .trust-tag {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .detail-body .trust-tag.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  .detail-body .trust-tag .letter {
+    background: var(--u1-orange);
+    color: white;
+    border-radius: 50%;
+    width: 18px; height: 18px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 800;
+  }
+  .detail-body .u1way-flag {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--amber-soft);
+    color: var(--amber);
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 700;
+    border: 1px solid var(--amber);
+  }
+  .detail-body .u1way-flag.off {
+    background: var(--rule-soft);
+    color: var(--mute);
+    border-color: var(--rule);
+    font-weight: 500;
+  }
+  .detail-body .body-close-quote {
+    background: var(--u1-orange-soft);
+    border-left: 3px solid var(--u1-orange);
+    padding: 12px 14px;
+    font-style: italic;
+    font-size: 13px;
+    color: var(--ink);
+    font-weight: 600;
+    border-radius: 0 3px 3px 0;
+  }
+  .detail-body .meta-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--mute);
+    margin-top: 4px;
+  }
+  .detail-footer {
+    padding: 14px 22px;
+    border-top: 1px solid var(--rule);
+    background: var(--panel-2);
+    display: flex;
+    gap: 8px;
+  }
+  .detail-footer button {
+    flex: 1;
+    padding: 9px 14px;
+    border: 1px solid var(--rule);
+    background: white;
+    color: var(--ink-soft);
+    border-radius: 4px;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transition: all 0.12s;
+  }
+  .detail-footer button.danger { color: var(--u1-orange); }
+  .detail-footer button:hover { border-color: var(--u1-orange); color: var(--u1-orange); }
+
+  /* ====== MODAL (add post) ====== */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(20,24,28,0.45);
+    z-index: 200;
+    display: none;
+    align-items: center; justify-content: center;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: white;
+    border-radius: 8px;
+    width: 540px;
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 24px 60px rgba(20,24,28,0.3);
+  }
+  .modal-head {
+    background: var(--accent);
+    color: white;
+    padding: 16px 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 3px solid var(--u1-orange);
+  }
+  .modal-head .mh-title { font-size: 15px; font-weight: 700; }
+  .modal-head .mh-sub { font-size: 11px; color: rgba(255,255,255,0.6); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 2px; }
+  .modal-head .close-btn {
+    background: rgba(255,255,255,0.1); border: none; color: white;
+    width: 30px; height: 30px; border-radius: 50%;
+    font-size: 16px; line-height: 0;
+  }
+  .modal-body {
+    padding: 18px 22px;
+    overflow-y: auto;
+  }
+  .modal-body .field { margin-bottom: 14px; }
+  .modal-body label.fl {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--mute);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 5px;
+  }
+  .modal-body select, .modal-body input[type=date], .modal-body textarea {
+    width: 100%;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 13px;
+    border: 1.5px solid var(--rule);
+    border-radius: 4px;
+    background: white;
+    color: var(--ink);
+  }
+  .modal-body textarea { resize: vertical; min-height: 60px; }
+  .modal-body select:focus, .modal-body input:focus, .modal-body textarea:focus {
+    outline: none; border-color: var(--u1-orange);
+  }
+  .modal-body .trust-picker {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px;
+  }
+  .modal-body .trust-pick {
+    cursor: pointer;
+    background: var(--panel);
+    border: 1.5px solid var(--rule);
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    transition: all 0.12s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .modal-body .trust-pick:hover { border-color: var(--u1-orange); }
+  .modal-body .trust-pick.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  .modal-body .trust-pick .letter {
+    background: var(--u1-orange);
+    color: white;
+    border-radius: 50%;
+    width: 18px; height: 18px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 800;
+  }
+  .modal-body .validation {
+    font-size: 12px;
+    color: var(--u1-orange);
+    margin-top: 6px;
+    background: var(--u1-orange-soft);
+    border-left: 3px solid var(--u1-orange);
+    padding: 8px 10px;
+    border-radius: 0 3px 3px 0;
+    display: none;
+  }
+  .modal-body .validation.show { display: block; }
+  .modal-foot {
+    padding: 14px 22px;
+    border-top: 1px solid var(--rule);
+    background: var(--panel-2);
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .modal-foot button {
+    padding: 9px 18px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border: 1px solid var(--rule);
+    background: white;
+    color: var(--ink-soft);
+  }
+  .modal-foot button.primary {
+    background: var(--u1-orange);
+    color: white;
+    border-color: var(--u1-orange);
+  }
+  .modal-foot button.primary:hover { background: var(--u1-orange-hover); }
+  .modal-foot button.primary:disabled { background: var(--mute); border-color: var(--mute); cursor: not-allowed; }
+
+  /* ====== THEME VIEW ====== */
+  .theme-section {
+    background: white;
+    border: 1.5px solid var(--rule);
+    border-left: 6px solid var(--u1-orange);
+    border-radius: 6px;
+    padding: 18px 22px;
+    margin-bottom: 16px;
+  }
+  .theme-section.t1 { border-left-color: var(--t1); }
+  .theme-section.t2 { border-left-color: var(--t2); }
+  .theme-section.t3 { border-left-color: var(--t3); }
+  .theme-section.t4 { border-left-color: var(--t4); }
+  .theme-section.t5 { border-left-color: var(--t5); }
+  .theme-section.t6 { border-left-color: var(--t6); }
+  .theme-section h2 {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0 0 4px 0;
+    color: var(--accent);
+  }
+  .theme-section .tmeta {
+    font-size: 11.5px;
+    color: var(--mute);
+    margin-bottom: 12px;
+  }
+  .theme-section .tmeta .count {
+    color: var(--u1-orange);
+    font-weight: 700;
+  }
+  .theme-section .behavior-pill {
+    display: inline-block;
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    padding: 2px 7px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-left: 6px;
+    color: var(--ink-soft);
+  }
+  .theme-section .behavior-pill.triggered { color: var(--u1-orange); border-color: var(--u1-orange); }
+  .theme-section .dates-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px;
+  }
+  .theme-section .dcard {
+    padding: 9px 11px;
+    background: var(--panel-2);
+    border-radius: 4px;
+    border-left: 3px solid var(--rule);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .theme-section .dcard:hover { background: var(--panel); }
+  .theme-section .dcard .d { font-weight: 700; color: var(--ink); }
+  .theme-section .dcard .dv { color: var(--ink-soft); margin-top: 2px; }
+  .theme-section.dimmed { opacity: 0.35; }
+
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* Print */
+  @media print {
+    header.top, aside.controls, .detail-overlay, .modal-backdrop { display: none !important; }
+    .layout { display: block; }
+    main.cal-main { padding: 14px; max-width: none; }
+    .day-cell { min-height: 84px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <div>
+      <div class="product">U1 Posting Calendar</div>
+      <div class="name">6-month operational planner</div>
+    </div>
+    <div class="sub" id="cadence-meta">U1 Main · 3/wk · M/W/F</div>
+    <a href="u1_utility_guidance.html" style="display:inline-block; margin-top:6px; font-size:12px; color:var(--accent, #1E5B8B); text-decoration:none; border:1px solid var(--line, #d9dee6); padding:3px 10px; border-radius:6px;">Utility guidance · body-activation rule &rarr;</a>
+  </div>
+
+  <div style="display: flex; align-items: center; gap: 14px;">
+    <div class="month-nav">
+      <button id="prev-month" aria-label="Previous month">◀</button>
+      <div class="label" id="month-label">Loading</div>
+      <button id="next-month" aria-label="Next month">▶</button>
+    </div>
+    <div class="view-toggle" role="tablist" aria-label="View mode">
+      <button id="view-grid-btn" class="active" data-view="grid">Calendar</button>
+      <button id="view-theme-btn" data-view="theme">Theme view</button>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+
+  <aside class="controls">
+
+    <div class="section" id="sync-bar">
+      <h3 class="section-title">Shared calendar</h3>
+      <div id="sync-status" style="font-size:11px; color:var(--mute); line-height:1.45; margin-bottom:8px;">Offline / local-only. State lives in this browser. Configure Firebase (see SETUP.md) to share one live calendar.</div>
+      <div id="sync-auth" style="display:none; flex-direction:column; gap:6px;">
+        <button class="reset" id="signin-btn" style="border-color:var(--accent); color:var(--accent);">Sign in with Google</button>
+        <button class="reset" id="signout-btn" style="display:none;">Sign out</button>
+        <div id="sync-who" style="font-size:11px; color:var(--ink); font-weight:600;"></div>
+        <div id="sync-savestate" style="font-size:10px; color:var(--mute); line-height:1.4;"></div>
+      </div>
+    </div>
+
+    <div class="section" id="review-panel" style="display:none;">
+      <h3 class="section-title">Review proposals <span id="review-count" style="font-weight:400; color:var(--mute);">0</span></h3>
+      <div style="font-size:11px; color:var(--mute); margin-bottom:8px; line-height:1.45;">Each editor's working draft. Publish writes it to the live calendar everyone sees.</div>
+      <button class="reset" id="review-mydraft-btn" style="display:none; width:100%; margin-bottom:8px;">&larr; Back to my own draft</button>
+      <div id="review-list"></div>
+    </div>
+
+    <div class="stats">
+      <div class="stat-line"><span>Window</span> <strong id="stat-window">...</strong></div>
+      <div class="stat-line"><span>This month posts</span> <strong id="stat-count">...</strong></div>
+      <div class="stat-line"><span>Divisions covered</span> <strong id="stat-divs">...</strong></div>
+      <div class="stat-line"><span>Triggered events</span> <strong id="stat-trig">...</strong></div>
+    </div>
+
+    <div class="section">
+      <h3 class="section-title">Day-90 gate verification</h3>
+      <div style="font-size: 11px; color: var(--mute); margin-bottom: 10px; line-height: 1.45;" id="subdivision-tally-hint">All in-rotation subdivisions visible monthly on U1 Main.</div>
+      <div id="subdivision-tally" style="display: flex; flex-direction: column; gap: 3px; font-size: 11.5px;"></div>
+      <div style="height: 1px; background: var(--rule-soft); margin: 12px 0;"></div>
+      <div style="font-size: 11px; color: var(--mute); margin-bottom: 8px; line-height: 1.45;">Theme distribution this month.</div>
+      <div id="theme-distribution" style="display: flex; flex-direction: column; gap: 3px; font-size: 11.5px;"></div>
+    </div>
+
+    <div class="section">
+      <h3 class="section-title">Triggered events <span class="pill">EVENT-DRIVEN</span></h3>
+      <p style="font-size:11.5px; color:var(--mute); margin: 0 0 10px 0; line-height: 1.45;">Project Delivery, Career Arc, and U1 Way On Site post when a real event happens (project milestone / promotion / new hire / storm / coordination moment). Add when the event lands.</p>
+
+      <div class="triggered-queue">
+        <button class="triggered-add" id="add-project-btn">
+          <span class="dot" style="background:var(--t1);"></span>
+          <span>Add Project Delivery post</span>
+          <span class="plus">+</span>
+        </button>
+        <button class="triggered-add" id="add-career-btn">
+          <span class="dot" style="background:var(--t2);"></span>
+          <span>Add Career Arc post</span>
+          <span class="plus">+</span>
+        </button>
+        <button class="triggered-add" id="add-u1way-btn">
+          <span class="dot" style="background:var(--t3);"></span>
+          <span>Add U1 Way On Site event</span>
+          <span class="plus">+</span>
+        </button>
+      </div>
+
+      <div class="triggered-list" id="triggered-list"></div>
+    </div>
+
+    <div class="section">
+      <h3 class="section-title">Spotlight chooser</h3>
+      <div class="field">
+        <label class="fl" for="spot1-div">Spotlight 1 · division</label>
+        <select id="spot1-div"><option value="">(none)</option></select>
+      </div>
+      <div class="field">
+        <label class="fl" for="spot1-uplift">Spotlight 1 · extra posts / month</label>
+        <input type="number" id="spot1-uplift" min="0" max="6" value="2" />
+      </div>
+      <div class="field" style="margin-top: 12px;">
+        <label class="fl" for="spot2-div">Spotlight 2 · division</label>
+        <select id="spot2-div"><option value="">(none)</option></select>
+      </div>
+      <div class="field">
+        <label class="fl" for="spot2-uplift">Spotlight 2 · extra posts / month</label>
+        <input type="number" id="spot2-uplift" min="0" max="6" value="2" />
+      </div>
+      <div id="spot-warning" class="warning" style="display:none;">
+        Heavy month flagged. Consider dropping per-spotlight uplift to 1.
+      </div>
+    </div>
+
+    <div class="section">
+      <h3 class="section-title">Theme filter</h3>
+      <div class="theme-list" id="theme-list"></div>
+    </div>
+
+    <div class="section">
+      <h3 class="section-title">Brand-voice layers <span class="pill">LOCKED</span></h3>
+      <div class="layers">
+
+        <div class="layer-card l1">
+          <div class="lk">Layer 1 · Brand-heart line</div>
+          <div class="lt">"We don't overpromise. We overdeliver."</div>
+          <div class="ldesc">Universal body close on every scheduled post.</div>
+          <div class="lmeta">CEO verbatim (RCR Wireless, Nov 2024). Locked 19 May 2026.</div>
+        </div>
+
+        <div class="layer-card l2">
+          <div class="lk">Layer 2 · TRUST in the post body</div>
+          <div class="lt">Writer-authored per post</div>
+          <div class="ldesc">Each post body carries one short line that names 1 or 2 TRUST values, sits between body and brand-heart close. The line is written per post to fit the specific content; no theme-level default to copy.</div>
+          <div style="margin-top: 8px; font-size: 11px; color: var(--ink-soft); line-height: 1.5;">
+            <div style="margin-bottom: 4px;"><strong>T:</strong> Training</div>
+            <div style="margin-bottom: 4px;"><strong>R:</strong> Responsibility</div>
+            <div style="margin-bottom: 4px;"><strong>U:</strong> Understanding</div>
+            <div style="margin-bottom: 4px;"><strong>S:</strong> Safety</div>
+            <div style="margin-bottom: 4px;"><strong>T:</strong> Teamwork</div>
+          </div>
+          <div class="lmeta">Writer authors TRUST line per post in the slot detail panel.</div>
+        </div>
+
+        <div class="layer-card l3">
+          <div class="lk">Layer 3 · U1 Way method</div>
+          <div class="lt">Structure · Coordination · Real accountability</div>
+          <div class="ldesc">The <em>how</em> of overdelivery. Surfaces in operational themes (T1, T3, T5). Flagged per post.</div>
+          <div class="lmeta">In active use on Facebook + LinkedIn since Jan-Feb 2026. Locked as method layer 19 May 2026.</div>
+        </div>
+
+        <div class="layer-card l4">
+          <div class="lk">Layer 4 · Founder voice register</div>
+          <div class="lt">CEO-repertoire lines · cross-divisional</div>
+          <div class="ldesc">Two further documented CEO lines from public interviews available for cross-divisional content: <i>"Hard work beats talent when talent doesn't work hard."</i> and <i>"Always keep going."</i> Final use pattern confirmed in the monthly review.</div>
+          <div class="lmeta">From public-interview repertoire. Available to marketing for cross-divisional and thought-leadership content.</div>
+        </div>
+
+<div class="layer-card l5">
+          <div class="lk">Layer 5 · Founder register · personal</div>
+          <div class="lt">Reserved · Serghei-authored only</div>
+          <div class="ldesc">"100-degree attic" / "selling ice in Alaska" / "from nothing to something to everything" / founder-arc biographical material. Off-limits for scheduled calendar.</div>
+          <div class="lmeta">Founder content engine is a future-quarter conversation, capacity-gated.</div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="section">
+      <h3 class="section-title">State portability</h3>
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <button class="reset" id="export-btn" style="border-color: var(--accent); color: var(--accent);">Export state to JSON</button>
+        <button class="reset" id="import-btn">Import state from JSON</button>
+        <input type="file" id="import-file" accept="application/json" style="display: none;" />
+      </div>
+      <div style="font-size: 10px; color: var(--mute); margin-top: 6px; line-height: 1.45;">Save your work outside browser cache. Restore on a fresh open or different machine. State lives in localStorage by default; cache clear destroys it.</div>
+    </div>
+
+    <div class="section" style="border-bottom: none; padding-bottom: 0;">
+      <button class="reset" id="reset-btn">Reset all selections</button>
+    </div>
+
+  </aside>
+
+  <main class="cal-main">
+    <section id="view-grid" class="view active">
+      <div class="quarter-banner" id="quarter-banner">
+        <div class="qb-q-tag" id="qb-q-tag">Q3</div>
+        <div class="qb-content">
+          <div class="qb-eyebrow">Quarterly anchor theme</div>
+          <div class="qb-label" id="qb-label">One Company, Every Utility</div>
+          <div class="qb-desc" id="qb-desc">Multi-divisional rebalance opening</div>
+        </div>
+      </div>
+      <div class="weekday-header" id="weekday-header"></div>
+      <div class="month-grid" id="month-grid"></div>
+    </section>
+    <section id="view-theme" class="view"></section>
+  </main>
+
+</div>
+
+<!-- Detail panel -->
+<div class="detail-overlay" id="detail-overlay">
+  <div class="detail-header">
+    <div>
+      <div class="dh-title" id="dh-title">...</div>
+      <div class="dh-date" id="dh-date">...</div>
+    </div>
+    <button class="close-btn" id="detail-close" aria-label="Close">✕</button>
+  </div>
+  <div class="detail-body" id="detail-body"></div>
+  <div class="detail-footer" id="detail-footer"></div>
+</div>
+
+<!-- Modal -->
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="mh-title" id="modal-title">...</div>
+        <div class="mh-sub" id="modal-sub">...</div>
+      </div>
+      <button class="close-btn" id="modal-close" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-foot">
+      <button id="modal-cancel">Cancel</button>
+      <button class="primary" id="modal-save">Add post</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Firebase shared-calendar sync (compat SDK) =====
+     If the firebaseConfig below stays as the PASTE_ placeholders, the calendar runs
+     fully offline on localStorage exactly as before. Fill it in (see SETUP.md) to
+     turn on shared/published state. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+  // ====== FILL THESE IN (see SETUP.md). Leave as-is to run offline / local-only. ======
+  const firebaseConfig = {
+    apiKey: "AIzaSyAw4OdzDsO_3CWa6wTWsPyNSIrQEARVr1w",
+    authDomain: "u1-calendar.firebaseapp.com",
+    projectId: "u1-calendar",
+    appId: "1:784693618571:web:0b67641886d0de0a83f18e"
+  };
+  // Only this account can Publish to the live calendar everyone sees.
+  const OWNER_EMAIL = "wakroz@gmail.com";
+  // Open-proposals model: any signed-in user may edit their OWN draft; only
+  // OWNER_EMAIL can publish a draft to the live calendar. No editor allowlist.
+  // Auto-detect: if the apiKey is still a placeholder, stay fully offline.
+  const FIREBASE_ON = !!firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf("PASTE") === -1;
+</script>
+
+<script>
+// DATA
+
+// Brand-specific config. Replace this block to template the calendar to another brand.
+const BRAND_CONFIG = {
+  brand: {
+    id: 'u1',
+    name: 'U1',
+    fullName: 'Utilities One',
+    bodySignature: "We don't overpromise. We overdeliver."
+  },
+  window: {
+    anchorDate: new Date(2026, 5, 1), // Mon 1 Jun 2026
+    days: 183 // through Sun 30 Nov 2026 (extended from 90, council 2026-06-10)
+  },
+  storageKey: 'u1-calendar-state-v6',
+  units: [
+    { id: 'wireline',    name: 'Wireline',       abbr: 'WL',  tier: 'mature' },
+    { id: 'wireless',    name: 'Wireless',       abbr: 'WS',  tier: 'mature' },
+    { id: 'power',       name: 'Power Delivery', abbr: 'PD',  tier: 'mature' },
+    { id: 'water',       name: 'Water',          abbr: 'WA',  tier: 'mature' },
+    { id: 'renewable',   name: 'Renewable',      abbr: 'RN',  tier: 'aspirational' },
+    { id: 'datacenters', name: 'Data Centers',   abbr: 'DC',  tier: 'aspirational' },
+    { id: 'fulfillment', name: 'Fulfillment',    abbr: 'FF',  tier: 'backbone' },
+    { id: 'consulting',  name: 'Consulting',     abbr: 'CN',  tier: 'skeleton' }
+  ],
+  themes: [
+    { id: 't1', num: 1, name: 'Project Delivery',                       behavior: 'triggered', scope: 'divisional', tagline: 'Built to Hold.',                  trustLine: '', u1Way: true  },
+    { id: 't2', num: 2, name: 'The U1 Career Arc',                      behavior: 'triggered', scope: 'divisional', tagline: 'One Way. Talent finds its lane.', trustLine: '', u1Way: false },
+    { id: 't3', num: 3, name: 'The U1 Way On Site',                     behavior: 'triggered', scope: 'divisional', tagline: 'Built to Hold.',                  trustLine: '', u1Way: true  },
+    // T4 RETIRED 2026-06-08 (council pass 2): anchored on retired lineup line #3 "Eight specialties. One company."; per-division content routes to T1/T3/T5 by post intent.
+    { id: 't5', num: 5, name: 'From Financed Paper to Delivered Field', behavior: 'scheduled', scope: 'cross',      tagline: 'From paper to field.',            trustLine: '', u1Way: true  },
+    // T6 REOPENED 2026-06-08 (council pass 2): removed eligibleDivisions + utilityCustomerOverride; added bodyActivationRequired. Open to all 8 specialties when post body activates "utility / useful / usefulness / the use of" in older usefulness sense before tagline. See feedback-brand-line-body-activation-rule.
+    { id: 't6', num: 6, name: 'One Company, Every Utility',             behavior: 'scheduled', scope: 'cross',      tagline: 'One Company. Every Utility.',     trustLine: '', u1Way: false, bodyActivationRequired: true }
+  ],
+  // Default theme per unit for scheduled rotation slots. T1 is triggered so
+  // mature divisions fall back to T5 (industry direction) / T6 (cross-portfolio).
+  // Per-division content routes to T1 / T3 / T5 / T6 based on post intent.
+  // T4 retired 2026-06-08 (council pass 2). T6 reopened to all 8 specialties with
+  // bodyActivationRequired flag (see feedback-brand-line-body-activation-rule).
+  unitDefaultTheme: {
+    wireline:    't6',
+    wireless:    't5',
+    power:       't6',
+    water:       't5',
+    renewable:   't5',
+    datacenters: 't5',
+    fulfillment: 't6',
+    consulting:  't6'
+  },
+  unitThemeAlternatives: {
+    wireline:    ['t5'],
+    wireless:    ['t6'],
+    power:       ['t5'],
+    water:       ['t6'],
+    renewable:   ['t6'],
+    datacenters: ['t6'],
+    fulfillment: ['t5'],
+    consulting:  ['t5']
+  },
+  // Interleaved rotation order. Avoids consecutive telecom-coded divisions
+  // (Wireline + Wireless). Other-specialty divisions counterbalance both telecom
+  // slots; cross-cutting backbone + skeleton sit at the end of the cycle.
+  rotationOrder: ['power', 'wireline', 'renewable', 'water', 'wireless', 'datacenters', 'consulting', 'fulfillment'],
+  tierFramework: {
+    enabled: true,
+    careerEligibleTiers: ['mature'],
+    u1WayEligibleTiers: ['mature', 'aspirational', 'backbone', 'skeleton'],
+    spotlightExcludedTiers: ['backbone']
+  },
+  // Units paused from auto-rotation for the first N months from anchor.
+  activationGates: [
+    { unitId: 'consulting', pausedThroughMonth: 2, label: 'page activation' }
+  ],
+  trustValues: [
+    { letter: 'T',  name: 'Training' },
+    { letter: 'R',  name: 'Responsibility' },
+    { letter: 'U',  name: 'Understanding' },
+    { letter: 'S',  name: 'Safety' },
+    { letter: 'Tm', name: 'Teamwork' }
+  ],
+  // Quarterly anchor themes. Fiscal frame anchored at rollout (Mon 1 Jun 2026
+  // = Q3 opening). Used by the quarterly anchor banner above the calendar.
+  quarterlyAnchors: [
+    { months: [5, 6, 7],  q: 'Q3', label: 'One Company, Every Utility', desc: 'Multi-divisional rebalance opening &middot; body-activation rule applies on cross-divisional posts' },
+    { months: [8, 9, 10], q: 'Q4', label: 'Power for the Next Decade',  desc: 'Energy transition, E5 cross-link' },
+    { months: [11, 0, 1], q: 'Q1', label: 'Critical Infrastructure',    desc: 'Data Centers + Water + Wireline; GPM cross-link' },
+    { months: [2, 3, 4],  q: 'Q2', label: 'Built to Outwork',           desc: '11-year anniversary; cross-divisional cohesion' }
+  ]
+};
+
+// Aliases for readability; reflect any BRAND_CONFIG changes automatically.
+const DIVISIONS = BRAND_CONFIG.units;
+const THEMES = BRAND_CONFIG.themes;
+const DIVISION_DEFAULT_THEME = BRAND_CONFIG.unitDefaultTheme;
+const DIVISION_THEME_ALTERNATIVES = BRAND_CONFIG.unitThemeAlternatives;
+const ROTATION_ORDER = BRAND_CONFIG.rotationOrder;
+const TRUST_VALUES = BRAND_CONFIG.trustValues;
+const BODY_SIGNATURE = BRAND_CONFIG.brand.bodySignature;
+const QUARTERLY_ANCHORS = BRAND_CONFIG.quarterlyAnchors;
+const CAREER_ELIGIBLE_TIERS = BRAND_CONFIG.tierFramework.careerEligibleTiers;
+const U1WAY_ELIGIBLE_TIERS = BRAND_CONFIG.tierFramework.u1WayEligibleTiers;
+
+function getQuarterlyAnchorFor(date) {
+  const monthIdx = date.getMonth();
+  return QUARTERLY_ANCHORS.find(q => q.months.includes(monthIdx)) || QUARTERLY_ANCHORS[0];
+}
+
+// STATE
+
+const DEFAULT_STATE = {
+  view: 'grid',
+  currentMonth: null, // ISO 'YYYY-MM'; null = today's month
+  spot1Div: '', spot1Uplift: 2,
+  spot2Div: '', spot2Uplift: 2,
+  themes: { t1: true, t2: true, t3: true, t5: true, t6: true },
+  triggeredEvents: [], // [{id, date(ISO), themeId, divisionId, trustLine, note}]
+  slotOverrides: {},   // { 'YYYY-MM-DD': { themeId, note } } per-slot edits
+  spotlightOverrides: {}, // { 'YYYY-MM-DD': { skipped: true } | { newDate: 'YYYY-MM-DD' } } keyed by canonical (algorithm-placed) date
+};
+
+let state = loadState();
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(BRAND_CONFIG.storageKey);
+    if (!raw) return structuredClone(DEFAULT_STATE);
+    const parsed = JSON.parse(raw);
+    const merged = { ...structuredClone(DEFAULT_STATE), ...parsed };
+    if (!Array.isArray(merged.triggeredEvents)) merged.triggeredEvents = [];
+    if (typeof merged.slotOverrides !== 'object' || merged.slotOverrides === null) merged.slotOverrides = {};
+    if (typeof merged.spotlightOverrides !== 'object' || merged.spotlightOverrides === null) merged.spotlightOverrides = {};
+    // Migration: T4 retired 2026-06-08 (council pass 2). Remap any saved t4 theme
+    // references to t5 so old saved state stays valid without wiping user overrides.
+    const RETIRED_THEME_MAP = { t4: 't5' };
+    for (const k in merged.slotOverrides) {
+      const o = merged.slotOverrides[k];
+      if (o && RETIRED_THEME_MAP[o.themeId]) o.themeId = RETIRED_THEME_MAP[o.themeId];
+    }
+    merged.triggeredEvents.forEach(e => {
+      if (e && RETIRED_THEME_MAP[e.themeId]) e.themeId = RETIRED_THEME_MAP[e.themeId];
+    });
+    return merged;
+  } catch (e) {
+    return structuredClone(DEFAULT_STATE);
+  }
+}
+function saveState() {
+  try { localStorage.setItem(BRAND_CONFIG.storageKey, JSON.stringify(state)); }
+  catch (e) {}
+  // When signed in as an editor, also push to this user's proposal draft (debounced).
+  // No-op in offline mode (pushProposal is defined by the Firebase sync layer below).
+  if (typeof pushProposal === 'function') pushProposal();
+}
+
+// DATE HELPERS
+
+function startOfDay(d) { const n = new Date(d); n.setHours(0,0,0,0); return n; }
+function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
+function isoDate(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function isoMonth(d) {
+  if (typeof d === 'string') return d.slice(0,7);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+function parseISO(s) {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m-1, d);
+}
+function fmtDate(d) {
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+}
+function fmtDateShort(d) {
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+function fmtMonth(d) {
+  return d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+}
+function monthOffset(targetMonthIso, baseMonthIso) {
+  const [ty, tm] = targetMonthIso.split('-').map(Number);
+  const [by, bm] = baseMonthIso.split('-').map(Number);
+  return (ty - by) * 12 + (tm - bm);
+}
+
+// Planning anchor + window length come from BRAND_CONFIG.
+const TODAY = startOfDay(BRAND_CONFIG.window.anchorDate);
+const WINDOW_END = addDays(TODAY, BRAND_CONFIG.window.days);
+const TODAY_MONTH_ISO = isoMonth(TODAY);
+
+function currentMonthDate() {
+  const mi = state.currentMonth || TODAY_MONTH_ISO;
+  const [y, m] = mi.split('-').map(Number);
+  return new Date(y, m-1, 1);
+}
+
+// SLOT GENERATION
+
+// Counts Wed/Fri slots in `monthIso` that fall within the window.
+function countWedFriSlotsInMonth(monthIso) {
+  const [y, m] = monthIso.split('-').map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  let count = 0;
+  for (let day = 1; day <= lastDay; day++) {
+    const cur = new Date(y, m-1, day);
+    if (cur < TODAY || cur >= WINDOW_END) continue;
+    const dow = cur.getDay();
+    if (dow === 3 || dow === 5) count++;
+  }
+  return count;
+}
+
+// Counts Mondays in [TODAY, date), used to alternate T4/T5 across months.
+function countMondaysFromAnchorBefore(date) {
+  let count = 0;
+  for (let d = new Date(TODAY); d < date; d = addDays(d, 1)) {
+    if (d.getDay() === 1) count++;
+  }
+  return count;
+}
+
+// Returns the rotated division ID queue for the given month. The queue uses
+// the interleaved ROTATION_ORDER (no consecutive telecom divisions) and shifts
+// across months so divisions skipped in a short month (e.g., anchor month if
+// it has fewer than 8 Wed/Fri slots) get priority next month.
+//
+// Units flagged with activation gates in BRAND_CONFIG (e.g., Consulting in U1)
+// are excluded from auto-rotation for the first N months from anchor. Units
+// can still be added manually as triggered events in earlier months when a
+// real project lands.
+function getUnitsPausedForMonth(monthsFromAnchor) {
+  const paused = new Set();
+  for (const gate of (BRAND_CONFIG.activationGates || [])) {
+    if (monthsFromAnchor < gate.pausedThroughMonth) {
+      paused.add(gate.unitId);
+    }
+  }
+  return paused;
+}
+
+function getDivisionalQueueForMonth(monthIso) {
+  const monthsFromAnchor = monthOffset(monthIso, TODAY_MONTH_ISO);
+  const paused = getUnitsPausedForMonth(monthsFromAnchor);
+  const queue = ROTATION_ORDER.filter(id => !paused.has(id));
+  if (monthsFromAnchor <= 0) return queue;
+
+  let priorFilled = 0;
+  for (let off = 0; off < monthsFromAnchor; off++) {
+    const checkDate = new Date(TODAY.getFullYear(), TODAY.getMonth() + off, 1);
+    const checkIso = isoMonth(checkDate);
+    const wfSlots = countWedFriSlotsInMonth(checkIso);
+    const priorPaused = getUnitsPausedForMonth(off);
+    const priorQueueLen = ROTATION_ORDER.length - priorPaused.size;
+    priorFilled += Math.min(wfSlots, priorQueueLen);
+  }
+  const rotation = priorFilled % queue.length;
+  return queue.slice(rotation).concat(queue.slice(0, rotation));
+}
+
+// Scheduled posts in `monthIso`. Standard: each of the 8 divisions gets 1 post
+// per month (split across Wed + Fri); Mondays carry cross-divisional T4/T5
+// alternating. If a month has more Wed+Fri slots than divisions (e.g., July
+// with 10 slots), the surplus slots are left empty for manual fill. If a
+// month has fewer (e.g., June from Mon 8 anchor has 6 slots), the remaining
+// divisions roll over to next month.
+function generateScheduledSlots(monthIso) {
+  if (monthOffset(monthIso, TODAY_MONTH_ISO) < 0) return [];
+  const [y, m] = monthIso.split('-').map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+
+  // Collect chronological Mon and Wed+Fri dates in this month within window.
+  const monDates = [];
+  const wfDates = [];
+  for (let day = 1; day <= lastDay; day++) {
+    const cur = new Date(y, m-1, day);
+    if (cur < TODAY || cur >= WINDOW_END) continue;
+    const dow = cur.getDay();
+    if (dow === 1) monDates.push(cur);
+    else if (dow === 3 || dow === 5) wfDates.push(cur);
+  }
+
+  const slots = [];
+
+  // Monday cross-divisional posts (T5 / T6 alternating, indexed globally).
+  // T4 retired 2026-06-08; the two surviving scheduled-cross themes are T5 and T6.
+  for (const cur of monDates) {
+    const dateIso = isoDate(cur);
+    const override = state.slotOverrides[dateIso] || {};
+    if (override.skipped) continue;
+    const monIdx = countMondaysFromAnchorBefore(cur);
+    const defaultTheme = (monIdx % 2 === 0) ? 't5' : 't6';
+    const themeId = override.themeId || defaultTheme;
+    slots.push(buildSlot({
+      date: dateIso,
+      channel: 'u1-main',
+      divisionId: null,
+      themeId,
+      isSpotlight: false,
+      isTriggered: false,
+      contentNote: override.note || null,
+      trustLineOverride: override.trustLine || ''
+    }));
+  }
+
+  // Wed/Fri divisional posts: each of 8 divisions exactly once per month
+  // until the divisions run out; surplus W/F slots stay empty. Theme defaults
+  // come from DIVISION_DEFAULT_THEME but each slot is overridable per date
+  // (state.slotOverrides) so the writer can swap a missing T1 project for a
+  // T4 or T5 capability/industry post on the same date.
+  const queue = getDivisionalQueueForMonth(monthIso);
+  const cap = Math.min(wfDates.length, queue.length);
+  for (let i = 0; i < cap; i++) {
+    const dateIso = isoDate(wfDates[i]);
+    const divId = queue[i];
+    const override = state.slotOverrides[dateIso] || {};
+    if (override.skipped) continue; // user removed this scheduled slot
+    const themeId = override.themeId || DIVISION_DEFAULT_THEME[divId] || 't4';
+    slots.push(buildSlot({
+      date: dateIso,
+      channel: 'u1-main',
+      divisionId: divId,
+      themeId,
+      isSpotlight: false,
+      isTriggered: false,
+      contentNote: override.note || null,
+      trustLineOverride: override.trustLine || ''
+    }));
+  }
+
+  return slots;
+}
+
+// Canonical spotlight placement (pre-override). Places +N posts per month on
+// the spotlight division's showcase page on Tue/Thu. Hard rule: a spotlight
+// never shares a day with ANY other post — scheduled, triggered, or another
+// spotlight. Soft rule: avoid same-division ±1 day clustering with that
+// division's other posts (Wireline-Wed + Wireline-Thu = blocked).
+function generateCanonicalSpotlightSlots(monthIso) {
+  const [y, m] = monthIso.split('-').map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+
+  const spots = [
+    { divId: state.spot1Div, uplift: parseInt(state.spot1Uplift, 10) || 0 },
+    { divId: state.spot2Div, uplift: parseInt(state.spot2Uplift, 10) || 0 }
+  ].filter(s => s.divId && s.uplift > 0);
+
+  const scheduled = generateScheduledSlots(monthIso);
+  const triggered = generateTriggeredSlots(monthIso);
+
+  // Global same-day set: any date already carrying a scheduled or triggered
+  // post is off-limits for spotlights, regardless of division.
+  const globalSameDay = new Set();
+  for (const s of scheduled.concat(triggered)) globalSameDay.add(s.date);
+
+  // Per-division ±1 clustering block for spotlights of the same division.
+  const blocked = new Map(); // divId -> Set<isoDate>
+  function blockAround(divId, dateIso) {
+    if (!divId) return;
+    if (!blocked.has(divId)) blocked.set(divId, new Set());
+    const set = blocked.get(divId);
+    const d = parseISO(dateIso);
+    set.add(isoDate(addDays(d, -1)));
+    set.add(dateIso);
+    set.add(isoDate(addDays(d, 1)));
+  }
+  for (const s of scheduled.concat(triggered)) blockAround(s.divisionId, s.date);
+
+  // Global occupied set: a date already taken by a spotlight cannot host a
+  // second spotlight, regardless of division.
+  const spotlightOccupied = new Set();
+
+  const slots = [];
+  for (const sp of spots) {
+    let placed = 0;
+    for (let day = 1; day <= lastDay && placed < sp.uplift; day++) {
+      const cur = new Date(y, m-1, day);
+      if (cur < TODAY || cur >= WINDOW_END) continue;
+      const dow = cur.getDay();
+      if (dow !== 2 && dow !== 4) continue;
+      const dateIso = isoDate(cur);
+      if (globalSameDay.has(dateIso)) continue;
+      if (spotlightOccupied.has(dateIso)) continue;
+      const setForDiv = blocked.get(sp.divId);
+      if (setForDiv && setForDiv.has(dateIso)) continue;
+
+      const themeId = (placed % 2 === 0) ? 't1' : 't5';
+      slots.push(buildSlot({
+        date: dateIso,
+        channel: 'subdivision',
+        divisionId: sp.divId,
+        themeId,
+        isSpotlight: true,
+        isTriggered: false
+      }));
+      blockAround(sp.divId, dateIso);
+      spotlightOccupied.add(dateIso);
+      placed++;
+    }
+  }
+  return slots;
+}
+
+// Effective spotlight slots: canonical placements with skip / move overrides
+// applied. Each effective slot carries `canonicalDate` so override keys stay
+// stable across re-renders even after the slot has moved.
+function generateSpotlightSlots(monthIso) {
+  const canonical = generateCanonicalSpotlightSlots(monthIso);
+  const overridden = [];
+  for (const s of canonical) {
+    const ov = state.spotlightOverrides[s.date];
+    if (ov && ov.skipped) continue;
+    if (ov && ov.newDate) {
+      const newSlot = buildSlot({
+        date: ov.newDate,
+        channel: s.channel,
+        divisionId: s.divisionId,
+        themeId: s.themeId,
+        isSpotlight: true,
+        isTriggered: false
+      });
+      newSlot.canonicalDate = s.date;
+      overridden.push(newSlot);
+    } else {
+      s.canonicalDate = s.date;
+      overridden.push(s);
+    }
+  }
+  return overridden;
+}
+
+// Returns canonical spotlight slots whose canonical date currently has a
+// `skipped: true` override. Used by the month grid to render ghost chips
+// the user can click to restore.
+function getSkippedSpotlightSlots(monthIso) {
+  return generateCanonicalSpotlightSlots(monthIso).filter(s => {
+    const ov = state.spotlightOverrides[s.date];
+    return ov && ov.skipped === true;
+  });
+}
+
+// Triggered events: from state.triggeredEvents that fall within current month.
+function generateTriggeredSlots(monthIso) {
+  return state.triggeredEvents
+    .filter(e => isoMonth(e.date) === monthIso)
+    .map(e => buildSlot({
+      id: e.id,
+      date: e.date,
+      channel: e.themeId === 't2' ? 'u1-main' : 'u1-main',
+      divisionId: e.divisionId,
+      themeId: e.themeId,
+      isSpotlight: false,
+      isTriggered: true,
+      trustLineOverride: e.trustLine,
+      note: e.note
+    }));
+}
+
+function buildSlot(src) {
+  const theme = THEMES.find(t => t.id === src.themeId);
+  const div = src.divisionId ? DIVISIONS.find(d => d.id === src.divisionId) : null;
+  return {
+    id: src.id || (src.date + '-' + src.channel + '-' + (src.divisionId || 'x') + '-' + src.themeId + '-' + (src.isSpotlight ? 'sp' : 's')),
+    date: src.date,
+    dateObj: parseISO(src.date),
+    channel: src.channel,
+    divisionId: src.divisionId,
+    divisionName: div ? div.name : 'Cross-divisional',
+    divisionAbbr: div ? div.abbr : 'XD',
+    divisionTier: div ? div.tier : null,
+    themeId: src.themeId,
+    themeNum: theme.num,
+    themeName: theme.name,
+    themeBehavior: theme.behavior,
+    themeScope: theme.scope,
+    tagline: theme.tagline,
+    trustLine: src.trustLineOverride || theme.trustLine,
+    u1Way: theme.u1Way,
+    signature: BODY_SIGNATURE,
+    isSpotlight: !!src.isSpotlight,
+    isTriggered: !!src.isTriggered,
+    note: src.note || src.contentNote || null
+  };
+}
+
+function getAllSlotsForMonth(monthIso) {
+  const slots = [
+    ...generateScheduledSlots(monthIso),
+    ...generateSpotlightSlots(monthIso),
+    ...generateTriggeredSlots(monthIso)
+  ];
+  slots.sort((a, b) => {
+    if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+    return a.themeNum - b.themeNum;
+  });
+  return slots;
+}
+
+function getAllSlotsInWindow() {
+  // Used for theme view: aggregate all 3 months
+  const months = new Set();
+  for (let d = new Date(TODAY); d < WINDOW_END; d.setMonth(d.getMonth()+1)) {
+    months.add(isoMonth(d));
+  }
+  months.add(isoMonth(TODAY));
+  // Only add the WINDOW_END month if the window ends mid-month; when it ends on
+  // the 1st (e.g. days=183 -> 1 Dec) the prior month is the true last month.
+  if (WINDOW_END.getDate() !== 1) months.add(isoMonth(WINDOW_END));
+  const all = [];
+  for (const mi of months) all.push(...getAllSlotsForMonth(mi));
+  return all;
+}
+
+// Render: month grid
+
+function renderMonthGrid() {
+  const cur = currentMonthDate();
+  document.getElementById('month-label').textContent = fmtMonth(cur);
+
+  // Update quarterly anchor banner based on the current month
+  const anchor = getQuarterlyAnchorFor(cur);
+  document.getElementById('qb-q-tag').textContent = anchor.q;
+  document.getElementById('qb-label').textContent = anchor.label;
+  document.getElementById('qb-desc').textContent = anchor.desc;
+
+  // Weekday header (Mon-Sun)
+  const wdHeader = document.getElementById('weekday-header');
+  const wdLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  wdHeader.innerHTML = wdLabels.map((w, i) => {
+    const weekend = i >= 5 ? 'weekend' : '';
+    return `<div class="wd ${weekend}">${w}</div>`;
+  }).join('');
+
+  // Determine the Monday before-or-equal-to the 1st of the month
+  const first = new Date(cur);
+  const firstDow = first.getDay(); // 0=Sun, 1=Mon
+  const offset = (firstDow + 6) % 7; // days back to Monday
+  const gridStart = addDays(first, -offset);
+
+  // 6 weeks × 7 days = 42 cells (standard month grid)
+  const slots = getAllSlotsForMonth(isoMonth(cur));
+  const slotsByDate = new Map();
+  for (const s of slots) {
+    if (!slotsByDate.has(s.date)) slotsByDate.set(s.date, []);
+    slotsByDate.get(s.date).push(s);
+  }
+  // Skipped spotlights → ghost chips keyed by canonical date.
+  const skippedSpotlightsByDate = new Map();
+  for (const s of getSkippedSpotlightSlots(isoMonth(cur))) {
+    if (!skippedSpotlightsByDate.has(s.date)) skippedSpotlightsByDate.set(s.date, []);
+    skippedSpotlightsByDate.get(s.date).push(s);
+  }
+
+  let html = '';
+  for (let i = 0; i < 42; i++) {
+    const d = addDays(gridStart, i);
+    const inMonth = d.getMonth() === cur.getMonth();
+    const isToday = isoDate(d) === isoDate(TODAY);
+    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+    const inWindow = d >= TODAY && d < WINDOW_END;
+    const classes = [
+      'day-cell',
+      inMonth ? '' : 'other-month',
+      isToday ? 'today' : '',
+      isWeekend ? 'weekend' : ''
+    ].filter(Boolean).join(' ');
+
+    const dateIso = isoDate(d);
+    const daySlots = slotsByDate.get(dateIso) || [];
+    const dayNum = d.getDate();
+
+    let chipsHtml = '';
+    for (const s of daySlots) {
+      const themeOn = state.themes[s.themeId];
+      chipsHtml += renderChip(s, themeOn);
+    }
+
+    const dataAttrs = inMonth && inWindow ? ` data-date="${dateIso}" data-can-add="1"` : '';
+    const hasPosts = daySlots.length > 0;
+    const hasSkipped = (state.slotOverrides[dateIso] || {}).skipped === true;
+    // − button only enables for active posts. Skipped slots show a ghost chip
+    // that the user clicks to restore.
+    const removeDisabled = hasPosts ? '' : 'disabled';
+    const actionsHtml = inMonth && inWindow
+      ? `<div class="day-actions">
+          <button class="day-add" title="Add a post on this day">+</button>
+          <button class="day-remove" title="Remove a post on this day" ${removeDisabled}>−</button>
+        </div>
+        <div class="day-remove-popup" data-popup-date="${dateIso}"></div>`
+      : '';
+
+    // Ghost chip for skipped scheduled slot (click to restore)
+    if (inMonth && inWindow && hasSkipped) {
+      const ghost = getOriginalScheduledFor(dateIso);
+      if (ghost) chipsHtml += renderGhostChip(ghost, 'scheduled');
+    }
+    // Ghost chips for skipped spotlights on this day (click to restore)
+    if (inMonth && inWindow && skippedSpotlightsByDate.has(dateIso)) {
+      for (const ghost of skippedSpotlightsByDate.get(dateIso)) {
+        chipsHtml += renderGhostChip(ghost, 'spotlight');
+      }
+    }
+    html += `<div class="${classes}"${dataAttrs}>
+      ${actionsHtml}
+      <div class="dn">${dayNum}</div>
+      ${chipsHtml}
+    </div>`;
+  }
+  document.getElementById('month-grid').innerHTML = html;
+
+  // Bind cell clicks: cell click opens detail for the first post on that day.
+  document.querySelectorAll('.day-cell[data-can-add]').forEach(cell => {
+    cell.addEventListener('click', (e) => {
+      // Chip, action buttons, and popup all handle their own clicks.
+      if (e.target.closest('.chip')) return;
+      if (e.target.closest('.day-actions')) return;
+      if (e.target.closest('.day-remove-popup')) return;
+
+      const dateIso = cell.dataset.date;
+      const monthIso = isoMonth(currentMonthDate());
+      const allSlots = getAllSlotsForMonth(monthIso);
+      const onThisDay = allSlots.filter(s => s.date === dateIso);
+      if (onThisDay.length === 0) {
+        // Empty day: open add modal
+        openAddPostFlow(dateIso);
+      } else {
+        // Open detail for the first scheduled (U1 Main, non-spotlight, non-triggered)
+        // post on the day; fall back to first available if none.
+        const primary = onThisDay.find(s => !s.isSpotlight && !s.isTriggered) || onThisDay[0];
+        openDetailPanel(primary);
+      }
+    });
+  });
+
+  // Bind chip clicks (specific post detail). Ghost chips have their own handler below.
+  document.querySelectorAll('.chip:not(.chip-ghost)').forEach(chip => {
+    chip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const sid = chip.dataset.sid;
+      const monthIso = isoMonth(currentMonthDate());
+      const allSlots = getAllSlotsForMonth(monthIso);
+      const slot = allSlots.find(s => s.id === sid);
+      if (slot) openDetailPanel(slot);
+    });
+  });
+
+  // Bind ghost-chip clicks (restore skipped slot)
+  document.querySelectorAll('.chip.chip-ghost').forEach(chip => {
+    chip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const d = chip.dataset.restoreDate;
+      const type = chip.dataset.restoreType || 'scheduled';
+      if (type === 'spotlight') {
+        if (state.spotlightOverrides[d]) delete state.spotlightOverrides[d];
+      } else {
+        if (state.slotOverrides[d]) {
+          delete state.slotOverrides[d].skipped;
+          if (Object.keys(state.slotOverrides[d]).length === 0) delete state.slotOverrides[d];
+        }
+      }
+      saveState();
+      renderAll();
+    });
+  });
+
+  // Bind + buttons
+  document.querySelectorAll('.day-actions .day-add').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeAllRemovePopups();
+      const cell = btn.closest('.day-cell');
+      openAddPostFlow(cell.dataset.date);
+    });
+  });
+
+  // Bind − buttons
+  document.querySelectorAll('.day-actions .day-remove').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (btn.hasAttribute('disabled')) return;
+      const cell = btn.closest('.day-cell');
+      const popup = cell.querySelector('.day-remove-popup');
+      if (popup.classList.contains('open')) {
+        popup.classList.remove('open');
+      } else {
+        closeAllRemovePopups();
+        openRemovePopup(popup, cell.dataset.date);
+      }
+    });
+  });
+
+  // Stats
+  document.getElementById('stat-count').textContent = String(slots.length);
+  const divs = new Set();
+  for (const s of slots) if (s.divisionId) divs.add(s.divisionId);
+  document.getElementById('stat-divs').textContent = divs.size + ' / 8';
+}
+
+// Returns the slot that WOULD be scheduled for this date if it were not
+// skipped. Used to render a "ghost" chip on days where the user previously
+// skipped a scheduled post, so they can click the ghost to restore.
+function getOriginalScheduledFor(dateIso) {
+  const ov = state.slotOverrides[dateIso];
+  if (!ov || !ov.skipped) return null;
+  // Temporarily clear the skip flag, regenerate the month's scheduled slots,
+  // find the slot for this date, then restore the flag.
+  delete ov.skipped;
+  const monthIso = isoMonth(parseISO(dateIso));
+  const all = generateScheduledSlots(monthIso);
+  ov.skipped = true;
+  return all.find(s => s.date === dateIso) || null;
+}
+
+function renderGhostChip(slot, type) {
+  const label = slot.divisionId ? slot.divisionAbbr : 'CROSS';
+  const restoreType = type || 'scheduled';
+  const tag = restoreType === 'spotlight'
+    ? `Skipped spotlight: ${slot.themeName} for ${slot.divisionName}. Click to restore.`
+    : `Skipped: ${slot.themeName} for ${slot.divisionName}. Click to restore.`;
+  const spotMark = restoreType === 'spotlight' ? '<span class="csp" style="opacity:0.55;">SPOT</span>' : '';
+  return `<div class="chip chip-ghost chip-${slot.themeId}" data-restore-date="${escapeHtml(slot.date)}" data-restore-type="${restoreType}" title="${escapeHtml(tag)}">
+    <span class="cname">${escapeHtml(label)}</span>
+    ${spotMark}
+    <span class="ghost-icon">↺</span>
+  </div>`;
+}
+
+function closeAllRemovePopups() {
+  document.querySelectorAll('.day-remove-popup.open').forEach(p => p.classList.remove('open'));
+}
+
+function openRemovePopup(popupEl, dateIso) {
+  const monthIso = isoMonth(currentMonthDate());
+  const allSlots = getAllSlotsForMonth(monthIso);
+  const onThisDay = allSlots.filter(s => s.date === dateIso);
+
+  if (onThisDay.length === 0) {
+    popupEl.innerHTML = `<div class="rp-title">Nothing to remove</div>`;
+    popupEl.classList.add('open');
+    return;
+  }
+
+  let inner = `<div class="rp-title">Remove which post?</div>`;
+  for (const s of onThisDay) {
+    const cls = s.isTriggered ? 'triggered' : (s.isSpotlight ? 'spotlight' : 'scheduled');
+    const label = `${escapeHtml(s.themeName)} · ${escapeHtml(s.divisionName)}`;
+    if (s.isSpotlight) {
+      inner += `<div class="rp-item ${cls}">
+        <span class="rp-meta">${label}</span>
+        <button data-action="remove-spotlight" data-canonical="${escapeHtml(s.canonicalDate || s.date)}">Remove</button>
+      </div>`;
+    } else if (s.isTriggered) {
+      inner += `<div class="rp-item ${cls}">
+        <span class="rp-meta">${label}</span>
+        <button data-action="remove-triggered" data-id="${escapeHtml(s.id)}">Remove</button>
+      </div>`;
+    } else {
+      inner += `<div class="rp-item ${cls}">
+        <span class="rp-meta">${label}</span>
+        <button data-action="skip-scheduled" data-date="${escapeHtml(s.date)}">Skip</button>
+      </div>`;
+    }
+  }
+  inner += `<div class="rp-hint">Skipped scheduled and spotlight slots show a strikethrough ghost chip on the calendar. Click the ghost to restore.</div>`;
+
+  popupEl.innerHTML = inner;
+  popupEl.classList.add('open');
+
+  popupEl.querySelectorAll('button[data-action="remove-triggered"]').forEach(b => {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      removeTriggeredEvent(b.dataset.id);
+      closeAllRemovePopups();
+      renderAll();
+    });
+  });
+  popupEl.querySelectorAll('button[data-action="skip-scheduled"]').forEach(b => {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const d = b.dataset.date;
+      if (!state.slotOverrides[d]) state.slotOverrides[d] = {};
+      state.slotOverrides[d].skipped = true;
+      saveState();
+      closeAllRemovePopups();
+      renderAll();
+    });
+  });
+  popupEl.querySelectorAll('button[data-action="remove-spotlight"]').forEach(b => {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const canonical = b.dataset.canonical;
+      state.spotlightOverrides[canonical] = { skipped: true };
+      saveState();
+      closeAllRemovePopups();
+      renderAll();
+    });
+  });
+}
+
+// Click outside any popup closes them all
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.day-remove-popup')) return;
+  if (e.target.closest('.day-actions .day-remove')) return;
+  closeAllRemovePopups();
+});
+
+function renderChip(slot, themeOn) {
+  const cls = ['chip', 'chip-' + slot.themeId];
+  if (!themeOn) cls.push('dimmed');
+  const spotMark = slot.isSpotlight ? '<span class="csp">SPOT</span>' : '';
+  const trigMark = slot.isTriggered ? '<span class="csp" style="background:white; color:#5D3B7A;">EVT</span>' : '';
+  const label = slot.divisionId ? slot.divisionAbbr : 'CROSS';
+  return `<div class="${cls.join(' ')}" data-sid="${escapeHtml(slot.id)}" title="${escapeHtml(slot.themeName)} for ${escapeHtml(slot.divisionName)}">
+    <span class="cname">${escapeHtml(label)}</span>
+    ${spotMark}${trigMark}
+  </div>`;
+}
+
+function getTrustName(letter) {
+  const v = TRUST_VALUES.find(t => t.letter === letter);
+  return v ? v.name : letter;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+// Render: theme view
+
+function renderThemeView() {
+  const root = document.getElementById('view-theme');
+  const all = getAllSlotsInWindow();
+  let html = '';
+  for (const t of THEMES) {
+    const tSlots = all.filter(s => s.themeId === t.id);
+    const visible = state.themes[t.id];
+    const dim = visible ? '' : 'dimmed';
+    const behaviorPill = t.behavior === 'triggered'
+      ? '<span class="behavior-pill triggered">EVENT-DRIVEN</span>'
+      : '<span class="behavior-pill">SCHEDULED</span>';
+    html += `<div class="theme-section ${t.id} ${dim}">`;
+    html += `<h2>${escapeHtml(t.name)} ${behaviorPill}</h2>`;
+    html += `<div class="tmeta"><span class="count">${tSlots.length}</span> in 6-month window · scope: <strong>${t.scope === 'cross' ? 'cross-divisional' : 'divisional'}</strong> · tagline: <em>"${escapeHtml(t.tagline)}"</em> · U1 Way: ${t.u1Way ? 'yes' : 'no'}</div>
+      <div style="font-size: 12px; color: var(--ink-soft); margin-bottom: 12px; padding: 8px 10px; background: var(--panel-2); border-left: 3px solid var(--${t.id}); border-radius: 3px;"><strong>TRUST line in body:</strong> <em>"${escapeHtml(t.trustLine)}"</em></div>`;
+    if (tSlots.length === 0) {
+      const emptyMsg = t.behavior === 'triggered'
+        ? 'No events queued yet. Add when a real event lands (use the sidebar buttons).'
+        : 'No posts in the window yet.';
+      html += `<div style="font-size:12.5px; color:var(--mute); padding:8px 0; font-style:italic;">${emptyMsg}</div>`;
+    } else {
+      html += `<div class="dates-grid">`;
+      for (const s of tSlots) {
+        const spotTag = s.isSpotlight ? ' · SPOT' : '';
+        const trigTag = s.isTriggered ? ' · EVENT' : '';
+        html += `<div class="dcard" data-sid="${escapeHtml(s.id)}" style="border-left-color: var(--${s.themeId});">
+          <div class="d">${escapeHtml(fmtDate(s.dateObj))}${spotTag}${trigTag}</div>
+          <div class="dv">${escapeHtml(s.divisionName)} · ${s.channel === 'u1-main' ? 'U1 Main' : 'subdivision page'}</div>
+        </div>`;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+  }
+  root.innerHTML = html;
+
+  root.querySelectorAll('.dcard').forEach(card => {
+    card.addEventListener('click', () => {
+      const sid = card.dataset.sid;
+      const all = getAllSlotsInWindow();
+      const slot = all.find(s => s.id === sid);
+      if (slot) {
+        // Jump to that month and open detail
+        state.currentMonth = isoMonth(slot.dateObj);
+        saveState();
+        renderMonthGrid();
+        openDetailPanel(slot);
+      }
+    });
+  });
+}
+
+// DETAIL PANEL
+
+const detailOverlay = document.getElementById('detail-overlay');
+const detailFooter = document.getElementById('detail-footer');
+
+function openDetailPanel(slot) {
+  document.getElementById('dh-title').textContent =
+    slot.themeName;
+  document.getElementById('dh-date').textContent =
+    fmtDate(slot.dateObj) + ' · ' + (slot.channel === 'u1-main' ? 'U1 Main' : slot.divisionName + ' page');
+
+  const body = document.getElementById('detail-body');
+
+  const channelBadge = slot.channel === 'u1-main' ? 'U1 Main flagship page' : slot.divisionName + ' showcase page';
+  const spotBadge = slot.isSpotlight ? ' · <strong style="color:var(--u1-orange);">SPOTLIGHT extra</strong>' : '';
+  const trigBadge = slot.isTriggered ? ' · <strong style="color:var(--t2);">EVENT-TRIGGERED</strong>' : '';
+
+  // Theme editor: scheduled (non-spotlight, non-triggered) slots get a dropdown
+  // so writer can swap T1 for T4 or T5 (or any theme) when project content
+  // is absent for that division. The "default" shown below the dropdown is the
+  // division's baked default, not the current slot theme.
+  const isEditable = !slot.isSpotlight && !slot.isTriggered;
+  let defaultThemeId, alternatives;
+  if (isEditable) {
+    if (slot.divisionId) {
+      defaultThemeId = DIVISION_DEFAULT_THEME[slot.divisionId] || 't1';
+      alternatives = DIVISION_THEME_ALTERNATIVES[slot.divisionId] || [];
+    } else {
+      // Cross-divisional Monday: default alternates T5/T6 by Monday index (T4 retired 2026-06-08)
+      const monIdx = countMondaysFromAnchorBefore(slot.dateObj);
+      defaultThemeId = (monIdx % 2 === 0) ? 't5' : 't6';
+      alternatives = [(defaultThemeId === 't5') ? 't6' : 't5'];
+    }
+  }
+  const defaultTheme = isEditable ? THEMES.find(t => t.id === defaultThemeId) : null;
+  const defaultLabel = defaultTheme ? defaultTheme.name : '';
+  const divisionLabel = slot.divisionId ? slot.divisionName : 'this Monday cross-divisional slot';
+
+  const alternativesHtml = isEditable && alternatives.length > 0
+    ? `<div class="theme-alternatives">
+        <span class="alt-label">Alternatives:</span>
+        ${alternatives.map(altId => {
+          const altTheme = THEMES.find(t => t.id === altId);
+          const isActive = slot.themeId === altId;
+          return `<button class="alt-chip ${isActive ? 'active' : ''}" data-alt-theme="${altId}" data-date="${escapeHtml(slot.date)}" ${isActive ? 'disabled' : ''}>
+            <span class="dot" style="background:var(--${altId});"></span>${escapeHtml(altTheme.name)}
+          </button>`;
+        }).join('')}
+      </div>`
+    : '';
+
+  const themeDropdownHtml = isEditable
+    ? `<div class="section">
+        <div class="sec-title">Theme assigned · editable for this slot</div>
+        <select id="slot-theme-select" style="width:100%; padding:8px 10px; font-family:inherit; font-size:13px; border:1.5px solid var(--rule); border-radius:4px; background:white;">
+          ${THEMES.map(t => `<option value="${t.id}" ${slot.themeId === t.id ? 'selected' : ''}>${escapeHtml(t.name)} (${t.behavior})</option>`).join('')}
+        </select>
+        ${alternativesHtml}
+        <div style="font-size:11px; color:var(--mute); margin-top:8px; line-height:1.45;">
+          Default for ${escapeHtml(divisionLabel)} is <strong>${escapeHtml(defaultLabel)}</strong>. The default does not change when you pick a different theme for this slot. Use "Revert to default" in the footer to return to it.
+        </div>
+      </div>`
+    : '';
+
+  // Content note: optional topic / angle / project name for this specific slot
+  const noteFieldHtml = isEditable
+    ? `<div class="section">
+        <div class="sec-title">Content note · what this specific post covers</div>
+        <textarea id="slot-note-input" rows="2" style="width:100%; padding:8px 10px; font-family:inherit; font-size:13px; border:1.5px solid var(--rule); border-radius:4px; resize:vertical; min-height:50px;" placeholder="e.g., ${escapeHtml(getModalNoteExample(slot.themeId, slot.divisionId))}">${escapeHtml(slot.note || '')}</textarea>
+      </div>`
+    : (slot.note
+      ? `<div class="section">
+          <div class="sec-title">${slot.isTriggered ? 'Event note' : 'Content note'}</div>
+          <div class="sec-content italic">${escapeHtml(slot.note)}</div>
+        </div>`
+      : '');
+
+  body.innerHTML = `
+    <div class="section">
+      <div class="theme-strip" style="background: var(--${slot.themeId});">
+        <span>${escapeHtml(slot.themeName)}</span>
+        <span style="margin-left:auto; font-size:10px; letter-spacing:0.16em; text-transform:uppercase; opacity:0.85;">
+          ${slot.themeBehavior}
+        </span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sec-title">Channel + division</div>
+      <div class="sec-content">
+        ${escapeHtml(channelBadge)}${spotBadge}${trigBadge}<br/>
+        <strong>${escapeHtml(slot.divisionName)}</strong>${slot.divisionTier ? ' · <span style="color:var(--mute);">' + escapeHtml(slot.divisionTier) + ' tier</span>' : ' · <span style="color:var(--mute);">cross-divisional</span>'}
+      </div>
+    </div>
+
+    ${themeDropdownHtml}
+
+    ${noteFieldHtml}
+
+    ${(isEditable && !slot.divisionId) ? `<div class="section">${renderCrossDivisionExamples()}</div>` : ''}
+
+    <div class="section">
+      <div class="sec-title">Visual surface tagline</div>
+      <div class="sec-content italic">"${escapeHtml(slot.tagline)}"</div>
+    </div>
+
+    <div class="section">
+      <div class="sec-title">Layer 2 · TRUST line (writer-authored, per post)</div>
+      ${isEditable
+        ? `<textarea id="slot-trust-input" rows="2" style="width:100%; padding:8px 10px; font-family:inherit; font-size:13px; border:1.5px solid var(--rule); border-radius:4px; resize:vertical; min-height:48px;" placeholder="Name 1 or 2 TRUST values that fit this specific post. e.g., 'Safety on every drop. Responsibility for the asset that lasts.'">${escapeHtml(slot.trustLine || '')}</textarea>
+        <div style="font-size:11px; color:var(--mute); margin-top:6px; line-height:1.45;">Writer authors per post. TRUST values: T(raining) R(esponsibility) U(nderstanding) S(afety) T(eamwork). Integrate naturally with the post content; do not stamp boilerplate.</div>`
+        : `<div class="body-close-quote" style="background: var(--panel-2); border-left-color: var(--accent); color: var(--ink-soft);">"${escapeHtml(slot.trustLine || '(none authored)')}"</div>
+        <div style="font-size:11px; color:var(--mute); margin-top:6px; line-height:1.4;">Authored when the event was added.</div>`
+      }
+    </div>
+
+    <div class="section">
+      <div class="sec-title">Layer 3 · U1 Way method</div>
+      <div class="sec-content">
+        ${slot.u1Way
+          ? '<span class="u1way-flag">Applies · structure · coordination · accountability</span>'
+          : '<span class="u1way-flag off">Not applicable to this theme</span>'}
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sec-title">Layer 1 · Body close (locked)</div>
+      <div class="body-close-quote">"${escapeHtml(slot.signature)}"</div>
+    </div>
+
+    <div class="section">
+      <div class="sec-title">Hashtag taxonomy</div>
+      <div class="sec-content" style="color:var(--mute); font-size:12px; line-height:1.5;">Full hashtag system + 8-10 worked subdivision examples — separate Marketing deliverable post-strategy-lock. Each post will carry the agreed hashtag set when the taxonomy lands.</div>
+    </div>
+  `;
+
+  // Wire up live editing for scheduled slots
+  if (isEditable) {
+    const dateIso = slot.date;
+    const setTheme = (newThemeId) => {
+      if (!state.slotOverrides[dateIso]) state.slotOverrides[dateIso] = {};
+      state.slotOverrides[dateIso].themeId = newThemeId;
+      saveState();
+      renderMonthGrid();
+      const updated = getAllSlotsForMonth(isoMonth(currentMonthDate())).find(s => s.date === dateIso && !s.isSpotlight && !s.isTriggered);
+      if (updated) openDetailPanel(updated);
+    };
+    document.getElementById('slot-theme-select').addEventListener('change', (e) => {
+      setTheme(e.target.value);
+    });
+    document.querySelectorAll('.theme-alternatives .alt-chip').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (btn.hasAttribute('disabled')) return;
+        setTheme(btn.dataset.altTheme);
+      });
+    });
+    document.getElementById('slot-note-input').addEventListener('input', (e) => {
+      const val = e.target.value;
+      if (!state.slotOverrides[dateIso]) state.slotOverrides[dateIso] = {};
+      state.slotOverrides[dateIso].note = val;
+      saveState();
+    });
+    const trustInput = document.getElementById('slot-trust-input');
+    if (trustInput) {
+      trustInput.addEventListener('input', (e) => {
+        const val = e.target.value;
+        if (!state.slotOverrides[dateIso]) state.slotOverrides[dateIso] = {};
+        state.slotOverrides[dateIso].trustLine = val;
+        saveState();
+      });
+    }
+  }
+
+  // Footer actions
+  if (slot.isTriggered) {
+    detailFooter.innerHTML = `
+      <button id="edit-triggered" data-id="${escapeHtml(slot.id)}">Edit event</button>
+      <button class="danger" id="remove-triggered" data-id="${escapeHtml(slot.id)}">Remove</button>
+    `;
+    document.getElementById('edit-triggered').addEventListener('click', () => {
+      closeDetailPanel();
+      openEditTriggeredEvent(slot.id);
+    });
+    document.getElementById('remove-triggered').addEventListener('click', () => {
+      removeTriggeredEvent(slot.id);
+      closeDetailPanel();
+      renderAll();
+    });
+  } else if (isEditable) {
+    detailFooter.innerHTML = `
+      <button id="slot-revert" data-date="${escapeHtml(slot.date)}">Revert to default</button>
+      <button id="detail-close-2">Close</button>
+    `;
+    document.getElementById('slot-revert').addEventListener('click', () => {
+      const d = document.getElementById('slot-revert').dataset.date;
+      delete state.slotOverrides[d];
+      saveState();
+      renderMonthGrid();
+      const updated = getAllSlotsForMonth(isoMonth(currentMonthDate())).find(s => s.date === d && !s.isSpotlight && !s.isTriggered);
+      if (updated) openDetailPanel(updated);
+    });
+    document.getElementById('detail-close-2').addEventListener('click', closeDetailPanel);
+  } else if (slot.isSpotlight) {
+    const canonical = slot.canonicalDate || slot.date;
+    // Constrain Move to within the canonical date's month so the moved slot
+    // doesn't orphan across month boundaries (spotlights are generated per
+    // canonical month).
+    const canonicalDateObj = parseISO(canonical);
+    const monthFirst = new Date(canonicalDateObj.getFullYear(), canonicalDateObj.getMonth(), 1);
+    const monthLast = new Date(canonicalDateObj.getFullYear(), canonicalDateObj.getMonth() + 1, 0);
+    const minBound = monthFirst < TODAY ? TODAY : monthFirst;
+    const maxBound = monthLast > addDays(WINDOW_END, -1) ? addDays(WINDOW_END, -1) : monthLast;
+    const minDate = isoDate(minBound);
+    const maxDate = isoDate(maxBound);
+    detailFooter.innerHTML = `
+      <label for="spot-move-date" style="font-size:11px; color:var(--mute); margin-right:6px;">Move to</label>
+      <input type="date" id="spot-move-date" value="${escapeHtml(slot.date)}" min="${minDate}" max="${maxDate}" style="padding:6px 8px; font-family:inherit; font-size:12.5px; border:1.5px solid var(--rule); border-radius:4px; margin-right:8px;" title="Within the canonical month only" />
+      <button id="spot-move" data-canonical="${escapeHtml(canonical)}">Move</button>
+      <button class="danger" id="spot-remove" data-canonical="${escapeHtml(canonical)}">Remove</button>
+      <button id="detail-close-2">Close</button>
+    `;
+    document.getElementById('spot-move').addEventListener('click', () => {
+      const newDate = document.getElementById('spot-move-date').value;
+      if (!newDate) return;
+      if (newDate === slot.date) return; // no-op move
+      if (newDate !== canonical) {
+        // Same-day collision check: a spotlight cannot share a day with any
+        // other post (scheduled, triggered, or another spotlight).
+        const monthIso = isoMonth(parseISO(newDate));
+        const monthScheduled = generateScheduledSlots(monthIso);
+        const monthTriggered = generateTriggeredSlots(monthIso);
+        const monthSpotlights = generateSpotlightSlots(monthIso);
+        const collision = [
+          ...monthScheduled,
+          ...monthTriggered,
+          ...monthSpotlights.filter(s => (s.canonicalDate || s.date) !== canonical)
+        ].find(s => s.date === newDate);
+        if (collision) {
+          alert('Cannot move to ' + newDate + ': day already has ' + collision.themeName + ' for ' + collision.divisionName + '. Pick a different date.');
+          return;
+        }
+      }
+      if (newDate === canonical) {
+        if (state.spotlightOverrides[canonical] && state.spotlightOverrides[canonical].newDate) {
+          delete state.spotlightOverrides[canonical];
+        }
+      } else {
+        state.spotlightOverrides[canonical] = { newDate };
+      }
+      saveState();
+      closeDetailPanel();
+      renderAll();
+    });
+    document.getElementById('spot-remove').addEventListener('click', () => {
+      state.spotlightOverrides[canonical] = { skipped: true };
+      saveState();
+      closeDetailPanel();
+      renderAll();
+    });
+    document.getElementById('detail-close-2').addEventListener('click', closeDetailPanel);
+  } else {
+    detailFooter.innerHTML = `<button id="detail-close-2">Close</button>`;
+    document.getElementById('detail-close-2').addEventListener('click', closeDetailPanel);
+  }
+
+  detailOverlay.classList.add('open');
+}
+function closeDetailPanel() { detailOverlay.classList.remove('open'); }
+document.getElementById('detail-close').addEventListener('click', closeDetailPanel);
+
+// Modals: add Career Arc, U1 Way, generic add
+
+const modalBackdrop = document.getElementById('modal-backdrop');
+const modalBody = document.getElementById('modal-body');
+const modalTitle = document.getElementById('modal-title');
+const modalSub = document.getElementById('modal-sub');
+const modalSave = document.getElementById('modal-save');
+
+let modalMode = null; // 'career' | 'u1way' | 'generic'
+let modalEditId = null;
+let modalState = null;
+
+function openModal({ mode, prefilledDate = null, editEvent = null }) {
+  modalMode = mode;
+  modalEditId = editEvent ? editEvent.id : null;
+  const today = isoDate(TODAY);
+  let initialThemeId;
+  if (mode === 'career') initialThemeId = 't2';
+  else if (mode === 'u1way') initialThemeId = 't3';
+  else if (mode === 'project') initialThemeId = 't1';
+  else initialThemeId = 't1'; // generic fallback
+  const initialTheme = THEMES.find(t => t.id === initialThemeId);
+  modalState = editEvent ? structuredClone(editEvent) : {
+    date: prefilledDate || today,
+    divisionId: '',
+    trustLine: initialTheme.trustLine || '',
+    note: '',
+    themeId: initialThemeId
+  };
+
+  if (mode === 'career') {
+    modalTitle.textContent = editEvent ? 'Edit Career Arc post' : 'Add Career Arc post';
+    modalSub.textContent = 'Theme 2 · event-driven · mature divisions only';
+  } else if (mode === 'u1way') {
+    modalTitle.textContent = editEvent ? 'Edit U1 Way On Site event' : 'Add U1 Way On Site event';
+    modalSub.textContent = 'Theme 3 · event-driven · any division';
+  } else if (mode === 'project') {
+    modalTitle.textContent = editEvent ? 'Edit Project Delivery post' : 'Add Project Delivery post';
+    modalSub.textContent = 'Theme 1 · project-triggered · any division';
+  } else {
+    modalTitle.textContent = 'Add custom post';
+    modalSub.textContent = 'Free-form scheduled post';
+  }
+
+  modalSave.textContent = editEvent ? 'Save changes' : 'Add to calendar';
+  renderModalBody();
+  modalBackdrop.classList.add('open');
+}
+function closeModal() {
+  modalBackdrop.classList.remove('open');
+  modalMode = null; modalEditId = null; modalState = null;
+}
+document.getElementById('modal-close').addEventListener('click', closeModal);
+document.getElementById('modal-cancel').addEventListener('click', closeModal);
+modalBackdrop.addEventListener('click', (e) => {
+  if (e.target === modalBackdrop) closeModal();
+});
+
+// Illustrative example for the "what this post covers" field, tailored to the
+// (theme, division) pair so users don't get a Fulfillment career example when
+// they're writing a Wireline project post. Shape-illustrative only; no real
+// names, no specific commercial claims.
+const MODAL_NOTE_EXAMPLES = {
+  t1: { // Project Delivery (triggered, divisional)
+    wireline:    'FTTH buildout milestone — homes-passed target hit in the current phase',
+    wireless:    'Tower swap completed on a 5G densification phase',
+    power:       'Substation energised on an accelerated build schedule',
+    water:       'Phase 2 LCRR — Discovery completed on the next batch of homes',
+    renewable:   'Utility tie-in coordinated across local utilities on a solar project',
+    datacenters: 'Power infrastructure commissioning on a hyperscale build',
+    consulting:  'Advisory engagement frame-of-reference delivered',
+    '':          'Pick a division to see a relevant Project Delivery example'
+  },
+  t2: { // Career Arc (triggered, mature only)
+    wireline: 'Wireline journeyman promoted to foreman after years on the FTTH buildout',
+    wireless: 'Tower technician promoted to site acquisition manager',
+    power:    'Substation apprentice promoted to journeyman lineman',
+    water:    'Field tech promoted to water operations lead',
+    '':       'Pick a mature-tier division (Wireline / Wireless / Power Delivery / Water)'
+  },
+  t3: { // U1 Way On Site (triggered, any tier)
+    wireline:    'Storm-response FTTH restoration completed inside 18 hours',
+    wireless:    'Tornado-area cell site rebuild completed ahead of plan',
+    power:       'Mutual-aid distribution restoration after a regional storm',
+    water:       'Emergency water main break repair coordinated overnight',
+    renewable:   'Utility-scale solar array commissioned ahead of tie-in deadline',
+    datacenters: 'Hyperscale cooling cutover completed with zero downtime',
+    fulfillment: 'Multi-region logistics surge supporting a sister-division storm response',
+    consulting:  'Cross-discipline advisory closed inside the engagement window',
+    '':          'Pick a division to see a relevant U1 Way On Site example'
+  },
+  // T4 RETIRED 2026-06-08 (council pass 2): anchored on retired lineup line #3. Modal note examples removed.
+  t5: { // From Financed Paper to Delivered Field (scheduled, cross)
+    wireline:    'Mandate-to-field — broadband program phase moving from contract to commissioned',
+    wireless:    'Mandate-to-field — 5G densification phase moving from RFP to live site',
+    power:       'Mandate-to-field — utility upgrade moving from regulator approval to energised',
+    water:       'Mandate-to-field — LCRR funding moving from federal allocation to replacement complete',
+    renewable:   'Mandate-to-field — IRA allocation moving from contract to commissioned array',
+    datacenters: 'Mandate-to-field — hyperscale contract moving from groundbreak to live power',
+    fulfillment: 'Mandate-to-field — multi-trade coordination from program approval to delivery',
+    consulting:  'Mandate-to-field — advisory engagement from frame-of-reference to action plan',
+    '':          'Mandate-to-field framing — paper milestone to delivered work'
+  },
+  t6: { // One Company, Every Utility (scheduled, cross-portfolio) — BODY ACTIVATION REQUIRED. Open to all 8 specialties per pass 2 (2026-06-08).
+    wireline:    'Wireline work for a named carrier customer; body activates "utility / useful / usefulness / the use of" before tagline (e.g., "The utility of a clean fiber pass is the customer call that never happens")',
+    wireless:    'Wireless work; body activates "the use of" or "what makes [X] useful" pattern (e.g., "What makes a small-cell network useful is the speed sites move from approved to active")',
+    power:       'Power Delivery work for a named utility customer (NextEra, ComEd, FECA, TVA, PSEG, Georgia Transmission); body activates "the utility of [substation / circuit / hardening work] is..."',
+    water:       'Water utility work; body activates "the usefulness of clean water at the tap" or "the utility of catching the leak before the street fails"',
+    renewable:   'Renewable (EV charging, solar, storage) work; body activates "the utility of a charging site to a driver" or "the usefulness of solar plus storage"',
+    datacenters: 'Data Centers work (Amazon per logo wall); body activates "the utility of a data center campus to the region around it"',
+    fulfillment: 'Fulfillment / multi-trade coordination; body activates "the utility of a clean install on day one"',
+    consulting:  'Consulting (engineering, permitting, staffing) work; body activates "the utility of a permit pack that goes through clean"',
+    '':          'Cross-portfolio post &middot; body MUST activate "utility / useful / usefulness / the use of" in older usefulness sense before tagline lands. See feedback-brand-line-body-activation-rule. Visual tag stays on every post; body does the meaning-carrying work. Downstream surfaces (OG previews, reshares) inherit context from primary publish.'
+  }
+};
+function getModalNoteExample(themeId, divisionId) {
+  const themeMap = MODAL_NOTE_EXAMPLES[themeId] || {};
+  return themeMap[divisionId || ''] || themeMap[''] || 'Free-form note for this post';
+}
+
+// Cross-division body-activation usage examples. Verbatim from the Chairman pass-2
+// deliverable (output/2026-06-08_u1_brand_voice_council/11_chairman_final_deliverable.md):
+// Part III = 28 two-division pairs (SMCM authored, ECR fixes + Chairman disposition);
+// Part IV = 3 three-division extension examples (Chairman authored). Each entry shows the
+// body-activation sentence that primes "utility / useful / usefulness / the use of" before
+// the "One Company. Every Utility." tagline lands. Pattern: same-site = one activation, shared
+// physical site; sequenced = design/scope then build/execute. See feedback-brand-line-body-activation-rule.
+const CROSS_DIVISION_EXAMPLES = {
+  pairs: [
+    { d: 'Wireline + Fulfillment',        p: 'sequenced',  a: 'The utility of a fiber route only shows up when the household at the end of it gets connected on the day the carrier promised.' },
+    { d: 'Wireline + Wireless',           p: 'same-site',  a: 'A carrier site is useful when the radio is hot and the backhaul behind it is lit the same week.' },
+    { d: 'Wireline + Data Centers',       p: 'same-site',  a: 'The utility of a hyperscale campus is measured in latency, redundancy, and the date the floor goes live.' },
+    { d: 'Wireline + Power Delivery',     p: 'same-site',  a: 'The utility of fiber paired with substation power is what a hyperscale build needs on one timeline.' },
+    { d: 'Wireline + Water',              p: 'same-site',  a: 'The use of one dig for two utilities is what cities ask us to coordinate.' },
+    { d: 'Wireline + Renewable',          p: 'same-site',  a: 'The utility of generation depends on the data path back to control.' },
+    { d: 'Wireline + Consulting',         p: 'sequenced',  a: 'Fiber is useful when the route is legal, accessible, and crewed on the same calendar.' },
+    { d: 'Fulfillment + Wireless',        p: 'sequenced',  a: 'The utility of fixed wireless to a household is one number: did the service work on the day the family signed up.' },
+    { d: 'Fulfillment + Data Centers',    p: 'sequenced',  a: 'The utility of a data center is uptime, and uptime depends on someone being on-site when something breaks.' },
+    { d: 'Fulfillment + Power Delivery',  p: 'same-site',  a: 'The utility of the grid to a member is what happens between the pole and the panel.' },
+    { d: 'Fulfillment + Water',           p: 'same-site',  a: 'The utility of a meter program to a city is residents not calling council about it.' },
+    { d: 'Fulfillment + Renewable',       p: 'sequenced',  a: 'The utility of EV infrastructure is measured in working stalls per day.' },
+    { d: 'Fulfillment + Consulting',      p: 'sequenced',  a: 'The use of a national program comes down to the daily count of completed jobs against a plan that holds.' },
+    { d: 'Wireless + Data Centers',       p: 'same-site',  a: 'The utility of a tower site to a hyperscaler is what compute can be hosted at it.' },
+    { d: 'Wireless + Power Delivery',     p: 'same-site',  a: "When you measure a tower's utility in megawatts, the upgrade story is not just the radio." },
+    { d: 'Wireless + Water',              p: 'same-site',  a: 'The utility of coordinated civil work is the corridor only closing once.' },
+    { d: 'Wireless + Renewable',          p: 'same-site',  a: 'The utility of off-grid radio infrastructure depends on the solar and storage behind it being sized, installed, and maintained as one system.' },
+    { d: 'Wireless + Consulting',         p: 'sequenced',  a: 'Tower programs are useful when the calendar holds where it meets the ground.' },
+    { d: 'Data Centers + Power Delivery', p: 'same-site',  a: 'The utility of a hyperscale campus is measured in megawatts delivered to the floor.' },
+    { d: 'Data Centers + Water',          p: 'same-site',  a: 'The utility of a campus depends on the water system behind it being sized, installed, and commissioned with the same care as the power and the fiber.' },
+    { d: 'Data Centers + Renewable',      p: 'same-site',  a: 'The utility of paired generation is the load and the supply landing on one operational timeline.' },
+    { d: 'Data Centers + Consulting',     p: 'sequenced',  a: 'The utility of a hyperscale portfolio is measured in the date each campus actually lights up.' },
+    { d: 'Power Delivery + Water',        p: 'same-site',  a: 'The utility of coordinated underground work is what residents do not have to live through twice.' },
+    { d: 'Power Delivery + Renewable',    p: 'sequenced',  a: 'The utility of new generation is zero until it interconnects.' },
+    { d: 'Power Delivery + Consulting',   p: 'sequenced',  a: 'The utility of a modernization program is what the grid actually does differently after the spend lands.' },
+    { d: 'Water + Renewable',             p: 'same-site',  a: 'What makes the project useful to the municipality is lower operating cost on the pump load with no service interruption during construction.' },
+    { d: 'Water + Consulting',            p: 'sequenced',  a: 'The utility of a city-scale program is the count of properties cleared against the federal deadline.' },
+    { d: 'Renewable + Consulting',        p: 'sequenced',  a: 'The use of an EV network to its operator is the count of sites energized against the deployment plan.' }
+  ],
+  triples: [
+    { d: 'Power Delivery + Water + Renewable',     meta: 'municipal infrastructure modernization', a: "The utility of running three utility upgrades under one program is what a city's public works director measures in resident complaints not filed, council meetings not lost to angry letters, and capital plans not re-baselined." },
+    { d: 'Wireline + Wireless + Data Centers',     meta: 'hyperscale edge integration',            a: 'The utility of integrated edge infrastructure is what a hyperscaler measures in time-to-first-workload at the new site.' },
+    { d: 'Power Delivery + Renewable + Consulting', meta: 'clean-energy program delivery',           a: "The utility of an integrated clean-energy program is what an IOU measures in megawatts on the grid against the deadlines its regulators set." }
+  ]
+};
+
+function renderCrossDivisionExamples() {
+  const pairRow = e => `<div style="padding:6px 0; border-bottom:1px solid var(--line, #eee);">
+      <div style="font-weight:600; font-size:12px;">${escapeHtml(e.d)} <span style="font-weight:400; color:var(--mute); font-size:10px;">&middot; ${escapeHtml(e.p)}</span></div>
+      <div style="font-size:11px; color:var(--mute); line-height:1.45; margin-top:2px;">${escapeHtml(e.a)}</div>
+    </div>`;
+  const tripleRow = e => `<div style="padding:6px 0; border-bottom:1px solid var(--line, #eee);">
+      <div style="font-weight:600; font-size:12px;">${escapeHtml(e.d)} <span style="font-weight:400; color:var(--mute); font-size:10px;">&middot; ${escapeHtml(e.meta)}</span></div>
+      <div style="font-size:11px; color:var(--mute); line-height:1.45; margin-top:2px;">${escapeHtml(e.a)}</div>
+    </div>`;
+  return `<details style="margin-top:6px; border:1px solid var(--line, #ddd); border-radius:6px; padding:8px 10px;">
+    <summary style="cursor:pointer; font-size:12px; font-weight:600; color:var(--ink, #1E5B8B);">Cross-division body-activation examples (Chairman pass 2) &middot; ${CROSS_DIVISION_EXAMPLES.pairs.length} pairs + ${CROSS_DIVISION_EXAMPLES.triples.length} three-division</summary>
+    <div style="font-size:11px; color:var(--mute); margin:6px 0; line-height:1.4;">For a cross-divisional post under "One Company. Every Utility.", the body must prime "utility / useful / usefulness / the use of" before the tagline. Worked activation lines per division combination, verbatim from the pass-2 deliverable:</div>
+    <div style="max-height:240px; overflow-y:auto; padding-right:4px;">
+      <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.04em; color:var(--mute); margin:4px 0 2px;">Two-division pairs</div>
+      ${CROSS_DIVISION_EXAMPLES.pairs.map(pairRow).join('')}
+      <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.04em; color:var(--mute); margin:10px 0 2px;">Three-division (one activation at meta-capability level)</div>
+      ${CROSS_DIVISION_EXAMPLES.triples.map(tripleRow).join('')}
+    </div>
+    <div style="font-size:10px; color:var(--mute); margin-top:6px; line-height:1.4;">4+ divisions: deferred (cannot carry inside natural feed-read length). Under the interim image-only rule, cross-divisional visuals use "Built to Hold." or no tagline; the body still carries the activation.</div>
+  </details>`;
+}
+
+function renderModalBody() {
+  const eligibleDivs = getEligibleDivisions(modalMode);
+  const themeOptions = modalMode === 'generic'
+    ? THEMES.filter(t => t.behavior === 'scheduled').map(t => `<option value="${t.id}" ${modalState.themeId === t.id ? 'selected' : ''}>${escapeHtml(t.name)}</option>`).join('')
+    : '';
+  const themeFieldHtml = modalMode === 'generic'
+    ? `<div class="field"><label class="fl">Theme</label><select id="m-theme">${themeOptions}</select></div>`
+    : '';
+
+  modalBody.innerHTML = `
+    <div class="field">
+      <label class="fl" for="m-date">Date</label>
+      <input type="date" id="m-date" value="${modalState.date}" min="${isoDate(TODAY)}" />
+    </div>
+    ${themeFieldHtml}
+    <div class="field">
+      <label class="fl" for="m-div">Division ${modalMode === 'career' ? '(mature tier only)' : modalMode === 'project' ? '(any division)' : ''}</label>
+      <select id="m-div">
+        <option value="">(pick division)</option>
+        ${eligibleDivs.map(d => `<option value="${d.id}" ${modalState.divisionId === d.id ? 'selected' : ''}>${escapeHtml(d.name)} (${escapeHtml(d.tier)})</option>`).join('')}
+      </select>
+    </div>
+    <div class="field">
+      <label class="fl" for="m-trustline">TRUST line (Layer 2) · surfaces in the body before the brand-heart close</label>
+      <textarea id="m-trustline" rows="2" style="resize:vertical; min-height:50px;">${escapeHtml(modalState.trustLine || '')}</textarea>
+      <div style="font-size:11px; color:var(--mute); margin-top:4px; line-height:1.4;">Default for this theme is prefilled. Edit to fit the specific event content (1 or 2 TRUST values named naturally).</div>
+    </div>
+    <div class="field">
+      <label class="fl" for="m-note">Event note (optional)</label>
+      <textarea id="m-note" placeholder="e.g., ${escapeHtml(getModalNoteExample(modalState.themeId, modalState.divisionId))}">${escapeHtml(modalState.note || '')}</textarea>
+    </div>
+    ${modalMode === 'generic' ? renderCrossDivisionExamples() : ''}
+    <div class="validation" id="m-validation"></div>
+  `;
+
+  function refreshNotePlaceholder() {
+    const el = document.getElementById('m-note');
+    if (el) el.setAttribute('placeholder', 'e.g., ' + getModalNoteExample(modalState.themeId, modalState.divisionId));
+  }
+
+  document.getElementById('m-date').addEventListener('change', e => { modalState.date = e.target.value; });
+  document.getElementById('m-div').addEventListener('change', e => {
+    modalState.divisionId = e.target.value;
+    refreshNotePlaceholder();
+  });
+  document.getElementById('m-note').addEventListener('input', e => { modalState.note = e.target.value; });
+  document.getElementById('m-trustline').addEventListener('input', e => { modalState.trustLine = e.target.value; });
+  if (document.getElementById('m-theme')) {
+    document.getElementById('m-theme').addEventListener('change', e => {
+      modalState.themeId = e.target.value;
+      // When theme changes, refresh the TRUST line default unless user already customised
+      const newTheme = THEMES.find(t => t.id === e.target.value);
+      modalState.trustLine = newTheme.trustLine;
+      document.getElementById('m-trustline').value = newTheme.trustLine;
+      refreshNotePlaceholder();
+    });
+  }
+}
+
+function getEligibleDivisions(mode) {
+  if (mode === 'career') return DIVISIONS.filter(d => CAREER_ELIGIBLE_TIERS.includes(d.tier));
+  if (mode === 'u1way') return DIVISIONS.filter(d => U1WAY_ELIGIBLE_TIERS.includes(d.tier));
+  if (mode === 'project') return DIVISIONS.filter(d => d.tier !== 'backbone'); // T1 needs a real project; Fulfillment surfaces inside other divisions
+  return DIVISIONS.filter(d => d.tier !== 'backbone');
+}
+
+modalSave.addEventListener('click', () => {
+  if (!modalState) return;
+  const validation = document.getElementById('m-validation');
+
+  if (!modalState.date) {
+    validation.textContent = 'Pick a date.';
+    validation.classList.add('show');
+    return;
+  }
+  if (!modalState.divisionId) {
+    validation.textContent = 'Pick a division.';
+    validation.classList.add('show');
+    return;
+  }
+  // Tier validation
+  const div = DIVISIONS.find(d => d.id === modalState.divisionId);
+  if (modalMode === 'career' && !CAREER_ELIGIBLE_TIERS.includes(div.tier)) {
+    validation.textContent = 'Career Arc applies to mature-tier divisions only (Wireline, Wireless, Power Delivery, Water).';
+    validation.classList.add('show');
+    return;
+  }
+
+  const event = {
+    id: modalEditId || ('e-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7)),
+    date: modalState.date,
+    themeId: modalState.themeId,
+    divisionId: modalState.divisionId,
+    trustLine: modalState.trustLine || '',
+    note: modalState.note || ''
+  };
+
+  if (modalEditId) {
+    const idx = state.triggeredEvents.findIndex(e => e.id === modalEditId);
+    if (idx >= 0) state.triggeredEvents[idx] = event;
+  } else {
+    state.triggeredEvents.push(event);
+  }
+
+  // Navigate to event's month
+  state.currentMonth = isoMonth(event.date);
+  saveState();
+  closeModal();
+  renderAll();
+});
+
+function openEditTriggeredEvent(id) {
+  const evt = state.triggeredEvents.find(e => e.id === id);
+  if (!evt) return;
+  let mode;
+  if (evt.themeId === 't1') mode = 'project';
+  else if (evt.themeId === 't2') mode = 'career';
+  else if (evt.themeId === 't3') mode = 'u1way';
+  else mode = 'generic';
+  openModal({ mode, editEvent: evt });
+}
+function removeTriggeredEvent(id) {
+  state.triggeredEvents = state.triggeredEvents.filter(e => e.id !== id);
+  saveState();
+}
+
+function openAddPostFlow(dateIso) {
+  // Generic post add for an empty cell
+  openModal({ mode: 'generic', prefilledDate: dateIso });
+}
+
+// Sidebar: triggered queue, theme filter, division selects
+
+function renderTriggeredList() {
+  const root = document.getElementById('triggered-list');
+  if (state.triggeredEvents.length === 0) {
+    root.innerHTML = `<div class="triggered-list-empty">No triggered events yet.</div>`;
+    return;
+  }
+  const sorted = [...state.triggeredEvents].sort((a, b) => a.date < b.date ? -1 : 1);
+  root.innerHTML = sorted.map(e => {
+    const theme = THEMES.find(t => t.id === e.themeId);
+    const div = DIVISIONS.find(d => d.id === e.divisionId);
+    const color = `var(--${e.themeId})`;
+    return `<div class="triggered-item" data-id="${escapeHtml(e.id)}" style="border-left-color:${color};">
+      <span class="date">${escapeHtml(fmtDateShort(parseISO(e.date)))}</span>
+      <span class="meta">${escapeHtml(theme.name)} · ${escapeHtml(div ? div.name : 'cross-div')}</span>
+      <button class="remove" data-id="${escapeHtml(e.id)}" title="Remove">✕</button>
+    </div>`;
+  }).join('');
+
+  root.querySelectorAll('.triggered-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      if (e.target.classList.contains('remove')) return;
+      openEditTriggeredEvent(item.dataset.id);
+    });
+  });
+  root.querySelectorAll('.remove').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      removeTriggeredEvent(btn.dataset.id);
+      renderAll();
+    });
+  });
+
+  document.getElementById('stat-trig').textContent = String(state.triggeredEvents.length);
+}
+
+function populateDivisionSelects() {
+  // Units listed in BRAND_CONFIG.tierFramework.spotlightExcludedTiers are
+  // excluded from the spotlight chooser. For U1: Fulfillment (backbone) is
+  // excluded because it surfaces inside every divisional spotlight as the
+  // coordination spine, not as a standalone-spotlight division.
+  const excluded = new Set(BRAND_CONFIG.tierFramework.spotlightExcludedTiers || []);
+  const spotlightEligible = DIVISIONS.filter(d => !excluded.has(d.tier));
+  const s1 = document.getElementById('spot1-div');
+  const s2 = document.getElementById('spot2-div');
+  for (const sel of [s1, s2]) {
+    while (sel.options.length > 1) sel.remove(1);
+    for (const d of spotlightEligible) {
+      const opt = document.createElement('option');
+      opt.value = d.id;
+      opt.textContent = d.name + ' (' + d.tier + ')';
+      sel.appendChild(opt);
+    }
+  }
+  s1.value = state.spot1Div;
+  s2.value = state.spot2Div;
+  document.getElementById('spot1-uplift').value = state.spot1Uplift;
+  document.getElementById('spot2-uplift').value = state.spot2Uplift;
+}
+
+function renderThemeFilter() {
+  const root = document.getElementById('theme-list');
+  root.innerHTML = THEMES.map(t => {
+    const checked = state.themes[t.id] ? 'checked' : '';
+    const behavior = t.behavior === 'triggered'
+      ? '<span class="behavior-tag triggered">EVENT</span>'
+      : '<span class="behavior-tag">SCHED</span>';
+    return `<label class="theme-check">
+      <input type="checkbox" data-theme-id="${t.id}" ${checked} />
+      <span class="theme-dot" style="background:var(--${t.id});"></span>
+      <span>${escapeHtml(t.name)}</span>
+      ${behavior}
+    </label>`;
+  }).join('');
+
+  root.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', (e) => {
+      state.themes[e.target.dataset.themeId] = e.target.checked;
+      saveState();
+      renderMonthGrid();
+      renderThemeView();
+    });
+  });
+}
+
+// CONTROLS BIND
+
+function bindControls() {
+  document.getElementById('prev-month').addEventListener('click', () => {
+    const cur = currentMonthDate();
+    cur.setMonth(cur.getMonth() - 1);
+    state.currentMonth = isoMonth(cur);
+    saveState();
+    renderMonthGrid();
+  });
+  document.getElementById('next-month').addEventListener('click', () => {
+    const cur = currentMonthDate();
+    cur.setMonth(cur.getMonth() + 1);
+    state.currentMonth = isoMonth(cur);
+    saveState();
+    renderMonthGrid();
+  });
+
+  document.querySelectorAll('.view-toggle button').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const v = e.target.dataset.view;
+      setView(v);
+    });
+  });
+
+  document.getElementById('spot1-div').addEventListener('change', e => {
+    state.spot1Div = e.target.value;
+    saveState(); renderAll();
+  });
+  document.getElementById('spot2-div').addEventListener('change', e => {
+    state.spot2Div = e.target.value;
+    saveState(); renderAll();
+  });
+  document.getElementById('spot1-uplift').addEventListener('change', e => {
+    state.spot1Uplift = parseInt(e.target.value, 10) || 0;
+    saveState(); renderAll();
+  });
+  document.getElementById('spot2-uplift').addEventListener('change', e => {
+    state.spot2Uplift = parseInt(e.target.value, 10) || 0;
+    saveState(); renderAll();
+  });
+
+  document.getElementById('add-project-btn').addEventListener('click', () => openModal({ mode: 'project' }));
+  document.getElementById('add-career-btn').addEventListener('click', () => openModal({ mode: 'career' }));
+  document.getElementById('add-u1way-btn').addEventListener('click', () => openModal({ mode: 'u1way' }));
+
+  document.getElementById('reset-btn').addEventListener('click', () => {
+    if (!confirm('Reset all selections and triggered events?')) return;
+    state = structuredClone(DEFAULT_STATE);
+    saveState();
+    populateDivisionSelects();
+    renderThemeFilter();
+    setView(state.view);
+    renderAll();
+  });
+
+  // Export state to JSON file
+  document.getElementById('export-btn').addEventListener('click', () => {
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `u1-calendar-state-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  // Import state from JSON file
+  document.getElementById('import-btn').addEventListener('click', () => {
+    document.getElementById('import-file').click();
+  });
+  document.getElementById('import-file').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const imported = JSON.parse(evt.target.result);
+        if (!confirm('Replace current state with imported JSON? Your current selections will be overwritten.')) {
+          e.target.value = '';
+          return;
+        }
+        state = { ...structuredClone(DEFAULT_STATE), ...imported };
+        if (!Array.isArray(state.triggeredEvents)) state.triggeredEvents = [];
+        if (typeof state.slotOverrides !== 'object' || state.slotOverrides === null) state.slotOverrides = {};
+        if (typeof state.spotlightOverrides !== 'object' || state.spotlightOverrides === null) state.spotlightOverrides = {};
+        saveState();
+        populateDivisionSelects();
+        renderThemeFilter();
+        setView(state.view);
+        renderAll();
+      } catch (err) {
+        alert('Import failed: invalid JSON. ' + err.message);
+      }
+      e.target.value = '';
+    };
+    reader.readAsText(file);
+  });
+}
+
+function setView(v) {
+  state.view = v;
+  saveState();
+  document.querySelectorAll('.view-toggle button').forEach(b => {
+    b.classList.toggle('active', b.dataset.view === v);
+  });
+  document.getElementById('view-grid').classList.toggle('active', v === 'grid');
+  document.getElementById('view-theme').classList.toggle('active', v === 'theme');
+  if (v === 'theme') renderThemeView();
+}
+
+// STATS
+
+function renderStats() {
+  document.getElementById('stat-window').textContent = fmtDateShort(TODAY) + ' → ' + fmtDateShort(addDays(WINDOW_END, -1));
+
+  const twoActive = state.spot1Div && state.spot2Div;
+  const heavyUplift = (parseInt(state.spot1Uplift,10)||0) + (parseInt(state.spot2Uplift,10)||0) >= 4;
+  document.getElementById('spot-warning').style.display = (twoActive && heavyUplift) ? 'block' : 'none';
+
+  document.getElementById('stat-trig').textContent = String(state.triggeredEvents.length);
+
+  // Per-subdivision tally + theme distribution for the displayed month
+  const monthIso = isoMonth(currentMonthDate());
+  const allSlots = getAllSlotsForMonth(monthIso);
+
+  // Unit tally (count posts per unit this month; include 0 for missing).
+  // Units flagged with activation gates in BRAND_CONFIG render with a "paused"
+  // label instead of a "0" miss when the displayed month is within the gate.
+  const divCount = new Map();
+  for (const d of DIVISIONS) divCount.set(d.id, 0);
+  for (const s of allSlots) {
+    if (s.divisionId && divCount.has(s.divisionId)) {
+      divCount.set(s.divisionId, divCount.get(s.divisionId) + 1);
+    }
+  }
+  const monthsFromAnchor = monthOffset(monthIso, TODAY_MONTH_ISO);
+  const pausedUnits = getUnitsPausedForMonth(monthsFromAnchor);
+  const pausedLabelByUnit = new Map();
+  for (const gate of (BRAND_CONFIG.activationGates || [])) {
+    if (pausedUnits.has(gate.unitId)) pausedLabelByUnit.set(gate.unitId, gate.label);
+  }
+  const subdivisionTallyHtml = DIVISIONS.map(d => {
+    const n = divCount.get(d.id);
+    if (pausedUnits.has(d.id) && n === 0) {
+      const label = pausedLabelByUnit.get(d.id) || 'paused';
+      return `<div style="display: flex; justify-content: space-between; align-items: center;">
+        <span style="color: var(--ink-soft);">${escapeHtml(d.name)}</span>
+        <span style="color: var(--amber); font-weight: 600; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;">${escapeHtml(label)}</span>
+      </div>`;
+    }
+    const ok = n >= 1;
+    const colour = ok ? 'var(--green)' : 'var(--mute)';
+    const weight = ok ? '700' : '500';
+    const mark = ok ? '✓' : '·';
+    return `<div style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="color: var(--ink-soft);">${escapeHtml(d.name)}</span>
+      <span style="color: ${colour}; font-weight: ${weight}; font-variant-numeric: tabular-nums;">${mark} ${n}</span>
+    </div>`;
+  }).join('');
+  document.getElementById('subdivision-tally').innerHTML = subdivisionTallyHtml;
+
+  // Update the hint above the tally to reflect any active activation gates.
+  const tallyHint = document.getElementById('subdivision-tally-hint');
+  if (tallyHint) {
+    const totalUnits = DIVISIONS.length;
+    const activeUnits = totalUnits - pausedUnits.size;
+    if (pausedUnits.size > 0) {
+      const pausedNames = Array.from(pausedUnits)
+        .map(id => DIVISIONS.find(d => d.id === id)?.name)
+        .filter(Boolean)
+        .join(', ');
+      tallyHint.textContent = `${activeUnits} of ${totalUnits} in rotation this month. ${pausedNames} paused during activation.`;
+    } else {
+      tallyHint.textContent = `All ${totalUnits} in rotation this month.`;
+    }
+  }
+
+  // Theme distribution this month
+  const themeCount = new Map();
+  for (const t of THEMES) themeCount.set(t.id, 0);
+  for (const s of allSlots) {
+    if (themeCount.has(s.themeId)) {
+      themeCount.set(s.themeId, themeCount.get(s.themeId) + 1);
+    }
+  }
+  const renderThemeRow = (t) => {
+    const n = themeCount.get(t.id);
+    return `<div style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 8px; height: 8px; border-radius: 2px; background: var(--${t.id});"></span><span style="color: var(--ink-soft);">${escapeHtml(t.name)}</span></span>
+      <span style="color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums;">${n}</span>
+    </div>`;
+  };
+  const scheduledThemes = THEMES.filter(t => t.behavior === 'scheduled');
+  const triggeredThemes = THEMES.filter(t => t.behavior === 'triggered');
+  const triggeredHeader = `<div style="font-size: 10px; color: var(--mute); text-transform: uppercase; letter-spacing: 0.08em; margin: 10px 0 4px 0;">Event-triggered (post when project / event lands)</div>`;
+  const themeDistHtml = scheduledThemes.map(renderThemeRow).join('')
+    + (triggeredThemes.length > 0 ? triggeredHeader + triggeredThemes.map(renderThemeRow).join('') : '');
+  document.getElementById('theme-distribution').innerHTML = themeDistHtml;
+}
+
+// MAIN RENDER
+
+function renderAll() {
+  renderStats();
+  renderTriggeredList();
+  renderMonthGrid();
+  renderThemeView();
+}
+
+// INIT
+
+if (!state.currentMonth) state.currentMonth = TODAY_MONTH_ISO;
+populateDivisionSelects();
+renderThemeFilter();
+bindControls();
+setView(state.view);
+renderAll();
+
+// ===== Firebase shared-calendar sync layer =====
+// Safe by design: if FIREBASE_ON is false (config left as placeholder), none of this
+// runs and the calendar stays on localStorage exactly as before.
+let fb = { user: null, isOwner: false, isEditor: false, previewing: false, saveTimer: null };
+function syncEl(id) { return document.getElementById(id); }
+
+// Option A (open proposals): any signed-in user may edit their own draft; only
+// OWNER_EMAIL can publish. No editor allowlist to maintain.
+
+function pushProposal() {
+  if (!(typeof FIREBASE_ON !== 'undefined' && FIREBASE_ON) || !fb.isEditor || !fb.user || fb.previewing) return;
+  clearTimeout(fb.saveTimer);
+  fb.saveTimer = setTimeout(() => {
+    firebase.firestore().collection('proposals').doc(fb.user.uid).set({
+      email: fb.user.email,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      state: state
+    }).then(() => { syncEl('sync-savestate').textContent = 'Draft saved ' + new Date().toLocaleTimeString(); })
+      .catch(e => { syncEl('sync-savestate').textContent = 'Save error: ' + e.message; });
+  }, 800);
+}
+
+function initFirebaseSync() {
+  if (typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON) return; // offline / local-only
+  if (typeof firebase === 'undefined') { syncEl('sync-status').textContent = 'Firebase SDK failed to load. Running local-only.'; return; }
+  firebase.initializeApp(firebaseConfig);
+  syncEl('sync-auth').style.display = 'flex';
+  syncEl('sync-status').textContent = 'Live calendar connected. Sign in to propose changes.';
+
+  // Live calendar (public read). Everyone sees the published state.
+  firebase.firestore().collection('calendar').doc('live').onSnapshot(doc => {
+    const data = doc.exists ? doc.data() : null;
+    if (data && data.state) {
+      window.__liveState = data.state;
+      // Viewers (and anyone not actively editing their own draft) mirror live.
+      if (!fb.isEditor && !fb.previewing) { state = data.state; renderAll(); }
+    }
+  }, err => { syncEl('sync-status').textContent = 'Live read error: ' + err.message; });
+
+  syncEl('signin-btn').addEventListener('click', () => {
+    firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e => alert(e.message));
+  });
+  syncEl('signout-btn').addEventListener('click', () => firebase.auth().signOut());
+  syncEl('review-mydraft-btn').addEventListener('click', () => { fb.previewing = false; loadOrCreateProposal(); });
+
+  firebase.auth().onAuthStateChanged(onAuthChange);
+}
+
+function onAuthChange(user) {
+  fb.user = user;
+  fb.isOwner = !!(user && user.email === OWNER_EMAIL);
+  fb.isEditor = !!user; // Option A: any signed-in user may edit their own draft
+  if (user) {
+    syncEl('signin-btn').style.display = 'none';
+    syncEl('signout-btn').style.display = 'block';
+    syncEl('sync-who').textContent = user.email + (fb.isOwner ? ' (owner)' : ' (editor)');
+    loadOrCreateProposal();
+    if (fb.isOwner) { syncEl('review-panel').style.display = 'block'; subscribeProposals(); }
+  } else {
+    syncEl('signin-btn').style.display = 'block';
+    syncEl('signout-btn').style.display = 'none';
+    syncEl('sync-who').textContent = '';
+    syncEl('sync-savestate').textContent = '';
+    syncEl('review-panel').style.display = 'none';
+    fb.isEditor = false; fb.previewing = false;
+    if (window.__liveState) { state = window.__liveState; renderAll(); }
+  }
+}
+
+function loadOrCreateProposal() {
+  fb.previewing = false;
+  firebase.firestore().collection('proposals').doc(fb.user.uid).get().then(doc => {
+    if (doc.exists && doc.data().state) { state = doc.data().state; }
+    else if (window.__liveState) { state = window.__liveState; }
+    if (typeof state.currentMonth === 'undefined' || !state.currentMonth) state.currentMonth = TODAY_MONTH_ISO;
+    renderAll();
+    syncEl('sync-savestate').textContent = 'Editing your draft. Changes save automatically; the owner reviews and publishes to live.';
+  }).catch(e => { syncEl('sync-savestate').textContent = 'Draft load error: ' + e.message; });
+}
+
+function subscribeProposals() {
+  firebase.firestore().collection('proposals').onSnapshot(snap => {
+    const list = syncEl('review-list'); list.innerHTML = '';
+    syncEl('review-count').textContent = snap.size;
+    if (snap.size === 0) { list.innerHTML = '<div style="font-size:11px;color:var(--mute);">No proposals yet.</div>'; return; }
+    snap.forEach(doc => {
+      const d = doc.data();
+      const when = d.updatedAt && d.updatedAt.toDate ? d.updatedAt.toDate().toLocaleString() : '(saving...)';
+      const row = document.createElement('div');
+      row.style.cssText = 'border:1px solid var(--rule); border-radius:6px; padding:8px; margin-bottom:6px;';
+      row.innerHTML = '<div style="font-weight:600;font-size:12px;">' + escapeHtml(d.email || doc.id) + '</div>' +
+        '<div style="font-size:10px;color:var(--mute);margin-bottom:6px;">updated ' + escapeHtml(when) + '</div>';
+      const btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex; gap:6px; flex-wrap:wrap;';
+      const preview = document.createElement('button'); preview.className = 'reset'; preview.textContent = 'Preview';
+      preview.onclick = () => { if (d.state) { fb.previewing = true; state = d.state; renderAll(); syncEl('review-mydraft-btn').style.display = 'block'; syncEl('sync-savestate').textContent = 'Previewing ' + (d.email || doc.id) + ' (read-only). Publish to make it live, or return to your draft.'; } };
+      const publish = document.createElement('button'); publish.className = 'reset'; publish.style.cssText = 'border-color:var(--accent);color:var(--accent);'; publish.textContent = 'Publish';
+      publish.onclick = () => { if (confirm('Publish ' + (d.email || doc.id) + "'s proposal to the LIVE calendar everyone sees?")) { firebase.firestore().collection('calendar').doc('live').set({ state: d.state, publishedAt: firebase.firestore.FieldValue.serverTimestamp(), publishedBy: fb.user.email, fromProposal: doc.id }).then(() => alert('Published to live.')).catch(e => alert('Publish error: ' + e.message)); } };
+      const discard = document.createElement('button'); discard.className = 'reset'; discard.textContent = 'Discard';
+      discard.onclick = () => { if (confirm('Delete this proposal? The editor keeps their local copy.')) firebase.firestore().collection('proposals').doc(doc.id).delete(); };
+      btnRow.appendChild(preview); btnRow.appendChild(publish); btnRow.appendChild(discard);
+      row.appendChild(btnRow); list.appendChild(row);
+    });
+  }, err => { syncEl('review-list').innerHTML = '<div style="font-size:11px;color:var(--warn);">Review read error: ' + escapeHtml(err.message) + '</div>'; });
+}
+
+initFirebaseSync();
+</script>
+
+</body>
+</html>

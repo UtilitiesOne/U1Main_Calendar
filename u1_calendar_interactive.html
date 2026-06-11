@@ -2580,63 +2580,17 @@ function getModalNoteExample(themeId, divisionId) {
 // body-activation sentence that primes "utility / useful / usefulness / the use of" before
 // the "One Company. Every Utility." tagline lands. Pattern: same-site = one activation, shared
 // physical site; sequenced = design/scope then build/execute. See feedback-brand-line-body-activation-rule.
-const CROSS_DIVISION_EXAMPLES = {
-  pairs: [
-    { d: 'Wireline + Fulfillment',        p: 'sequenced',  a: 'The utility of a fiber route only shows up when the household at the end of it gets connected on the day the carrier promised.' },
-    { d: 'Wireline + Wireless',           p: 'same-site',  a: 'A carrier site is useful when the radio is hot and the backhaul behind it is lit the same week.' },
-    { d: 'Wireline + Data Centers',       p: 'same-site',  a: 'The utility of a hyperscale campus is measured in latency, redundancy, and the date the floor goes live.' },
-    { d: 'Wireline + Power Delivery',     p: 'same-site',  a: 'The utility of fiber paired with substation power is what a hyperscale build needs on one timeline.' },
-    { d: 'Wireline + Water',              p: 'same-site',  a: 'The use of one dig for two utilities is what cities ask us to coordinate.' },
-    { d: 'Wireline + Renewable',          p: 'same-site',  a: 'The utility of generation depends on the data path back to control.' },
-    { d: 'Wireline + Consulting',         p: 'sequenced',  a: 'Fiber is useful when the route is legal, accessible, and crewed on the same calendar.' },
-    { d: 'Fulfillment + Wireless',        p: 'sequenced',  a: 'The utility of fixed wireless to a household is one number: did the service work on the day the family signed up.' },
-    { d: 'Fulfillment + Data Centers',    p: 'sequenced',  a: 'The utility of a data center is uptime, and uptime depends on someone being on-site when something breaks.' },
-    { d: 'Fulfillment + Power Delivery',  p: 'same-site',  a: 'The utility of the grid to a member is what happens between the pole and the panel.' },
-    { d: 'Fulfillment + Water',           p: 'same-site',  a: 'The utility of a meter program to a city is residents not calling council about it.' },
-    { d: 'Fulfillment + Renewable',       p: 'sequenced',  a: 'The utility of EV infrastructure is measured in working stalls per day.' },
-    { d: 'Fulfillment + Consulting',      p: 'sequenced',  a: 'The use of a national program comes down to the daily count of completed jobs against a plan that holds.' },
-    { d: 'Wireless + Data Centers',       p: 'same-site',  a: 'The utility of a tower site to a hyperscaler is what compute can be hosted at it.' },
-    { d: 'Wireless + Power Delivery',     p: 'same-site',  a: "When you measure a tower's utility in megawatts, the upgrade story is not just the radio." },
-    { d: 'Wireless + Water',              p: 'same-site',  a: 'The utility of coordinated civil work is the corridor only closing once.' },
-    { d: 'Wireless + Renewable',          p: 'same-site',  a: 'The utility of off-grid radio infrastructure depends on the solar and storage behind it being sized, installed, and maintained as one system.' },
-    { d: 'Wireless + Consulting',         p: 'sequenced',  a: 'Tower programs are useful when the calendar holds where it meets the ground.' },
-    { d: 'Data Centers + Power Delivery', p: 'same-site',  a: 'The utility of a hyperscale campus is measured in megawatts delivered to the floor.' },
-    { d: 'Data Centers + Water',          p: 'same-site',  a: 'The utility of a campus depends on the water system behind it being sized, installed, and commissioned with the same care as the power and the fiber.' },
-    { d: 'Data Centers + Renewable',      p: 'same-site',  a: 'The utility of paired generation is the load and the supply landing on one operational timeline.' },
-    { d: 'Data Centers + Consulting',     p: 'sequenced',  a: 'The utility of a hyperscale portfolio is measured in the date each campus actually lights up.' },
-    { d: 'Power Delivery + Water',        p: 'same-site',  a: 'The utility of coordinated underground work is what residents do not have to live through twice.' },
-    { d: 'Power Delivery + Renewable',    p: 'sequenced',  a: 'The utility of new generation is zero until it interconnects.' },
-    { d: 'Power Delivery + Consulting',   p: 'sequenced',  a: 'The utility of a modernization program is what the grid actually does differently after the spend lands.' },
-    { d: 'Water + Renewable',             p: 'same-site',  a: 'What makes the project useful to the municipality is lower operating cost on the pump load with no service interruption during construction.' },
-    { d: 'Water + Consulting',            p: 'sequenced',  a: 'The utility of a city-scale program is the count of properties cleared against the federal deadline.' },
-    { d: 'Renewable + Consulting',        p: 'sequenced',  a: 'The use of an EV network to its operator is the count of sites energized against the deployment plan.' }
-  ],
-  triples: [
-    { d: 'Power Delivery + Water + Renewable',     meta: 'municipal infrastructure modernization', a: "The utility of running three utility upgrades under one program is what a city's public works director measures in resident complaints not filed, council meetings not lost to angry letters, and capital plans not re-baselined." },
-    { d: 'Wireline + Wireless + Data Centers',     meta: 'hyperscale edge integration',            a: 'The utility of integrated edge infrastructure is what a hyperscaler measures in time-to-first-workload at the new site.' },
-    { d: 'Power Delivery + Renewable + Consulting', meta: 'clean-energy program delivery',           a: "The utility of an integrated clean-energy program is what an IOU measures in megawatts on the grid against the deadlines its regulators set." }
-  ]
-};
-
 function renderCrossDivisionExamples() {
-  const pairRow = e => `<div style="padding:6px 0; border-bottom:1px solid var(--line, #eee);">
-      <div style="font-weight:600; font-size:12px;">${escapeHtml(e.d)} <span style="font-weight:400; color:var(--mute); font-size:10px;">&middot; ${escapeHtml(e.p)}</span></div>
-      <div style="font-size:11px; color:var(--mute); line-height:1.45; margin-top:2px;">${escapeHtml(e.a)}</div>
-    </div>`;
-  const tripleRow = e => `<div style="padding:6px 0; border-bottom:1px solid var(--line, #eee);">
-      <div style="font-weight:600; font-size:12px;">${escapeHtml(e.d)} <span style="font-weight:400; color:var(--mute); font-size:10px;">&middot; ${escapeHtml(e.meta)}</span></div>
-      <div style="font-size:11px; color:var(--mute); line-height:1.45; margin-top:2px;">${escapeHtml(e.a)}</div>
-    </div>`;
   return `<details style="margin-top:6px; border:1px solid var(--line, #ddd); border-radius:6px; padding:8px 10px;">
-    <summary style="cursor:pointer; font-size:12px; font-weight:600; color:var(--ink, #1E5B8B);">Cross-division body-activation examples (Chairman pass 2) &middot; ${CROSS_DIVISION_EXAMPLES.pairs.length} pairs + ${CROSS_DIVISION_EXAMPLES.triples.length} three-division</summary>
-    <div style="font-size:11px; color:var(--mute); margin:6px 0; line-height:1.4;">For a cross-divisional post under "One Company. Every Utility.", the body must prime "utility / useful / usefulness / the use of" before the tagline. Worked activation lines per division combination, verbatim from the pass-2 deliverable:</div>
-    <div style="max-height:240px; overflow-y:auto; padding-right:4px;">
-      <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.04em; color:var(--mute); margin:4px 0 2px;">Two-division pairs</div>
-      ${CROSS_DIVISION_EXAMPLES.pairs.map(pairRow).join('')}
-      <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.04em; color:var(--mute); margin:10px 0 2px;">Three-division (one activation at meta-capability level)</div>
-      ${CROSS_DIVISION_EXAMPLES.triples.map(tripleRow).join('')}
+    <summary style="cursor:pointer; font-size:12px; font-weight:600; color:var(--ink, #1E5B8B);">Cross-divisional voice tiers &middot; worked example posts</summary>
+    <div style="font-size:11px; color:var(--mute); margin:6px 0; line-height:1.4;">For a cross-divisional post under "One Company. Every Utility.", the body activates "utility" once before the tagline. The worked examples now live as short B2B posts in four registers. Use them for register and build, not as words to copy:</div>
+    <div style="padding-right:4px;">
+      <div style="padding:5px 0;"><a href="u1_voice_conservative_one.html" target="_blank" style="font-weight:600; font-size:12px; color:var(--accent, #1E5B8B); text-decoration:none;">Conservative One &rarr;</a> <span style="font-size:11px; color:var(--mute);">standard register, measured and operator-grade</span></div>
+      <div style="padding:5px 0;"><a href="u1_voice_flamboyant_one.html" target="_blank" style="font-weight:600; font-size:12px; color:var(--accent, #1E5B8B); text-decoration:none;">Flamboyant One &rarr;</a> <span style="font-size:11px; color:var(--mute);">more gravitas and swing, same discipline</span></div>
+      <div style="padding:5px 0;"><a href="u1_voice_marketing_one.html" target="_blank" style="font-weight:600; font-size:12px; color:var(--accent, #1E5B8B); text-decoration:none;">Marketing One &rarr;</a> <span style="font-size:11px; color:var(--mute);">hook and fact, built to draw attention</span></div>
+      <div style="padding:5px 0;"><span style="font-weight:600; font-size:12px; color:var(--mute);">Magic One</span> <span style="font-size:11px; color:var(--mute);">unfenced creative stretch, local only and not published</span></div>
     </div>
-    <div style="font-size:10px; color:var(--mute); margin-top:6px; line-height:1.4;">4+ divisions: deferred (cannot carry inside natural feed-read length). Under the interim image-only rule, cross-divisional visuals use "Built to Hold." or no tagline; the body still carries the activation.</div>
+    <div style="font-size:10px; color:var(--mute); margin-top:6px; line-height:1.4;">See the <a href="u1_utility_guidance.html" target="_blank" style="color:var(--accent,#1E5B8B);">Utility Guidance</a> for the body-activation discipline. Under the interim image-only rule, cross-divisional visuals use "Built to Hold." or no tagline; the body still carries the activation.</div>
   </details>`;
 }
 

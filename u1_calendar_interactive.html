@@ -31,6 +31,7 @@
     --t4: #B86E00; --t4-soft: #FFF4E0;   /* Eight Specialties, One Company (scheduled) */
     --t5: #1A6B7A; --t5-soft: #E5F2F4;   /* From Financed Paper to Delivered Field (scheduled) */
     --t6: #1E5B8B; --t6-soft: #E8EFF6;   /* One Company, Every Utility (scheduled, utility-specialty only) */
+    --t7: #A83255; --t7-soft: #F7E8ED;   /* U1 Culture (triggered) */
   }
 
   * { box-sizing: border-box; }
@@ -458,6 +459,7 @@
   .chip-t4 { background: var(--t4); }
   .chip-t5 { background: var(--t5); }
   .chip-t6 { background: var(--t6); }
+  .chip-t7 { background: var(--t7); }
 
   /* Quarterly anchor banner (above calendar grid) */
   .quarter-banner {
@@ -1112,7 +1114,7 @@
 
     <div class="section">
       <h3 class="section-title">Triggered events <span class="pill">EVENT-DRIVEN</span></h3>
-      <p style="font-size:11.5px; color:var(--mute); margin: 0 0 10px 0; line-height: 1.45;">Project Delivery, Career Arc, and U1 Way On Site post when a real event happens (project milestone / promotion / new hire / storm / coordination moment). Add when the event lands.</p>
+      <p style="font-size:11.5px; color:var(--mute); margin: 0 0 10px 0; line-height: 1.45;">Project Delivery, Career Arc, U1 Way On Site, and U1 Culture post when a real event happens (project milestone, promotion, new hire, storm, coordination moment, leadership visit, annual meeting). Add when the event lands.</p>
 
       <div class="triggered-queue">
         <button class="triggered-add" id="add-project-btn">
@@ -1128,6 +1130,11 @@
         <button class="triggered-add" id="add-u1way-btn">
           <span class="dot" style="background:var(--t3);"></span>
           <span>Add U1 Way On Site event</span>
+          <span class="plus">+</span>
+        </button>
+        <button class="triggered-add" id="add-culture-btn">
+          <span class="dot" style="background:var(--t7);"></span>
+          <span>Add U1 Culture post</span>
           <span class="plus">+</span>
         </button>
       </div>
@@ -1333,7 +1340,8 @@ const BRAND_CONFIG = {
     // T4 RETIRED 2026-06-08 (council pass 2): anchored on retired lineup line #3 "Eight specialties. One company."; per-division content routes to T1/T3/T5 by post intent.
     { id: 't5', num: 5, name: 'From Financed Paper to Delivered Field', behavior: 'scheduled', scope: 'cross',      tagline: 'From paper to field.',            trustLine: '', u1Way: true  },
     // T6 REOPENED 2026-06-08 (council pass 2): removed eligibleDivisions + utilityCustomerOverride; added bodyActivationRequired. Open to all 8 specialties when post body activates "utility / useful / usefulness / the use of" in older usefulness sense before tagline. See feedback-brand-line-body-activation-rule.
-    { id: 't6', num: 6, name: 'One Company, Every Utility',             behavior: 'scheduled', scope: 'cross',      tagline: 'One Company. Every Utility.',     trustLine: '', u1Way: false, bodyActivationRequired: true }
+    { id: 't6', num: 6, name: 'One Company, Every Utility',             behavior: 'scheduled', scope: 'cross',      tagline: 'One Company. Every Utility.',     trustLine: '', u1Way: false, bodyActivationRequired: true },
+    { id: 't7', num: 7, name: 'U1 Culture',                              behavior: 'triggered', scope: 'company',    tagline: 'Built to Hold.',                  trustLine: '', u1Way: false }
   ],
   // Default theme per unit for scheduled rotation slots. T1 is triggered so
   // mature divisions fall back to T5 (industry direction) / T6 (cross-portfolio).
@@ -1415,7 +1423,7 @@ const DEFAULT_STATE = {
   currentMonth: null, // ISO 'YYYY-MM'; null = today's month
   spot1Div: '', spot1Uplift: 2,
   spot2Div: '', spot2Uplift: 2,
-  themes: { t1: true, t2: true, t3: true, t5: true, t6: true },
+  themes: { t1: true, t2: true, t3: true, t5: true, t6: true, t7: true },
   triggeredEvents: [], // [{id, date(ISO), themeId, divisionId, trustLine, note}]
   slotOverrides: {},   // { 'YYYY-MM-DD': { themeId, note } } per-slot edits
   spotlightOverrides: {}, // { 'YYYY-MM-DD': { skipped: true } | { newDate: 'YYYY-MM-DD' } } keyed by canonical (algorithm-placed) date
@@ -1432,6 +1440,8 @@ function loadState() {
     if (!Array.isArray(merged.triggeredEvents)) merged.triggeredEvents = [];
     if (typeof merged.slotOverrides !== 'object' || merged.slotOverrides === null) merged.slotOverrides = {};
     if (typeof merged.spotlightOverrides !== 'object' || merged.spotlightOverrides === null) merged.spotlightOverrides = {};
+    if (typeof merged.themes !== 'object' || merged.themes === null) merged.themes = {};
+    THEMES.forEach(t => { if (merged.themes[t.id] === undefined) merged.themes[t.id] = true; });
     // Migration: T4 retired 2026-06-08 (council pass 2). Remap any saved t4 theme
     // references to t5 so old saved state stays valid without wiping user overrides.
     const RETIRED_THEME_MAP = { t4: 't5' };
@@ -1766,8 +1776,8 @@ function buildSlot(src) {
     dateObj: parseISO(src.date),
     channel: src.channel,
     divisionId: src.divisionId,
-    divisionName: div ? div.name : 'Cross-divisional',
-    divisionAbbr: div ? div.abbr : 'XD',
+    divisionName: div ? div.name : (theme.scope === 'company' ? 'Company-wide' : 'Cross-divisional'),
+    divisionAbbr: div ? div.abbr : (theme.scope === 'company' ? 'U1' : 'XD'),
     divisionTier: div ? div.tier : null,
     themeId: src.themeId,
     themeNum: theme.num,
@@ -2013,7 +2023,7 @@ function getOriginalScheduledFor(dateIso) {
 }
 
 function renderGhostChip(slot, type) {
-  const label = slot.divisionId ? slot.divisionAbbr : 'CROSS';
+  const label = slot.divisionId ? slot.divisionAbbr : (slot.themeScope === 'company' ? 'U1' : 'CROSS');
   const restoreType = type || 'scheduled';
   const tag = restoreType === 'spotlight'
     ? `Skipped spotlight: ${slot.themeName} for ${slot.divisionName}. Click to restore.`
@@ -2110,7 +2120,7 @@ function renderChip(slot, themeOn) {
   if (!themeOn) cls.push('dimmed');
   const spotMark = slot.isSpotlight ? '<span class="csp">SPOT</span>' : '';
   const trigMark = slot.isTriggered ? '<span class="csp" style="background:white; color:#5D3B7A;">EVT</span>' : '';
-  const label = slot.divisionId ? slot.divisionAbbr : 'CROSS';
+  const label = slot.divisionId ? slot.divisionAbbr : (slot.themeScope === 'company' ? 'U1' : 'CROSS');
   return `<div class="${cls.join(' ')}" data-sid="${escapeHtml(slot.id)}" title="${escapeHtml(slot.themeName)} for ${escapeHtml(slot.divisionName)}">
     <span class="cname">${escapeHtml(label)}</span>
     ${spotMark}${trigMark}
@@ -2143,8 +2153,9 @@ function renderThemeView() {
       : '<span class="behavior-pill">SCHEDULED</span>';
     html += `<div class="theme-section ${t.id} ${dim}">`;
     html += `<h2>${escapeHtml(t.name)} ${behaviorPill}</h2>`;
-    html += `<div class="tmeta"><span class="count">${tSlots.length}</span> in 6-month window · scope: <strong>${t.scope === 'cross' ? 'cross-divisional' : 'divisional'}</strong> · tagline: <em>"${escapeHtml(t.tagline)}"</em> · U1 Way: ${t.u1Way ? 'yes' : 'no'}</div>
+    html += `<div class="tmeta"><span class="count">${tSlots.length}</span> in 6-month window · scope: <strong>${t.scope === 'cross' ? 'cross-divisional' : t.scope === 'company' ? 'company-wide' : 'divisional'}</strong> · tagline: <em>"${escapeHtml(t.tagline)}"</em> · U1 Way: ${t.u1Way ? 'yes' : 'no'}</div>
       <div style="font-size: 12px; color: var(--ink-soft); margin-bottom: 12px; padding: 8px 10px; background: var(--panel-2); border-left: 3px solid var(--${t.id}); border-radius: 3px;"><strong>TRUST line in body:</strong> <em>"${escapeHtml(t.trustLine)}"</em></div>`;
+    html += `<div class="tusage" style="font-size:12px; color:var(--ink-soft); margin:0 0 12px; padding:8px 10px; background:var(--panel-2); border-left:3px solid var(--${t.id}); border-radius:3px;"><strong>When to use:</strong> ${escapeHtml(THEME_USAGE[t.id] || '')}</div>`;
     if (tSlots.length === 0) {
       const emptyMsg = t.behavior === 'triggered'
         ? 'No events queued yet. Add when a real event lands (use the sidebar buttons).'
@@ -2461,7 +2472,7 @@ const modalTitle = document.getElementById('modal-title');
 const modalSub = document.getElementById('modal-sub');
 const modalSave = document.getElementById('modal-save');
 
-let modalMode = null; // 'career' | 'u1way' | 'generic'
+let modalMode = null; // 'career' | 'u1way' | 'project' | 'generic' | 'culture'
 let modalEditId = null;
 let modalState = null;
 
@@ -2473,6 +2484,7 @@ function openModal({ mode, prefilledDate = null, editEvent = null }) {
   if (mode === 'career') initialThemeId = 't2';
   else if (mode === 'u1way') initialThemeId = 't3';
   else if (mode === 'project') initialThemeId = 't1';
+  else if (mode === 'culture') initialThemeId = 't7';
   else initialThemeId = 't1'; // generic fallback
   const initialTheme = THEMES.find(t => t.id === initialThemeId);
   modalState = editEvent ? structuredClone(editEvent) : {
@@ -2492,6 +2504,9 @@ function openModal({ mode, prefilledDate = null, editEvent = null }) {
   } else if (mode === 'project') {
     modalTitle.textContent = editEvent ? 'Edit Project Delivery post' : 'Add Project Delivery post';
     modalSub.textContent = 'Theme 1 · project-triggered · any division';
+  } else if (mode === 'culture') {
+    modalTitle.textContent = editEvent ? 'Edit U1 Culture post' : 'Add U1 Culture post';
+    modalSub.textContent = 'Theme 7 · event-driven · company-wide';
   } else {
     modalTitle.textContent = 'Add custom post';
     modalSub.textContent = 'Free-form scheduled post';
@@ -2515,6 +2530,14 @@ modalBackdrop.addEventListener('click', (e) => {
 // (theme, division) pair so users don't get a Fulfillment career example when
 // they're writing a Wireline project post. Shape-illustrative only; no real
 // names, no specific commercial claims.
+const THEME_USAGE = {
+  t1: 'Post when a project hits a real milestone: energized, commissioned, restored, online. Names the division that delivered it.',
+  t2: 'Post when someone is promoted, hired, or moves across specialties.',
+  t3: 'Post when a coordination moment or field practice shows the method at work on a real site.',
+  t5: 'Scheduled cadence. Industry-direction and capital-to-execution posts: what gets financed on paper becomes delivered in the field.',
+  t6: 'Scheduled cadence. Cross-divisional and portfolio posts; the body activates "utility" before the tagline lands.',
+  t7: 'Post when a company moment happens: leadership visit, annual meeting, town hall, award, anniversary, or conference presence. Closes on the signature; pick the visual tagline that fits.'
+};
 const MODAL_NOTE_EXAMPLES = {
   t1: { // Project Delivery (triggered, divisional)
     wireline:    'FTTH buildout milestone: homes-passed target hit in the current phase',
@@ -2566,6 +2589,9 @@ const MODAL_NOTE_EXAMPLES = {
     fulfillment: 'Fulfillment / multi-trade coordination; body activates "the utility of a clean install on day one"',
     consulting:  'Consulting (engineering, permitting, staffing) work; body activates "the utility of a permit pack that goes through clean"',
     '':          'Cross-portfolio post · body MUST activate "utility / useful / usefulness / the use of" in older usefulness sense before tagline lands. See feedback-brand-line-body-activation-rule. Visual tag stays on every post; body does the meaning-carrying work. Downstream surfaces (OG previews, reshares) inherit context from primary publish.'
+  },
+  t7: { // U1 Culture (triggered, company-wide)
+    '': 'e.g., Leadership visit to a field office; annual meeting recap; team award or milestone'
   }
 };
 function getModalNoteExample(themeId, divisionId) {
@@ -2610,7 +2636,7 @@ function renderModalBody() {
     </div>
     ${themeFieldHtml}
     <div class="field">
-      <label class="fl" for="m-div">Division ${modalMode === 'career' ? '(mature tier only)' : modalMode === 'project' ? '(any division)' : ''}</label>
+      <label class="fl" for="m-div">Division ${modalMode === 'career' ? '(mature tier only)' : modalMode === 'project' ? '(any division)' : modalMode === 'culture' ? '(optional · company-wide)' : ''}</label>
       <select id="m-div">
         <option value="">(pick division)</option>
         ${eligibleDivs.map(d => `<option value="${d.id}" ${modalState.divisionId === d.id ? 'selected' : ''}>${escapeHtml(d.name)} (${escapeHtml(d.tier)})</option>`).join('')}
@@ -2657,6 +2683,7 @@ function getEligibleDivisions(mode) {
   if (mode === 'career') return DIVISIONS.filter(d => CAREER_ELIGIBLE_TIERS.includes(d.tier));
   if (mode === 'u1way') return DIVISIONS.filter(d => U1WAY_ELIGIBLE_TIERS.includes(d.tier));
   if (mode === 'project') return DIVISIONS.filter(d => d.tier !== 'backbone'); // T1 needs a real project; Fulfillment surfaces inside other divisions
+  if (mode === 'culture') return DIVISIONS; // company-wide; division optional
   return DIVISIONS.filter(d => d.tier !== 'backbone');
 }
 
@@ -2669,7 +2696,7 @@ modalSave.addEventListener('click', () => {
     validation.classList.add('show');
     return;
   }
-  if (!modalState.divisionId) {
+  if (!modalState.divisionId && modalMode !== 'culture') {
     validation.textContent = 'Pick a division.';
     validation.classList.add('show');
     return;
@@ -2856,6 +2883,7 @@ function bindControls() {
   document.getElementById('add-project-btn').addEventListener('click', () => openModal({ mode: 'project' }));
   document.getElementById('add-career-btn').addEventListener('click', () => openModal({ mode: 'career' }));
   document.getElementById('add-u1way-btn').addEventListener('click', () => openModal({ mode: 'u1way' }));
+  document.getElementById('add-culture-btn').addEventListener('click', () => openModal({ mode: 'culture' }));
 
   document.getElementById('reset-btn').addEventListener('click', () => {
     if (!confirm('Reset all selections and triggered events?')) return;

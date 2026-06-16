@@ -1347,7 +1347,7 @@ const BRAND_CONFIG = {
   // mature divisions fall back to T5 (industry direction) / T6 (cross-portfolio).
   // Per-division content routes to T1 / T3 / T5 / T6 based on post intent.
   // T4 retired 2026-06-08 (council pass 2). T6 reopened to all 8 specialties with
-  // bodyActivationRequired flag (see feedback-brand-line-body-activation-rule).
+  // bodyActivationRequired flag (see the body-activation rule).
   unitDefaultTheme: {
     wireline:    't6',
     wireless:    't5',
@@ -2599,8 +2599,8 @@ function getModalNoteExample(themeId, divisionId) {
   return themeMap[divisionId || ''] || themeMap[''] || 'Free-form note for this post';
 }
 
-// Cross-division body-activation usage examples. Verbatim from the Chairman pass-2
-// deliverable (output/2026-06-08_u1_brand_voice_council/11_chairman_final_deliverable.md):
+// Cross-division body-activation usage examples, from the approved
+// brand-voice work:
 // Part III = 28 two-division pairs (SMCM authored, ECR fixes + Chairman disposition);
 // Part IV = 3 three-division extension examples (Chairman authored). Each entry shows the
 // body-activation sentence that primes "utility / useful / usefulness / the use of" before

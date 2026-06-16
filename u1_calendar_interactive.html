@@ -1171,20 +1171,19 @@
     </div>
 
     <div class="section">
-      <h3 class="section-title">Brand-voice layers <span class="pill">LOCKED</span></h3>
+      <h3 class="section-title">Brand-voice layers</h3>
       <div class="layers">
 
         <div class="layer-card l1">
-          <div class="lk">Layer 1 · Brand-heart line</div>
+          <div class="lk">Brand-heart line</div>
           <div class="lt">"We don't overpromise. We overdeliver."</div>
-          <div class="ldesc">Universal body close on every scheduled post.</div>
-          <div class="lmeta">CEO verbatim (RCR Wireless, Nov 2024). Locked 19 May 2026.</div>
+          <div class="ldesc">The close on every post.</div>
         </div>
 
         <div class="layer-card l2">
-          <div class="lk">Layer 2 · TRUST in the post body</div>
-          <div class="lt">Writer-authored per post</div>
-          <div class="ldesc">Each post body carries one short line that names 1 or 2 TRUST values, sits between body and brand-heart close. The line is written per post to fit the specific content; no theme-level default to copy.</div>
+          <div class="lk">TRUST in the body</div>
+          <div class="lt">One short line per post</div>
+          <div class="ldesc">Each post carries a short line naming one or two TRUST values, between the body and the close. Written to fit the post, not copied from a template.</div>
           <div style="margin-top: 8px; font-size: 11px; color: var(--ink-soft); line-height: 1.5;">
             <div style="margin-bottom: 4px;"><strong>T:</strong> Training</div>
             <div style="margin-bottom: 4px;"><strong>R:</strong> Responsibility</div>
@@ -1192,28 +1191,12 @@
             <div style="margin-bottom: 4px;"><strong>S:</strong> Safety</div>
             <div style="margin-bottom: 4px;"><strong>T:</strong> Teamwork</div>
           </div>
-          <div class="lmeta">Writer authors TRUST line per post in the slot detail panel.</div>
         </div>
 
         <div class="layer-card l3">
-          <div class="lk">Layer 3 · U1 Way method</div>
-          <div class="lt">Structure · Coordination · Real accountability</div>
-          <div class="ldesc">The <em>how</em> of overdelivery. Surfaces in operational themes (T1, T3, T5). Flagged per post.</div>
-          <div class="lmeta">In active use on Facebook + LinkedIn since Jan-Feb 2026. Locked as method layer 19 May 2026.</div>
-        </div>
-
-        <div class="layer-card l4">
-          <div class="lk">Layer 4 · Founder voice register</div>
-          <div class="lt">CEO-repertoire lines · cross-divisional</div>
-          <div class="ldesc">Two further documented CEO lines from public interviews available for cross-divisional content: <i>"Hard work beats talent when talent doesn't work hard."</i> and <i>"Always keep going."</i> Final use pattern confirmed in the monthly review.</div>
-          <div class="lmeta">From public-interview repertoire. Available to marketing for cross-divisional and thought-leadership content.</div>
-        </div>
-
-<div class="layer-card l5">
-          <div class="lk">Layer 5 · Founder register · personal</div>
-          <div class="lt">Reserved · Serghei-authored only</div>
-          <div class="ldesc">"100-degree attic" / "selling ice in Alaska" / "from nothing to something to everything" / founder-arc biographical material. Off-limits for scheduled calendar.</div>
-          <div class="lmeta">Founder content engine is a future-quarter conversation, capacity-gated.</div>
+          <div class="lk">U1 Way method</div>
+          <div class="lt">Structure, coordination, real accountability</div>
+          <div class="ldesc">The how of overdelivery, part of the U1 Way. Surfaces in operational posts.</div>
         </div>
 
       </div>
@@ -1320,7 +1303,7 @@ const BRAND_CONFIG = {
   },
   window: {
     anchorDate: new Date(2026, 5, 1), // Mon 1 Jun 2026
-    days: 183 // through Sun 30 Nov 2026 (extended from 90, council 2026-06-10)
+    days: 183 // through Sun 30 Nov 2026 (extended from 90, review 2026-06-10)
   },
   storageKey: 'u1-calendar-state-v6',
   units: [
@@ -1337,16 +1320,16 @@ const BRAND_CONFIG = {
     { id: 't1', num: 1, name: 'Project Delivery',                       behavior: 'triggered', scope: 'divisional', tagline: 'Built to Hold.',                  trustLine: '', u1Way: true  },
     { id: 't2', num: 2, name: 'The U1 Career Arc',                      behavior: 'triggered', scope: 'divisional', tagline: 'One Way. Talent finds its lane.', trustLine: '', u1Way: false },
     { id: 't3', num: 3, name: 'The U1 Way On Site',                     behavior: 'triggered', scope: 'divisional', tagline: 'Built to Hold.',                  trustLine: '', u1Way: true  },
-    // T4 RETIRED 2026-06-08 (council pass 2): anchored on retired lineup line #3 "Eight specialties. One company."; per-division content routes to T1/T3/T5 by post intent.
+    // T4 RETIRED 2026-06-08 (brand-voice review): anchored on retired lineup line #3 "Eight specialties. One company."; per-division content routes to T1/T3/T5 by post intent.
     { id: 't5', num: 5, name: 'From Financed Paper to Delivered Field', behavior: 'scheduled', scope: 'cross',      tagline: 'From paper to field.',            trustLine: '', u1Way: true  },
-    // T6 REOPENED 2026-06-08 (council pass 2): removed eligibleDivisions + utilityCustomerOverride; added bodyActivationRequired. Open to all 8 specialties when post body activates "utility / useful / usefulness / the use of" in older usefulness sense before tagline. See the Utility Guidance.
+    // T6 REOPENED 2026-06-08 (brand-voice review): removed eligibleDivisions + utilityCustomerOverride; added bodyActivationRequired. Open to all 8 specialties when post body activates "utility / useful / usefulness / the use of" in older usefulness sense before tagline. See the Utility Guidance.
     { id: 't6', num: 6, name: 'One Company, Every Utility',             behavior: 'scheduled', scope: 'cross',      tagline: 'One Company. Every Utility.',     trustLine: '', u1Way: false, bodyActivationRequired: true },
     { id: 't7', num: 7, name: 'U1 Culture',                              behavior: 'triggered', scope: 'company',    tagline: 'Built to Hold.',                  trustLine: '', u1Way: false }
   ],
   // Default theme per unit for scheduled rotation slots. T1 is triggered so
   // mature divisions fall back to T5 (industry direction) / T6 (cross-portfolio).
   // Per-division content routes to T1 / T3 / T5 / T6 based on post intent.
-  // T4 retired 2026-06-08 (council pass 2). T6 reopened to all 8 specialties with
+  // T4 retired 2026-06-08 (brand-voice review). T6 reopened to all 8 specialties with
   // bodyActivationRequired flag (see the body-activation rule).
   unitDefaultTheme: {
     wireline:    't6',
@@ -1442,7 +1425,7 @@ function loadState() {
     if (typeof merged.spotlightOverrides !== 'object' || merged.spotlightOverrides === null) merged.spotlightOverrides = {};
     if (typeof merged.themes !== 'object' || merged.themes === null) merged.themes = {};
     THEMES.forEach(t => { if (merged.themes[t.id] === undefined) merged.themes[t.id] = true; });
-    // Migration: T4 retired 2026-06-08 (council pass 2). Remap any saved t4 theme
+    // Migration: T4 retired 2026-06-08 (brand-voice review). Remap any saved t4 theme
     // references to t5 so old saved state stays valid without wiping user overrides.
     const RETIRED_THEME_MAP = { t4: 't5' };
     for (const k in merged.slotOverrides) {
@@ -2567,7 +2550,7 @@ const MODAL_NOTE_EXAMPLES = {
     consulting:  'Cross-discipline advisory closed inside the engagement window',
     '':          'Pick a division to see a relevant U1 Way On Site example'
   },
-  // T4 RETIRED 2026-06-08 (council pass 2): anchored on retired lineup line #3. Modal note examples removed.
+  // T4 RETIRED 2026-06-08 (brand-voice review): anchored on retired lineup line #3. Modal note examples removed.
   t5: { // From Financed Paper to Delivered Field (scheduled, cross)
     wireline:    'Mandate-to-field: broadband program phase moving from contract to commissioned',
     wireless:    'Mandate-to-field: 5G densification phase moving from RFP to live site',
@@ -2579,7 +2562,7 @@ const MODAL_NOTE_EXAMPLES = {
     consulting:  'Mandate-to-field: advisory engagement from frame-of-reference to action plan',
     '':          'Mandate-to-field framing: paper milestone to delivered work'
   },
-  t6: { // One Company, Every Utility (scheduled, cross-portfolio): BODY ACTIVATION REQUIRED. Open to all 8 specialties per pass 2 (2026-06-08).
+  t6: { // One Company, Every Utility (scheduled, cross-portfolio): BODY ACTIVATION REQUIRED. Open to all 8 specialties in the brand-voice review.
     wireline:    'Wireline work for a named carrier customer; body activates "utility / useful / usefulness / the use of" before tagline (e.g., "The utility of a clean fiber pass is the customer call that never happens")',
     wireless:    'Wireless work; body activates "the use of" or "what makes [X] useful" pattern (e.g., "What makes a small-cell network useful is the speed sites move from approved to active")',
     power:       'Power Delivery work for a named utility customer (NextEra, ComEd, FECA, TVA, PSEG, Georgia Transmission); body activates "the utility of [substation / circuit / hardening work] is..."',

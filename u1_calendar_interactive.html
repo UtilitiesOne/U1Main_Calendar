@@ -1339,7 +1339,7 @@ const BRAND_CONFIG = {
     { id: 't3', num: 3, name: 'The U1 Way On Site',                     behavior: 'triggered', scope: 'divisional', tagline: 'Built to Hold.',                  trustLine: '', u1Way: true  },
     // T4 RETIRED 2026-06-08 (council pass 2): anchored on retired lineup line #3 "Eight specialties. One company."; per-division content routes to T1/T3/T5 by post intent.
     { id: 't5', num: 5, name: 'From Financed Paper to Delivered Field', behavior: 'scheduled', scope: 'cross',      tagline: 'From paper to field.',            trustLine: '', u1Way: true  },
-    // T6 REOPENED 2026-06-08 (council pass 2): removed eligibleDivisions + utilityCustomerOverride; added bodyActivationRequired. Open to all 8 specialties when post body activates "utility / useful / usefulness / the use of" in older usefulness sense before tagline. See feedback-brand-line-body-activation-rule.
+    // T6 REOPENED 2026-06-08 (council pass 2): removed eligibleDivisions + utilityCustomerOverride; added bodyActivationRequired. Open to all 8 specialties when post body activates "utility / useful / usefulness / the use of" in older usefulness sense before tagline. See the Utility Guidance.
     { id: 't6', num: 6, name: 'One Company, Every Utility',             behavior: 'scheduled', scope: 'cross',      tagline: 'One Company. Every Utility.',     trustLine: '', u1Way: false, bodyActivationRequired: true },
     { id: 't7', num: 7, name: 'U1 Culture',                              behavior: 'triggered', scope: 'company',    tagline: 'Built to Hold.',                  trustLine: '', u1Way: false }
   ],
@@ -2588,7 +2588,7 @@ const MODAL_NOTE_EXAMPLES = {
     datacenters: 'Data Centers work (Amazon per logo wall); body activates "the utility of a data center campus to the region around it"',
     fulfillment: 'Fulfillment / multi-trade coordination; body activates "the utility of a clean install on day one"',
     consulting:  'Consulting (engineering, permitting, staffing) work; body activates "the utility of a permit pack that goes through clean"',
-    '':          'Cross-portfolio post · body MUST activate "utility / useful / usefulness / the use of" in older usefulness sense before tagline lands. See feedback-brand-line-body-activation-rule. Visual tag stays on every post; body does the meaning-carrying work. Downstream surfaces (OG previews, reshares) inherit context from primary publish.'
+    '':          'Cross-portfolio post · body MUST activate "utility / useful / usefulness / the use of" in older usefulness sense before tagline lands. See the Utility Guidance. Visual tag stays on every post; body does the meaning-carrying work. Downstream surfaces (OG previews, reshares) inherit context from primary publish.'
   },
   t7: { // U1 Culture (triggered, company-wide)
     '': 'e.g., Leadership visit to a field office; annual meeting recap; team award or milestone'
@@ -2605,7 +2605,7 @@ function getModalNoteExample(themeId, divisionId) {
 // Part IV = 3 three-division extension examples (Chairman authored). Each entry shows the
 // body-activation sentence that primes "utility / useful / usefulness / the use of" before
 // the "One Company. Every Utility." tagline lands. Pattern: same-site = one activation, shared
-// physical site; sequenced = design/scope then build/execute. See feedback-brand-line-body-activation-rule.
+// physical site; sequenced = design/scope then build/execute. See the Utility Guidance.
 function renderCrossDivisionExamples() {
   return `<details style="margin-top:6px; border:1px solid var(--line, #ddd); border-radius:6px; padding:8px 10px;">
     <summary style="cursor:pointer; font-size:12px; font-weight:600; color:var(--ink, #1E5B8B);">Cross-divisional voice tiers &middot; worked example posts</summary>
@@ -2614,7 +2614,6 @@ function renderCrossDivisionExamples() {
       <div style="padding:5px 0;"><a href="u1_voice_conservative_one.html" target="_blank" style="font-weight:600; font-size:12px; color:var(--accent, #1E5B8B); text-decoration:none;">Conservative One &rarr;</a> <span style="font-size:11px; color:var(--mute);">standard register, measured and operator-grade</span></div>
       <div style="padding:5px 0;"><a href="u1_voice_flamboyant_one.html" target="_blank" style="font-weight:600; font-size:12px; color:var(--accent, #1E5B8B); text-decoration:none;">Flamboyant One &rarr;</a> <span style="font-size:11px; color:var(--mute);">more gravitas and swing, same discipline</span></div>
       <div style="padding:5px 0;"><a href="u1_voice_marketing_one.html" target="_blank" style="font-weight:600; font-size:12px; color:var(--accent, #1E5B8B); text-decoration:none;">Marketing One &rarr;</a> <span style="font-size:11px; color:var(--mute);">hook and fact, built to draw attention</span></div>
-      <div style="padding:5px 0;"><span style="font-weight:600; font-size:12px; color:var(--mute);">Magic One</span> <span style="font-size:11px; color:var(--mute);">unfenced creative stretch, local only and not published</span></div>
     </div>
     <div style="font-size:10px; color:var(--mute); margin-top:6px; line-height:1.4;">See the <a href="u1_utility_guidance.html" target="_blank" style="color:var(--accent,#1E5B8B);">Utility Guidance</a> for the body-activation discipline. Under the interim image-only rule, cross-divisional visuals use "Built to Hold." or no tagline; the body still carries the activation.</div>
   </details>`;

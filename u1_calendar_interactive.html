@@ -1096,6 +1096,12 @@
       <div id="review-list"></div>
     </div>
 
+    <div class="section" id="version-panel" style="display:none;">
+      <h3 class="section-title">Version history <span id="version-count" style="font-weight:400; color:var(--mute);">0</span></h3>
+      <div style="font-size:11px; color:var(--mute); margin-bottom:8px; line-height:1.45;">The last 10 published versions. Restore puts a version back on the live calendar everyone sees.</div>
+      <div id="version-list"></div>
+    </div>
+
     <div class="stats">
       <div class="stat-line"><span>Window</span> <strong id="stat-window">...</strong></div>
       <div class="stat-line"><span>This month posts</span> <strong id="stat-count">...</strong></div>
@@ -3105,13 +3111,14 @@ function onAuthChange(user) {
     syncEl('signout-btn').style.display = 'block';
     syncEl('sync-who').textContent = user.email + (fb.isOwner ? ' (owner)' : ' (editor)');
     loadOrCreateProposal();
-    if (fb.isOwner) { syncEl('review-panel').style.display = 'block'; subscribeProposals(); }
+    if (fb.isOwner) { syncEl('review-panel').style.display = 'block'; subscribeProposals(); syncEl('version-panel').style.display = 'block'; subscribeVersions(); }
   } else {
     syncEl('signin-btn').style.display = 'block';
     syncEl('signout-btn').style.display = 'none';
     syncEl('sync-who').textContent = '';
     syncEl('sync-savestate').textContent = '';
     syncEl('review-panel').style.display = 'none';
+    syncEl('version-panel').style.display = 'none';
     fb.isEditor = false; fb.previewing = false;
     if (window.__liveState) { state = window.__liveState; renderAll(); }
   }
@@ -3144,13 +3151,60 @@ function subscribeProposals() {
       const preview = document.createElement('button'); preview.className = 'reset'; preview.textContent = 'Preview';
       preview.onclick = () => { if (d.state) { fb.previewing = true; state = d.state; renderAll(); syncEl('review-mydraft-btn').style.display = 'block'; syncEl('sync-savestate').textContent = 'Previewing ' + (d.email || doc.id) + ' (read-only). Publish to make it live, or return to your draft.'; } };
       const publish = document.createElement('button'); publish.className = 'reset'; publish.style.cssText = 'border-color:var(--accent);color:var(--accent);'; publish.textContent = 'Publish';
-      publish.onclick = () => { if (confirm('Publish ' + (d.email || doc.id) + "'s proposal to the LIVE calendar everyone sees?")) { firebase.firestore().collection('calendar').doc('live').set({ state: d.state, publishedAt: firebase.firestore.FieldValue.serverTimestamp(), publishedBy: fb.user.email, fromProposal: doc.id }).then(() => { window.__liveState = d.state; fb.previewing = true; state = d.state; renderAll(); syncEl('review-mydraft-btn').style.display = 'block'; syncEl('sync-savestate').textContent = 'Published to live ' + new Date().toLocaleTimeString() + '. Showing the live calendar; return to your draft anytime.'; }).catch(e => alert('Publish error: ' + e.message)); } };
+      publish.onclick = () => { if (confirm('Publish ' + (d.email || doc.id) + "'s proposal to the LIVE calendar everyone sees?")) { publishToLive(d.state, 'published from proposal by ' + (d.email || doc.id)).then(() => { window.__liveState = d.state; fb.previewing = true; state = d.state; renderAll(); syncEl('review-mydraft-btn').style.display = 'block'; syncEl('sync-savestate').textContent = 'Published to live ' + new Date().toLocaleTimeString() + '. Showing the live calendar; return to your draft anytime.'; }).catch(e => alert('Publish error: ' + e.message)); } };
       const discard = document.createElement('button'); discard.className = 'reset'; discard.textContent = 'Discard';
       discard.onclick = () => { if (confirm('Delete this proposal? The editor keeps their local copy.')) firebase.firestore().collection('proposals').doc(doc.id).delete(); };
       btnRow.appendChild(preview); btnRow.appendChild(publish); btnRow.appendChild(discard);
       row.appendChild(btnRow); list.appendChild(row);
     });
   }, err => { syncEl('review-list').innerHTML = '<div style="font-size:11px;color:var(--warn);">Review read error: ' + escapeHtml(err.message) + '</div>'; });
+}
+
+function publishToLive(stateObj, source) {
+  // Writing calendar/live is the gating step. The version-history entry is best-effort:
+  // if it fails (e.g. calendar_versions rules not deployed yet) the publish still succeeds.
+  var db = firebase.firestore();
+  return db.collection('calendar').doc('live').set({
+    state: stateObj,
+    publishedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    publishedBy: fb.user.email,
+    source: source
+  }).then(function () {
+    db.collection('calendar_versions').add({
+      state: stateObj,
+      publishedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      publishedBy: fb.user.email,
+      source: source
+    }).then(function () {
+      // keep only the last 10 versions
+      db.collection('calendar_versions').orderBy('publishedAt', 'desc').get().then(function (snap) {
+        snap.docs.slice(10).forEach(function (doc) { doc.ref.delete(); });
+      }).catch(function () {});
+    }).catch(function (e) { console.warn('Version history write skipped:', e.message); });
+  });
+}
+
+function subscribeVersions() {
+  firebase.firestore().collection('calendar_versions').orderBy('publishedAt', 'desc').limit(10).onSnapshot(function (snap) {
+    var list = syncEl('version-list'); list.innerHTML = '';
+    syncEl('version-count').textContent = snap.size;
+    if (snap.size === 0) { list.innerHTML = '<div style="font-size:11px;color:var(--mute);">No published versions yet.</div>'; return; }
+    snap.forEach(function (doc) {
+      var v = doc.data();
+      var when = v.publishedAt && v.publishedAt.toDate ? v.publishedAt.toDate().toLocaleString() : '(saving...)';
+      var row = document.createElement('div');
+      row.style.cssText = 'border:1px solid var(--rule); border-radius:6px; padding:8px; margin-bottom:6px;';
+      row.innerHTML = '<div style="font-weight:600;font-size:12px;">' + escapeHtml(when) + '</div>' +
+        '<div style="font-size:10px;color:var(--mute);margin-bottom:6px;">' + escapeHtml(v.source || ('by ' + (v.publishedBy || '?'))) + '</div>';
+      var btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex; gap:6px; flex-wrap:wrap;';
+      var preview = document.createElement('button'); preview.className = 'reset'; preview.textContent = 'Preview';
+      preview.onclick = function () { if (v.state) { fb.previewing = true; state = v.state; renderAll(); syncEl('review-mydraft-btn').style.display = 'block'; syncEl('sync-savestate').textContent = 'Previewing a past version (read-only). Restore to make it live, or return to your draft.'; } };
+      var restore = document.createElement('button'); restore.className = 'reset'; restore.style.cssText = 'border-color:var(--accent);color:var(--accent);'; restore.textContent = 'Restore';
+      restore.onclick = function () { if (confirm('Restore this version to the LIVE calendar everyone sees?')) { publishToLive(v.state, 'restored from ' + when).then(function () { window.__liveState = v.state; fb.previewing = true; state = v.state; renderAll(); syncEl('review-mydraft-btn').style.display = 'block'; syncEl('sync-savestate').textContent = 'Restored to live ' + new Date().toLocaleTimeString() + '. Showing the live calendar; return to your draft anytime.'; }).catch(function (e) { alert('Restore error: ' + e.message); }); } };
+      btnRow.appendChild(preview); btnRow.appendChild(restore);
+      row.appendChild(btnRow); list.appendChild(row);
+    });
+  }, function (err) { syncEl('version-list').innerHTML = '<div style="font-size:11px;color:var(--warn);">History read error: ' + escapeHtml(err.message) + '</div>'; });
 }
 
 initFirebaseSync();

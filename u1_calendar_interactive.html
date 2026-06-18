@@ -1085,6 +1085,8 @@
         <button class="reset" id="signin-btn" style="border-color:var(--accent); color:var(--accent);">Sign in with Google</button>
         <button class="reset" id="signout-btn" style="display:none;">Sign out</button>
         <div id="sync-who" style="font-size:11px; color:var(--ink); font-weight:600;"></div>
+        <button class="reset" id="edit-mode-btn" style="display:none; border-color:var(--accent); color:var(--accent);">Propose changes</button>
+        <button class="reset" id="view-live-btn" style="display:none;">&larr; Back to live view</button>
         <div id="sync-savestate" style="font-size:10px; color:var(--mute); line-height:1.4;"></div>
       </div>
     </div>
@@ -1092,7 +1094,7 @@
     <div class="section" id="review-panel" style="display:none;">
       <h3 class="section-title">Review proposals <span id="review-count" style="font-weight:400; color:var(--mute);">0</span></h3>
       <div style="font-size:11px; color:var(--mute); margin-bottom:8px; line-height:1.45;">Each editor's working draft. Publish writes it to the live calendar everyone sees.</div>
-      <button class="reset" id="review-mydraft-btn" style="display:none; width:100%; margin-bottom:8px;">&larr; Back to my own draft</button>
+      <button class="reset" id="review-mydraft-btn" style="display:none; width:100%; margin-bottom:8px;">&larr; Back to live view</button>
       <div id="review-list"></div>
     </div>
 
@@ -1881,7 +1883,7 @@ function renderMonthGrid() {
     // − button only enables for active posts. Skipped slots show a ghost chip
     // that the user clicks to restore.
     const removeDisabled = hasPosts ? '' : 'disabled';
-    const actionsHtml = inMonth && inWindow
+    const actionsHtml = inMonth && inWindow && canEdit()
       ? `<div class="day-actions">
           <button class="day-add" title="Add a post on this day">+</button>
           <button class="day-remove" title="Remove a post on this day" ${removeDisabled}>−</button>
@@ -2203,7 +2205,7 @@ function openDetailPanel(slot) {
   // so writer can swap T1 for T4 or T5 (or any theme) when project content
   // is absent for that division. The "default" shown below the dropdown is the
   // division's baked default, not the current slot theme.
-  const isEditable = !slot.isSpotlight && !slot.isTriggered;
+  const isEditable = !slot.isSpotlight && !slot.isTriggered && canEdit();
   let defaultThemeId, alternatives;
   if (isEditable) {
     if (slot.divisionId) {
@@ -2466,6 +2468,7 @@ let modalEditId = null;
 let modalState = null;
 
 function openModal({ mode, prefilledDate = null, editEvent = null }) {
+  ensureEditing();
   modalMode = mode;
   modalEditId = editEvent ? editEvent.id : null;
   const today = isoDate(TODAY);
@@ -3063,41 +3066,102 @@ function syncEl(id) { return document.getElementById(id); }
 // Option A (open proposals): any signed-in user may edit their own draft; only
 // OWNER_EMAIL can publish. No editor allowlist to maintain.
 
+function fbClone(o) { return JSON.parse(JSON.stringify(o)); }
+function canEdit() { return (typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON) || fb.editing; }
+
+function updateModeIndicator() {
+  var el = syncEl('sync-savestate'); if (!el) return;
+  if (!fb.user) { el.textContent = ''; return; }
+  if (fb.previewing) { el.textContent = 'Previewing (read-only). Return to live anytime.'; return; }
+  if (fb.editing) { el.textContent = 'Editing your proposal, based on live v' + (fb.baseVersion || 0) + '. Auto-saves; the owner publishes to live.'; return; }
+  el.textContent = 'Viewing the live calendar (v' + (window.__liveVersion || 0) + '). Click "Propose changes" to edit.';
+}
+
+function setEditButtons() {
+  var em = syncEl('edit-mode-btn'), vl = syncEl('view-live-btn');
+  var on = (typeof FIREBASE_ON !== 'undefined' && FIREBASE_ON) && !!fb.user;
+  if (em) em.style.display = (on && !fb.editing && !fb.previewing) ? 'block' : 'none';
+  if (vl) vl.style.display = (on && (fb.editing || fb.previewing)) ? 'block' : 'none';
+}
+
+function applyLiveToView() {
+  if (!fb.editing && !fb.previewing && window.__liveState) {
+    state = fbClone(window.__liveState);
+    if (!state.currentMonth) state.currentMonth = TODAY_MONTH_ISO;
+    renderAll();
+  }
+}
+
+function enterEditMode() {
+  if (!(typeof FIREBASE_ON !== 'undefined' && FIREBASE_ON) || !fb.user) return;
+  fb.previewing = false;
+  fb.editing = true;
+  fb.baseVersion = window.__liveVersion || 0;
+  fb.baseState = fbClone(window.__liveState || state);
+  state = fbClone(window.__liveState || state);
+  if (!state.currentMonth) state.currentMonth = TODAY_MONTH_ISO;
+  renderAll();
+  setEditButtons(); updateModeIndicator();
+  pushProposalNow();
+}
+
+function ensureEditing() {
+  if ((typeof FIREBASE_ON !== 'undefined' && FIREBASE_ON) && fb.user && !fb.editing && !fb.previewing) enterEditMode();
+}
+
+function exitToLive() {
+  fb.editing = false; fb.previewing = false;
+  if (window.__liveState) {
+    state = fbClone(window.__liveState);
+    if (!state.currentMonth) state.currentMonth = TODAY_MONTH_ISO;
+  }
+  renderAll();
+  setEditButtons(); updateModeIndicator();
+}
+
 function pushProposal() {
-  if (!(typeof FIREBASE_ON !== 'undefined' && FIREBASE_ON) || !fb.isEditor || !fb.user || fb.previewing) return;
+  if (!(typeof FIREBASE_ON !== 'undefined' && FIREBASE_ON) || !fb.user || fb.previewing || !fb.editing) return;
   clearTimeout(fb.saveTimer);
-  fb.saveTimer = setTimeout(() => {
-    firebase.firestore().collection('proposals').doc(fb.user.uid).set({
-      email: fb.user.email,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      state: state
-    }).then(() => { syncEl('sync-savestate').textContent = 'Draft saved ' + new Date().toLocaleTimeString(); })
-      .catch(e => { syncEl('sync-savestate').textContent = 'Save error: ' + e.message; });
-  }, 800);
+  fb.saveTimer = setTimeout(pushProposalNow, 800);
+}
+
+function pushProposalNow() {
+  if (!(typeof FIREBASE_ON !== 'undefined' && FIREBASE_ON) || !fb.user || fb.previewing || !fb.editing) return;
+  firebase.firestore().collection('proposals').doc(fb.user.uid).set({
+    email: fb.user.email,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    state: state,
+    baseVersion: fb.baseVersion || 0,
+    baseState: fb.baseState || null
+  }).then(function () { updateModeIndicator(); })
+    .catch(function (e) { var el = syncEl('sync-savestate'); if (el) el.textContent = 'Save error: ' + e.message; });
 }
 
 function initFirebaseSync() {
-  if (typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON) return; // offline / local-only
+  if (typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON) return;
   if (typeof firebase === 'undefined') { syncEl('sync-status').textContent = 'Firebase SDK failed to load. Running local-only.'; return; }
   firebase.initializeApp(firebaseConfig);
   syncEl('sync-auth').style.display = 'flex';
-  syncEl('sync-status').textContent = 'Live calendar connected. Sign in to propose changes.';
+  syncEl('sync-status').textContent = 'Live calendar connected. Everyone sees this one shared version.';
 
-  // Live calendar (public read). Everyone sees the published state.
-  firebase.firestore().collection('calendar').doc('live').onSnapshot(doc => {
-    const data = doc.exists ? doc.data() : null;
+  firebase.firestore().collection('calendar').doc('live').onSnapshot(function (doc) {
+    var data = doc.exists ? doc.data() : null;
     if (data && data.state) {
       window.__liveState = data.state;
-      // Viewers (and anyone not actively editing their own draft) mirror live.
-      if (!fb.isEditor && !fb.previewing) { state = data.state; renderAll(); }
+      window.__liveVersion = data.version || 0;
+      applyLiveToView();
+      updateModeIndicator();
+      if (fb.isOwner && window.__proposalsSnap) renderProposalList();
     }
-  }, err => { syncEl('sync-status').textContent = 'Live read error: ' + err.message; });
+  }, function (err) { syncEl('sync-status').textContent = 'Live read error: ' + err.message; });
 
-  syncEl('signin-btn').addEventListener('click', () => {
-    firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e => alert(e.message));
+  syncEl('signin-btn').addEventListener('click', function () {
+    firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function (e) { alert(e.message); });
   });
-  syncEl('signout-btn').addEventListener('click', () => firebase.auth().signOut());
-  syncEl('review-mydraft-btn').addEventListener('click', () => { fb.previewing = false; loadOrCreateProposal(); });
+  syncEl('signout-btn').addEventListener('click', function () { firebase.auth().signOut(); });
+  if (syncEl('edit-mode-btn')) syncEl('edit-mode-btn').addEventListener('click', enterEditMode);
+  if (syncEl('view-live-btn')) syncEl('view-live-btn').addEventListener('click', exitToLive);
+  if (syncEl('review-mydraft-btn')) syncEl('review-mydraft-btn').addEventListener('click', exitToLive);
 
   firebase.auth().onAuthStateChanged(onAuthChange);
 }
@@ -3105,88 +3169,123 @@ function initFirebaseSync() {
 function onAuthChange(user) {
   fb.user = user;
   fb.isOwner = !!(user && user.email === OWNER_EMAIL);
-  fb.isEditor = !!user; // Option A: any signed-in user may edit their own draft
+  fb.isEditor = !!user;
+  fb.editing = false; fb.previewing = false;
   if (user) {
     syncEl('signin-btn').style.display = 'none';
     syncEl('signout-btn').style.display = 'block';
     syncEl('sync-who').textContent = user.email + (fb.isOwner ? ' (owner)' : ' (editor)');
-    loadOrCreateProposal();
     if (fb.isOwner) { syncEl('review-panel').style.display = 'block'; subscribeProposals(); syncEl('version-panel').style.display = 'block'; subscribeVersions(); }
   } else {
     syncEl('signin-btn').style.display = 'block';
     syncEl('signout-btn').style.display = 'none';
     syncEl('sync-who').textContent = '';
-    syncEl('sync-savestate').textContent = '';
     syncEl('review-panel').style.display = 'none';
     syncEl('version-panel').style.display = 'none';
-    fb.isEditor = false; fb.previewing = false;
-    if (window.__liveState) { state = window.__liveState; renderAll(); }
   }
-}
-
-function loadOrCreateProposal() {
-  fb.previewing = false;
-  firebase.firestore().collection('proposals').doc(fb.user.uid).get().then(doc => {
-    if (doc.exists && doc.data().state) { state = doc.data().state; }
-    else if (window.__liveState) { state = window.__liveState; }
-    if (typeof state.currentMonth === 'undefined' || !state.currentMonth) state.currentMonth = TODAY_MONTH_ISO;
-    renderAll();
-    syncEl('sync-savestate').textContent = 'Editing your draft. Changes save automatically; the owner reviews and publishes to live.';
-  }).catch(e => { syncEl('sync-savestate').textContent = 'Draft load error: ' + e.message; });
+  exitToLive();
+  setEditButtons();
 }
 
 function subscribeProposals() {
-  firebase.firestore().collection('proposals').onSnapshot(snap => {
-    const list = syncEl('review-list'); list.innerHTML = '';
-    syncEl('review-count').textContent = snap.size;
-    if (snap.size === 0) { list.innerHTML = '<div style="font-size:11px;color:var(--mute);">No proposals yet.</div>'; return; }
-    snap.forEach(doc => {
-      const d = doc.data();
-      const when = d.updatedAt && d.updatedAt.toDate ? d.updatedAt.toDate().toLocaleString() : '(saving...)';
-      const row = document.createElement('div');
-      row.style.cssText = 'border:1px solid var(--rule); border-radius:6px; padding:8px; margin-bottom:6px;';
-      row.innerHTML = '<div style="font-weight:600;font-size:12px;">' + escapeHtml(d.email || doc.id) + '</div>' +
-        '<div style="font-size:10px;color:var(--mute);margin-bottom:6px;">updated ' + escapeHtml(when) + '</div>';
-      const btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex; gap:6px; flex-wrap:wrap;';
-      const preview = document.createElement('button'); preview.className = 'reset'; preview.textContent = 'Preview';
-      preview.onclick = () => { if (d.state) { fb.previewing = true; state = d.state; renderAll(); syncEl('review-mydraft-btn').style.display = 'block'; syncEl('sync-savestate').textContent = 'Previewing ' + (d.email || doc.id) + ' (read-only). Publish to make it live, or return to your draft.'; } };
-      const publish = document.createElement('button'); publish.className = 'reset'; publish.style.cssText = 'border-color:var(--accent);color:var(--accent);'; publish.textContent = 'Publish';
-      publish.onclick = () => { if (confirm('Publish ' + (d.email || doc.id) + "'s proposal to the LIVE calendar everyone sees?")) { publishToLive(d.state, 'published from proposal by ' + (d.email || doc.id)).then(() => { window.__liveState = d.state; fb.previewing = true; state = d.state; renderAll(); syncEl('review-mydraft-btn').style.display = 'block'; syncEl('sync-savestate').textContent = 'Published to live ' + new Date().toLocaleTimeString() + '. Showing the live calendar; return to your draft anytime.'; }).catch(e => alert('Publish error: ' + e.message)); } };
-      const discard = document.createElement('button'); discard.className = 'reset'; discard.textContent = 'Discard';
-      discard.onclick = () => { if (confirm('Delete this proposal? The editor keeps their local copy.')) firebase.firestore().collection('proposals').doc(doc.id).delete(); };
-      btnRow.appendChild(preview); btnRow.appendChild(publish); btnRow.appendChild(discard);
-      row.appendChild(btnRow); list.appendChild(row);
-    });
-  }, err => { syncEl('review-list').innerHTML = '<div style="font-size:11px;color:var(--warn);">Review read error: ' + escapeHtml(err.message) + '</div>'; });
+  firebase.firestore().collection('proposals').onSnapshot(function (snap) {
+    window.__proposalsSnap = snap;
+    renderProposalList();
+  }, function (err) { syncEl('review-list').innerHTML = '<div style="font-size:11px;color:var(--warn);">Review read error: ' + escapeHtml(err.message) + '</div>'; });
 }
 
-function publishToLive(stateObj, source) {
-  // Writing calendar/live is the gating step. The version-history entry is best-effort:
-  // if it fails (e.g. calendar_versions rules not deployed yet) the publish still succeeds.
-  var db = firebase.firestore();
-  return db.collection('calendar').doc('live').set({
-    state: stateObj,
-    publishedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    publishedBy: fb.user.email,
-    source: source
-  }).then(function () {
-    db.collection('calendar_versions').add({
-      state: stateObj,
-      publishedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      publishedBy: fb.user.email,
-      source: source
-    }).then(function () {
-      // keep only the last 10 versions
-      db.collection('calendar_versions').orderBy('publishedAt', 'desc').get().then(function (snap) {
-        snap.docs.slice(10).forEach(function (doc) { doc.ref.delete(); });
-      }).catch(function () {});
-    }).catch(function (e) { console.warn('Version history write skipped:', e.message); });
+function renderProposalList() {
+  var snap = window.__proposalsSnap; if (!snap) return;
+  var list = syncEl('review-list'); if (!list) return; list.innerHTML = '';
+  syncEl('review-count').textContent = snap.size;
+  if (snap.size === 0) { list.innerHTML = '<div style="font-size:11px;color:var(--mute);">No proposals yet.</div>'; return; }
+  var liveV = window.__liveVersion || 0;
+  snap.forEach(function (doc) {
+    var d = doc.data();
+    var when = d.updatedAt && d.updatedAt.toDate ? d.updatedAt.toDate().toLocaleString() : '(saving...)';
+    var base = d.baseVersion || 0;
+    var stale = base < liveV;
+    var row = document.createElement('div');
+    row.style.cssText = 'border:1px solid var(--rule); border-radius:6px; padding:8px; margin-bottom:6px;';
+    row.innerHTML = '<div style="font-weight:600;font-size:12px;">' + escapeHtml(d.email || doc.id) + '</div>' +
+      '<div style="font-size:10px;color:var(--mute);margin-bottom:6px;">updated ' + escapeHtml(when) + ' &middot; based on v' + base +
+      (stale ? ' <span style="color:var(--warn);font-weight:600;">(live is v' + liveV + ' &mdash; rebase to publish)</span>' : '') + '</div>';
+    var btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex; gap:6px; flex-wrap:wrap;';
+    var preview = document.createElement('button'); preview.className = 'reset'; preview.textContent = 'Preview';
+    preview.onclick = function () { if (d.state) { fb.previewing = true; fb.editing = false; state = fbClone(d.state); renderAll(); setEditButtons(); syncEl('sync-savestate').textContent = 'Previewing ' + (d.email || doc.id) + ' (read-only).'; } };
+    btnRow.appendChild(preview);
+    if (!stale) {
+      var publish = document.createElement('button'); publish.className = 'reset'; publish.style.cssText = 'border-color:var(--accent);color:var(--accent);'; publish.textContent = 'Publish';
+      publish.onclick = function () { if (confirm('Publish ' + (d.email || doc.id) + "'s proposal to the LIVE calendar everyone sees?")) { guardedPublish(d.state, base, 'published from proposal by ' + (d.email || doc.id)); } };
+      btnRow.appendChild(publish);
+    } else {
+      var rebase = document.createElement('button'); rebase.className = 'reset'; rebase.style.cssText = 'border-color:var(--accent);color:var(--accent);'; rebase.textContent = 'Rebase & publish';
+      rebase.onclick = function () { if (confirm('Rebase ' + (d.email || doc.id) + "'s proposal onto the current live calendar and publish? Their day-level changes win on any same-day conflict.")) { var merged = mergeOntoLive(window.__liveState, d.baseState, d.state); guardedPublish(merged, window.__liveVersion || 0, 'rebased + published from proposal by ' + (d.email || doc.id)); } };
+      btnRow.appendChild(rebase);
+    }
+    var discard = document.createElement('button'); discard.className = 'reset'; discard.textContent = 'Discard';
+    discard.onclick = function () { if (confirm('Delete this proposal? The editor keeps their local copy.')) firebase.firestore().collection('proposals').doc(doc.id).delete(); };
+    btnRow.appendChild(discard);
+    row.appendChild(btnRow); list.appendChild(row);
   });
 }
 
+function guardedPublish(stateObj, expectedVersion, source) {
+  var db = firebase.firestore();
+  var liveRef = db.collection('calendar').doc('live');
+  db.runTransaction(function (tx) {
+    return tx.get(liveRef).then(function (snap) {
+      var cur = snap.exists ? (snap.data().version || 0) : 0;
+      if (cur !== expectedVersion) { throw new Error('STALE:' + cur); }
+      tx.set(liveRef, {
+        state: stateObj,
+        version: cur + 1,
+        publishedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        publishedBy: fb.user.email,
+        source: source
+      });
+      return cur + 1;
+    });
+  }).then(function (newV) {
+    db.collection('calendar_versions').add({ state: stateObj, version: newV, publishedAt: firebase.firestore.FieldValue.serverTimestamp(), publishedBy: fb.user.email, source: source })
+      .then(function () { db.collection('calendar_versions').orderBy('publishedAt', 'desc').get().then(function (ss) { ss.docs.slice(20).forEach(function (dd) { dd.ref.delete(); }); }).catch(function () {}); })
+      .catch(function (e) { console.warn('Version history write skipped:', e.message); });
+    window.__liveState = stateObj; window.__liveVersion = newV;
+    fb.previewing = false; fb.editing = false;
+    state = fbClone(stateObj); renderAll(); setEditButtons();
+    syncEl('sync-savestate').textContent = 'Published to live as v' + newV + ' at ' + new Date().toLocaleTimeString() + '. Everyone now sees this.';
+  }).catch(function (e) {
+    var msg = String((e && e.message) || e);
+    if (msg.indexOf('STALE:') === 0) { alert('Live already advanced to v' + msg.split(':')[1] + ' since this was drafted. Use "Rebase & publish" to apply it on top of the current live calendar.'); }
+    else { alert('Publish error: ' + msg); }
+  });
+}
+
+function mergeOntoLive(live, base, edited) {
+  var result = fbClone(live || {});
+  base = base || {}; edited = edited || {};
+  ['slotOverrides', 'spotlightOverrides'].forEach(function (key) {
+    var b = base[key] || {}, ed = edited[key] || {};
+    if (typeof result[key] !== 'object' || result[key] === null) result[key] = {};
+    Object.keys(ed).forEach(function (date) { if (JSON.stringify(ed[date]) !== JSON.stringify(b[date])) result[key][date] = fbClone(ed[date]); });
+    Object.keys(b).forEach(function (date) { if (!(date in ed) && (date in result[key])) delete result[key][date]; });
+  });
+  var bEv = base.triggeredEvents || [], edEv = edited.triggeredEvents || [];
+  var edIds = {}; edEv.forEach(function (e) { edIds[e.id] = e; });
+  if (!Array.isArray(result.triggeredEvents)) result.triggeredEvents = [];
+  var resById = {}; result.triggeredEvents.forEach(function (e) { resById[e.id] = e; });
+  edEv.forEach(function (e) { resById[e.id] = fbClone(e); });
+  bEv.forEach(function (e) { if (!(e.id in edIds)) delete resById[e.id]; });
+  result.triggeredEvents = Object.keys(resById).map(function (k) { return resById[k]; });
+  ['spot1Div', 'spot2Div', 'spot1Count', 'spot2Count', 'themes'].forEach(function (key) {
+    if (JSON.stringify(edited[key]) !== JSON.stringify(base[key])) result[key] = fbClone(edited[key]);
+  });
+  return result;
+}
+
 function subscribeVersions() {
-  firebase.firestore().collection('calendar_versions').orderBy('publishedAt', 'desc').limit(10).onSnapshot(function (snap) {
-    var list = syncEl('version-list'); list.innerHTML = '';
+  firebase.firestore().collection('calendar_versions').orderBy('publishedAt', 'desc').limit(20).onSnapshot(function (snap) {
+    var list = syncEl('version-list'); if (!list) return; list.innerHTML = '';
     syncEl('version-count').textContent = snap.size;
     if (snap.size === 0) { list.innerHTML = '<div style="font-size:11px;color:var(--mute);">No published versions yet.</div>'; return; }
     snap.forEach(function (doc) {
@@ -3194,13 +3293,13 @@ function subscribeVersions() {
       var when = v.publishedAt && v.publishedAt.toDate ? v.publishedAt.toDate().toLocaleString() : '(saving...)';
       var row = document.createElement('div');
       row.style.cssText = 'border:1px solid var(--rule); border-radius:6px; padding:8px; margin-bottom:6px;';
-      row.innerHTML = '<div style="font-weight:600;font-size:12px;">' + escapeHtml(when) + '</div>' +
+      row.innerHTML = '<div style="font-weight:600;font-size:12px;">v' + (v.version || '?') + ' &middot; ' + escapeHtml(when) + '</div>' +
         '<div style="font-size:10px;color:var(--mute);margin-bottom:6px;">' + escapeHtml(v.source || ('by ' + (v.publishedBy || '?'))) + '</div>';
       var btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex; gap:6px; flex-wrap:wrap;';
       var preview = document.createElement('button'); preview.className = 'reset'; preview.textContent = 'Preview';
-      preview.onclick = function () { if (v.state) { fb.previewing = true; state = v.state; renderAll(); syncEl('review-mydraft-btn').style.display = 'block'; syncEl('sync-savestate').textContent = 'Previewing a past version (read-only). Restore to make it live, or return to your draft.'; } };
+      preview.onclick = function () { if (v.state) { fb.previewing = true; fb.editing = false; state = fbClone(v.state); renderAll(); setEditButtons(); syncEl('sync-savestate').textContent = 'Previewing v' + (v.version || '?') + ' (read-only).'; } };
       var restore = document.createElement('button'); restore.className = 'reset'; restore.style.cssText = 'border-color:var(--accent);color:var(--accent);'; restore.textContent = 'Restore';
-      restore.onclick = function () { if (confirm('Restore this version to the LIVE calendar everyone sees?')) { publishToLive(v.state, 'restored from ' + when).then(function () { window.__liveState = v.state; fb.previewing = true; state = v.state; renderAll(); syncEl('review-mydraft-btn').style.display = 'block'; syncEl('sync-savestate').textContent = 'Restored to live ' + new Date().toLocaleTimeString() + '. Showing the live calendar; return to your draft anytime.'; }).catch(function (e) { alert('Restore error: ' + e.message); }); } };
+      restore.onclick = function () { if (confirm('Restore v' + (v.version || '?') + ' to the LIVE calendar everyone sees?')) { guardedPublish(v.state, window.__liveVersion || 0, 'restored from v' + (v.version || '?')); } };
       btnRow.appendChild(preview); btnRow.appendChild(restore);
       row.appendChild(btnRow); list.appendChild(row);
     });

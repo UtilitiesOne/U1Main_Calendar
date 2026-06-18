@@ -1087,6 +1087,7 @@
         <div id="sync-who" style="font-size:11px; color:var(--ink); font-weight:600;"></div>
         <button class="reset" id="edit-mode-btn" style="display:none; border-color:var(--accent); color:var(--accent);">Propose changes</button>
         <button class="reset" id="view-live-btn" style="display:none;">&larr; Back to live view</button>
+        <button class="reset" id="submit-approval-btn" style="display:none; border-color:var(--ok,#1f7a4d); color:var(--ok,#1f7a4d);">Submit for approval</button>
         <div id="sync-savestate" style="font-size:10px; color:var(--mute); line-height:1.4;"></div>
       </div>
     </div>
@@ -3078,10 +3079,11 @@ function updateModeIndicator() {
 }
 
 function setEditButtons() {
-  var em = syncEl('edit-mode-btn'), vl = syncEl('view-live-btn');
+  var em = syncEl('edit-mode-btn'), vl = syncEl('view-live-btn'), sb = syncEl('submit-approval-btn');
   var on = (typeof FIREBASE_ON !== 'undefined' && FIREBASE_ON) && !!fb.user;
   if (em) em.style.display = (on && !fb.editing && !fb.previewing) ? 'block' : 'none';
   if (vl) vl.style.display = (on && (fb.editing || fb.previewing)) ? 'block' : 'none';
+  if (sb) { sb.style.display = (on && fb.editing) ? 'block' : 'none'; sb.textContent = fb.submitted ? 'Submitted for approval' : 'Submit for approval'; sb.disabled = !!fb.submitted; }
 }
 
 function applyLiveToView() {
@@ -3096,6 +3098,7 @@ function enterEditMode() {
   if (!(typeof FIREBASE_ON !== 'undefined' && FIREBASE_ON) || !fb.user) return;
   fb.previewing = false;
   fb.editing = true;
+  fb.submitted = false;
   fb.baseVersion = window.__liveVersion || 0;
   fb.baseState = fbClone(window.__liveState || state);
   state = fbClone(window.__liveState || state);
@@ -3121,6 +3124,7 @@ function exitToLive() {
 
 function pushProposal() {
   if (!(typeof FIREBASE_ON !== 'undefined' && FIREBASE_ON) || !fb.user || fb.previewing || !fb.editing) return;
+  if (fb.submitted) { fb.submitted = false; setEditButtons(); }
   clearTimeout(fb.saveTimer);
   fb.saveTimer = setTimeout(pushProposalNow, 800);
 }
@@ -3132,9 +3136,19 @@ function pushProposalNow() {
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     state: state,
     baseVersion: fb.baseVersion || 0,
-    baseState: fb.baseState || null
+    baseState: fb.baseState || null,
+    submitted: !!fb.submitted,
+    submittedAt: fb.submitted ? firebase.firestore.FieldValue.serverTimestamp() : null
   }).then(function () { updateModeIndicator(); })
     .catch(function (e) { var el = syncEl('sync-savestate'); if (el) el.textContent = 'Save error: ' + e.message; });
+}
+
+function submitForApproval() {
+  if (!(typeof FIREBASE_ON !== 'undefined' && FIREBASE_ON) || !fb.user || !fb.editing) return;
+  fb.submitted = true;
+  setEditButtons();
+  pushProposalNow();
+  var el = syncEl('sync-savestate'); if (el) el.textContent = 'Submitted for approval at ' + new Date().toLocaleTimeString() + '. The owner reviews and publishes.';
 }
 
 function initFirebaseSync() {
@@ -3161,6 +3175,7 @@ function initFirebaseSync() {
   syncEl('signout-btn').addEventListener('click', function () { firebase.auth().signOut(); });
   if (syncEl('edit-mode-btn')) syncEl('edit-mode-btn').addEventListener('click', enterEditMode);
   if (syncEl('view-live-btn')) syncEl('view-live-btn').addEventListener('click', exitToLive);
+  if (syncEl('submit-approval-btn')) syncEl('submit-approval-btn').addEventListener('click', submitForApproval);
   if (syncEl('review-mydraft-btn')) syncEl('review-mydraft-btn').addEventListener('click', exitToLive);
 
   firebase.auth().onAuthStateChanged(onAuthChange);
@@ -3205,22 +3220,25 @@ function renderProposalList() {
     var when = d.updatedAt && d.updatedAt.toDate ? d.updatedAt.toDate().toLocaleString() : '(saving...)';
     var base = d.baseVersion || 0;
     var stale = base < liveV;
+    var own = doc.id === fb.user.uid;
+    var ready = !!d.submitted || own;
+    var status = ready ? (own ? 'your draft' : 'ready for review') : 'in progress (not submitted)';
     var row = document.createElement('div');
-    row.style.cssText = 'border:1px solid var(--rule); border-radius:6px; padding:8px; margin-bottom:6px;';
-    row.innerHTML = '<div style="font-weight:600;font-size:12px;">' + escapeHtml(d.email || doc.id) + '</div>' +
+    row.style.cssText = 'border:1px solid var(--rule); border-radius:6px; padding:8px; margin-bottom:6px;' + (ready ? '' : ' opacity:0.6;');
+    row.innerHTML = '<div style="font-weight:600;font-size:12px;">' + escapeHtml(d.email || doc.id) + ' <span style="font-weight:400;color:' + (ready ? 'var(--ok,#1f7a4d)' : 'var(--mute)') + ';">&middot; ' + status + '</span></div>' +
       '<div style="font-size:10px;color:var(--mute);margin-bottom:6px;">updated ' + escapeHtml(when) + ' &middot; based on v' + base +
       (stale ? ' <span style="color:var(--warn);font-weight:600;">(live is v' + liveV + ' &mdash; rebase to publish)</span>' : '') + '</div>';
     var btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex; gap:6px; flex-wrap:wrap;';
     var preview = document.createElement('button'); preview.className = 'reset'; preview.textContent = 'Preview';
     preview.onclick = function () { if (d.state) { fb.previewing = true; fb.editing = false; state = fbClone(d.state); renderAll(); setEditButtons(); syncEl('sync-savestate').textContent = 'Previewing ' + (d.email || doc.id) + ' (read-only).'; } };
     btnRow.appendChild(preview);
-    if (!stale) {
+    if (ready && !stale) {
       var publish = document.createElement('button'); publish.className = 'reset'; publish.style.cssText = 'border-color:var(--accent);color:var(--accent);'; publish.textContent = 'Publish';
-      publish.onclick = function () { if (confirm('Publish ' + (d.email || doc.id) + "'s proposal to the LIVE calendar everyone sees?")) { guardedPublish(d.state, base, 'published from proposal by ' + (d.email || doc.id)); } };
+      publish.onclick = function () { if (confirm('Publish ' + (d.email || doc.id) + "'s proposal to the LIVE calendar everyone sees?")) { guardedPublish(d.state, base, 'published from proposal by ' + (d.email || doc.id), doc.id); } };
       btnRow.appendChild(publish);
-    } else {
+    } else if (ready && stale) {
       var rebase = document.createElement('button'); rebase.className = 'reset'; rebase.style.cssText = 'border-color:var(--accent);color:var(--accent);'; rebase.textContent = 'Rebase & publish';
-      rebase.onclick = function () { if (confirm('Rebase ' + (d.email || doc.id) + "'s proposal onto the current live calendar and publish? Their day-level changes win on any same-day conflict.")) { var merged = mergeOntoLive(window.__liveState, d.baseState, d.state); guardedPublish(merged, window.__liveVersion || 0, 'rebased + published from proposal by ' + (d.email || doc.id)); } };
+      rebase.onclick = function () { if (confirm('Rebase ' + (d.email || doc.id) + "'s proposal onto the current live calendar and publish? Their day-level changes win on any same-day conflict.")) { var merged = mergeOntoLive(window.__liveState, d.baseState, d.state); guardedPublish(merged, window.__liveVersion || 0, 'rebased + published from proposal by ' + (d.email || doc.id), doc.id); } };
       btnRow.appendChild(rebase);
     }
     var discard = document.createElement('button'); discard.className = 'reset'; discard.textContent = 'Discard';
@@ -3230,7 +3248,7 @@ function renderProposalList() {
   });
 }
 
-function guardedPublish(stateObj, expectedVersion, source) {
+function guardedPublish(stateObj, expectedVersion, source, proposalId) {
   var db = firebase.firestore();
   var liveRef = db.collection('calendar').doc('live');
   db.runTransaction(function (tx) {
@@ -3250,6 +3268,7 @@ function guardedPublish(stateObj, expectedVersion, source) {
     db.collection('calendar_versions').add({ state: stateObj, version: newV, publishedAt: firebase.firestore.FieldValue.serverTimestamp(), publishedBy: fb.user.email, source: source })
       .then(function () { db.collection('calendar_versions').orderBy('publishedAt', 'desc').get().then(function (ss) { ss.docs.slice(20).forEach(function (dd) { dd.ref.delete(); }); }).catch(function () {}); })
       .catch(function (e) { console.warn('Version history write skipped:', e.message); });
+    if (proposalId) { db.collection('proposals').doc(proposalId).delete().catch(function () {}); }
     window.__liveState = stateObj; window.__liveVersion = newV;
     fb.previewing = false; fb.editing = false;
     state = fbClone(stateObj); renderAll(); setEditButtons();

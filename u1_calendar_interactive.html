@@ -1070,6 +1070,7 @@
     <div class="view-toggle" role="tablist" aria-label="View mode">
       <button id="view-grid-btn" class="active" data-view="grid">Calendar</button>
       <button id="view-theme-btn" data-view="theme">Theme view</button>
+      <button id="view-review-btn" data-view="review" style="display:none;">Review</button>
     </div>
   </div>
 </header>
@@ -1092,18 +1093,6 @@
       </div>
     </div>
 
-    <div class="section" id="review-panel" style="display:none;">
-      <h3 class="section-title">Review proposals <span id="review-count" style="font-weight:400; color:var(--mute);">0</span></h3>
-      <div style="font-size:11px; color:var(--mute); margin-bottom:8px; line-height:1.45;">Each editor's working draft. Publish writes it to the live calendar everyone sees.</div>
-      <button class="reset" id="review-mydraft-btn" style="display:none; width:100%; margin-bottom:8px;">&larr; Back to live view</button>
-      <div id="review-list"></div>
-    </div>
-
-    <div class="section" id="version-panel" style="display:none;">
-      <h3 class="section-title">Version history <span id="version-count" style="font-weight:400; color:var(--mute);">0</span></h3>
-      <div style="font-size:11px; color:var(--mute); margin-bottom:8px; line-height:1.45;">The last 10 published versions. Restore puts a version back on the live calendar everyone sees.</div>
-      <div id="version-list"></div>
-    </div>
 
     <div class="stats">
       <div class="stat-line"><span>Window</span> <strong id="stat-window">...</strong></div>
@@ -1241,6 +1230,18 @@
       <div class="month-grid" id="month-grid"></div>
     </section>
     <section id="view-theme" class="view"></section>
+    <section id="view-review" class="view">
+      <div class="section" id="review-panel">
+        <h3 class="section-title">Review proposals <span id="review-count" style="font-weight:400; color:var(--mute);">0</span></h3>
+        <div style="font-size:11px; color:var(--mute); margin-bottom:8px; line-height:1.45;">Editors submit proposals here. Publish (or Rebase &amp; publish) writes one to the live calendar everyone sees.</div>
+        <div id="review-list"></div>
+      </div>
+      <div class="section" id="version-panel">
+        <h3 class="section-title">Version history <span id="version-count" style="font-weight:400; color:var(--mute);">0</span></h3>
+        <div style="font-size:11px; color:var(--mute); margin-bottom:8px; line-height:1.45;">The last 20 published versions. Restore puts a version back on the live calendar everyone sees.</div>
+        <div id="version-list"></div>
+      </div>
+    </section>
   </main>
 
 </div>
@@ -2935,6 +2936,7 @@ function bindControls() {
 }
 
 function setView(v) {
+  if (v === 'review' && !(typeof fb !== 'undefined' && fb && fb.isOwner)) v = 'grid';
   state.view = v;
   saveState();
   document.querySelectorAll('.view-toggle button').forEach(b => {
@@ -2942,6 +2944,7 @@ function setView(v) {
   });
   document.getElementById('view-grid').classList.toggle('active', v === 'grid');
   document.getElementById('view-theme').classList.toggle('active', v === 'theme');
+  var vr = document.getElementById('view-review'); if (vr) vr.classList.toggle('active', v === 'review');
   if (v === 'theme') renderThemeView();
 }
 
@@ -3190,13 +3193,13 @@ function onAuthChange(user) {
     syncEl('signin-btn').style.display = 'none';
     syncEl('signout-btn').style.display = 'block';
     syncEl('sync-who').textContent = user.email + (fb.isOwner ? ' (owner)' : ' (editor)');
-    if (fb.isOwner) { syncEl('review-panel').style.display = 'block'; subscribeProposals(); syncEl('version-panel').style.display = 'block'; subscribeVersions(); }
+    if (fb.isOwner) { var rb = syncEl('view-review-btn'); if (rb) rb.style.display = ''; subscribeProposals(); subscribeVersions(); }
   } else {
     syncEl('signin-btn').style.display = 'block';
     syncEl('signout-btn').style.display = 'none';
     syncEl('sync-who').textContent = '';
-    syncEl('review-panel').style.display = 'none';
-    syncEl('version-panel').style.display = 'none';
+    var rb2 = syncEl('view-review-btn'); if (rb2) rb2.style.display = 'none';
+    if (state.view === 'review') setView('grid');
   }
   exitToLive();
   setEditButtons();
@@ -3230,7 +3233,7 @@ function renderProposalList() {
       (stale ? ' <span style="color:var(--warn);font-weight:600;">(live is v' + liveV + ' &mdash; rebase to publish)</span>' : '') + '</div>';
     var btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex; gap:6px; flex-wrap:wrap;';
     var preview = document.createElement('button'); preview.className = 'reset'; preview.textContent = 'Preview';
-    preview.onclick = function () { if (d.state) { fb.previewing = true; fb.editing = false; state = fbClone(d.state); renderAll(); setEditButtons(); syncEl('sync-savestate').textContent = 'Previewing ' + (d.email || doc.id) + ' (read-only).'; } };
+    preview.onclick = function () { if (d.state) { fb.previewing = true; fb.editing = false; state = fbClone(d.state); setView('grid'); renderAll(); setEditButtons(); syncEl('sync-savestate').textContent = 'Previewing ' + (d.email || doc.id) + ' (read-only). Switch to Review to publish.'; } };
     btnRow.appendChild(preview);
     if (ready && !stale) {
       var publish = document.createElement('button'); publish.className = 'reset'; publish.style.cssText = 'border-color:var(--accent);color:var(--accent);'; publish.textContent = 'Publish';
@@ -3316,7 +3319,7 @@ function subscribeVersions() {
         '<div style="font-size:10px;color:var(--mute);margin-bottom:6px;">' + escapeHtml(v.source || ('by ' + (v.publishedBy || '?'))) + '</div>';
       var btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex; gap:6px; flex-wrap:wrap;';
       var preview = document.createElement('button'); preview.className = 'reset'; preview.textContent = 'Preview';
-      preview.onclick = function () { if (v.state) { fb.previewing = true; fb.editing = false; state = fbClone(v.state); renderAll(); setEditButtons(); syncEl('sync-savestate').textContent = 'Previewing v' + (v.version || '?') + ' (read-only).'; } };
+      preview.onclick = function () { if (v.state) { fb.previewing = true; fb.editing = false; state = fbClone(v.state); setView('grid'); renderAll(); setEditButtons(); syncEl('sync-savestate').textContent = 'Previewing v' + (v.version || '?') + ' (read-only). Switch to Review to restore.'; } };
       var restore = document.createElement('button'); restore.className = 'reset'; restore.style.cssText = 'border-color:var(--accent);color:var(--accent);'; restore.textContent = 'Restore';
       restore.onclick = function () { if (confirm('Restore v' + (v.version || '?') + ' to the LIVE calendar everyone sees?')) { guardedPublish(v.state, window.__liveVersion || 0, 'restored from v' + (v.version || '?')); } };
       btnRow.appendChild(preview); btnRow.appendChild(restore);

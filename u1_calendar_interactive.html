@@ -697,12 +697,12 @@
   .detail-overlay {
     position: fixed;
     top: 0; right: 0;
-    width: 420px;
+    width: 100vw;
     height: 100vh;
     background: white;
     border-left: 1.5px solid var(--rule);
     box-shadow: -8px 0 24px rgba(20,24,28,0.08);
-    transform: translateX(420px);
+    transform: translateX(100%);
     transition: transform 0.22s ease-out;
     z-index: 100;
     overflow-y: auto;
@@ -738,7 +738,7 @@
   }
   .detail-header .close-btn:hover { background: rgba(255,255,255,0.2); }
 
-  .detail-body { padding: 20px 22px; }
+  .detail-body { padding: 20px 22px; max-width: 920px; margin: 0 auto; width: 100%; }
   .detail-body .section {
     margin-bottom: 18px;
     padding-bottom: 14px;
@@ -855,9 +855,10 @@
   .modal {
     background: white;
     border-radius: 8px;
-    width: 540px;
-    max-width: 90vw;
-    max-height: 90vh;
+    width: 100vw;
+    max-width: 100vw;
+    height: 100vh;
+    max-height: 100vh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -882,6 +883,10 @@
   .modal-body {
     padding: 18px 22px;
     overflow-y: auto;
+    flex: 1;
+    max-width: 920px;
+    margin: 0 auto;
+    width: 100%;
   }
   .modal-body .field { margin-bottom: 14px; }
   .modal-body label.fl {
@@ -903,7 +908,7 @@
     background: white;
     color: var(--ink);
   }
-  .modal-body textarea { resize: vertical; min-height: 60px; }
+  .modal-body textarea { resize: vertical; min-height: 220px; font-size: 14px; line-height: 1.55; }
   .modal-body select:focus, .modal-body input:focus, .modal-body textarea:focus {
     outline: none; border-color: var(--u1-orange);
   }
@@ -1075,6 +1080,7 @@
   </div>
 </header>
 
+<div id="notif-banner" style="display:none; align-items:center; gap:12px; background:var(--ok,#1f7a4d); color:#fff; padding:10px 16px; font-size:13px; line-height:1.4;"></div>
 <div class="layout">
 
   <aside class="controls">
@@ -2254,7 +2260,7 @@ function openDetailPanel(slot) {
   const noteFieldHtml = isEditable
     ? `<div class="section">
         <div class="sec-title">Content note · what this specific post covers</div>
-        <textarea id="slot-note-input" rows="2" style="width:100%; padding:8px 10px; font-family:inherit; font-size:13px; border:1.5px solid var(--rule); border-radius:4px; resize:vertical; min-height:50px;" placeholder="e.g., ${escapeHtml(getModalNoteExample(slot.themeId, slot.divisionId))}">${escapeHtml(slot.note || '')}</textarea>
+        <textarea id="slot-note-input" rows="12" style="width:100%; padding:12px 14px; font-family:inherit; font-size:14px; line-height:1.55; border:1.5px solid var(--rule); border-radius:4px; resize:vertical; min-height:300px;" placeholder="e.g., ${escapeHtml(getModalNoteExample(slot.themeId, slot.divisionId))}">${escapeHtml(slot.note || '')}</textarea>
       </div>`
     : (slot.note
       ? `<div class="section">
@@ -2295,7 +2301,7 @@ function openDetailPanel(slot) {
     <div class="section">
       <div class="sec-title">Layer 2 · TRUST line (writer-authored, per post)</div>
       ${isEditable
-        ? `<textarea id="slot-trust-input" rows="2" style="width:100%; padding:8px 10px; font-family:inherit; font-size:13px; border:1.5px solid var(--rule); border-radius:4px; resize:vertical; min-height:48px;" placeholder="Name 1 or 2 TRUST values that fit this specific post. e.g., 'Safety on every drop. Responsibility for the asset that lasts.'">${escapeHtml(slot.trustLine || '')}</textarea>
+        ? `<textarea id="slot-trust-input" rows="4" style="width:100%; padding:12px 14px; font-family:inherit; font-size:14px; line-height:1.55; border:1.5px solid var(--rule); border-radius:4px; resize:vertical; min-height:110px;" placeholder="Name 1 or 2 TRUST values that fit this specific post. e.g., 'Safety on every drop. Responsibility for the asset that lasts.'">${escapeHtml(slot.trustLine || '')}</textarea>
         <div style="font-size:11px; color:var(--mute); margin-top:6px; line-height:1.45;">Writer authors per post. TRUST values: T(raining) R(esponsibility) U(nderstanding) S(afety) T(eamwork). Integrate naturally with the post content; do not stamp boilerplate.</div>`
         : `<div class="body-close-quote" style="background: var(--panel-2); border-left-color: var(--accent); color: var(--ink-soft);">"${escapeHtml(slot.trustLine || '(none authored)')}"</div>
         <div style="font-size:11px; color:var(--mute); margin-top:6px; line-height:1.4;">Authored when the event was added.</div>`
@@ -2637,12 +2643,12 @@ function renderModalBody() {
     </div>
     <div class="field">
       <label class="fl" for="m-trustline">TRUST line (Layer 2) · surfaces in the body before the brand-heart close</label>
-      <textarea id="m-trustline" rows="2" style="resize:vertical; min-height:50px;">${escapeHtml(modalState.trustLine || '')}</textarea>
+      <textarea id="m-trustline" rows="4" style="resize:vertical; min-height:110px;">${escapeHtml(modalState.trustLine || '')}</textarea>
       <div style="font-size:11px; color:var(--mute); margin-top:4px; line-height:1.4;">Default for this theme is prefilled. Edit to fit the specific event content (1 or 2 TRUST values named naturally).</div>
     </div>
     <div class="field">
       <label class="fl" for="m-note">Event note (optional)</label>
-      <textarea id="m-note" placeholder="e.g., ${escapeHtml(getModalNoteExample(modalState.themeId, modalState.divisionId))}">${escapeHtml(modalState.note || '')}</textarea>
+      <textarea id="m-note" rows="12" placeholder="e.g., ${escapeHtml(getModalNoteExample(modalState.themeId, modalState.divisionId))}">${escapeHtml(modalState.note || '')}</textarea>
     </div>
     ${modalMode === 'generic' ? renderCrossDivisionExamples() : ''}
     <div class="validation" id="m-validation"></div>
@@ -3154,6 +3160,26 @@ function submitForApproval() {
   var el = syncEl('sync-savestate'); if (el) el.textContent = 'Submitted for approval at ' + new Date().toLocaleTimeString() + '. The owner reviews and publishes.';
 }
 
+function subscribeNotifications() {
+  if (!fb.user) return;
+  if (window.__notifUnsub) { window.__notifUnsub(); window.__notifUnsub = null; }
+  window.__notifUnsub = firebase.firestore().collection('notifications').where('toUid', '==', fb.user.uid).onSnapshot(function (snap) {
+    var items = [];
+    snap.forEach(function (d) { var n = d.data(); if (!n.read) items.push({ id: d.id, msg: n.message || 'Your proposal was approved.' }); });
+    renderNotifBanner(items);
+  }, function () {});
+}
+
+function renderNotifBanner(items) {
+  var el = syncEl('notif-banner'); if (!el) return;
+  if (!items || items.length === 0) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  var msg = (items.length === 1) ? items[0].msg : (items.length + ' updates. ' + items.map(function (i) { return i.msg; }).join(' '));
+  el.innerHTML = '<span style="flex:1;">' + escapeHtml(msg) + '</span><button class="reset" id="notif-dismiss" style="border-color:#fff; color:#fff; flex:0 0 auto;">Dismiss</button>';
+  el.style.display = 'flex';
+  var btn = syncEl('notif-dismiss');
+  if (btn) btn.onclick = function () { items.forEach(function (i) { firebase.firestore().collection('notifications').doc(i.id).update({ read: true }).catch(function () {}); }); el.style.display = 'none'; };
+}
+
 function initFirebaseSync() {
   if (typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON) return;
   if (typeof firebase === 'undefined') { syncEl('sync-status').textContent = 'Firebase SDK failed to load. Running local-only.'; return; }
@@ -3193,12 +3219,15 @@ function onAuthChange(user) {
     syncEl('signin-btn').style.display = 'none';
     syncEl('signout-btn').style.display = 'block';
     syncEl('sync-who').textContent = user.email + (fb.isOwner ? ' (owner)' : ' (editor)');
+    subscribeNotifications();
     if (fb.isOwner) { var rb = syncEl('view-review-btn'); if (rb) rb.style.display = ''; subscribeProposals(); subscribeVersions(); }
   } else {
     syncEl('signin-btn').style.display = 'block';
     syncEl('signout-btn').style.display = 'none';
     syncEl('sync-who').textContent = '';
     var rb2 = syncEl('view-review-btn'); if (rb2) rb2.style.display = 'none';
+    var nb = syncEl('notif-banner'); if (nb) nb.style.display = 'none';
+    if (window.__notifUnsub) { window.__notifUnsub(); window.__notifUnsub = null; }
     if (state.view === 'review') setView('grid');
   }
   exitToLive();
@@ -3272,6 +3301,7 @@ function guardedPublish(stateObj, expectedVersion, source, proposalId) {
       .then(function () { db.collection('calendar_versions').orderBy('publishedAt', 'desc').get().then(function (ss) { ss.docs.slice(20).forEach(function (dd) { dd.ref.delete(); }); }).catch(function () {}); })
       .catch(function (e) { console.warn('Version history write skipped:', e.message); });
     if (proposalId) { db.collection('proposals').doc(proposalId).delete().catch(function () {}); }
+    if (proposalId && proposalId !== fb.user.uid) { db.collection('notifications').add({ toUid: proposalId, message: 'Your proposal was approved and published as v' + newV + '.', version: newV, at: firebase.firestore.FieldValue.serverTimestamp(), read: false }).catch(function (e) { console.warn('Notification skipped:', e.message); }); }
     window.__liveState = stateObj; window.__liveVersion = newV;
     fb.previewing = false; fb.editing = false;
     state = fbClone(stateObj); renderAll(); setEditButtons();

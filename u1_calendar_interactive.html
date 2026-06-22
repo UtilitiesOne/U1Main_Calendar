@@ -710,7 +710,6 @@
     flex-direction: column;
   }
   .detail-overlay.open { transform: translateX(0); }
-  .detail-overlay.fullscreen { width: 100vw; }
   .detail-header {
     background: var(--accent);
     color: white;
@@ -739,7 +738,7 @@
   }
   .detail-header .close-btn:hover { background: rgba(255,255,255,0.2); }
 
-  .detail-body { padding: 20px 22px; max-width: 920px; margin: 0 auto; width: 100%; }
+  .detail-body { padding: 20px 22px; }
   .detail-body .section {
     margin-bottom: 18px;
     padding-bottom: 14px;
@@ -844,6 +843,47 @@
   .detail-footer button.danger { color: var(--u1-orange); }
   .detail-footer button:hover { border-color: var(--u1-orange); color: var(--u1-orange); }
 
+  /* ====== FULL-SCREEN POST EDITOR (opens from the drawer's Open-full-editor button) ====== */
+  .post-editor-overlay {
+    position: fixed; inset: 0;
+    background: white;
+    z-index: 300;
+    display: none;
+    flex-direction: column;
+  }
+  .post-editor-overlay.open { display: flex; }
+  .pe-head {
+    background: var(--accent); color: white;
+    padding: 16px 28px;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    border-bottom: 3px solid var(--u1-orange);
+    flex: 0 0 auto;
+  }
+  .pe-head .pe-title { font-size: 16px; font-weight: 700; }
+  .pe-head .pe-date { font-size: 11px; color: rgba(255,255,255,0.6); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 3px; }
+  .pe-head .close-btn { background: rgba(255,255,255,0.1); border: none; color: white; width: 30px; height: 30px; border-radius: 50%; font-size: 16px; line-height: 0; cursor: pointer; }
+  .pe-head .close-btn:hover { background: rgba(255,255,255,0.2); }
+  .pe-body { flex: 1 1 auto; overflow-y: auto; padding: 26px 28px; }
+  .pe-inner { max-width: 920px; margin: 0 auto; width: 100%; }
+  .pe-field { margin-bottom: 20px; }
+  .pe-field label.pe-fl { display: block; font-size: 11px; font-weight: 600; color: var(--mute); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+  .pe-field select, .pe-field textarea { width: 100%; padding: 12px 14px; font-family: inherit; font-size: 14px; line-height: 1.55; border: 1.5px solid var(--rule); border-radius: 4px; background: white; color: var(--ink); box-sizing: border-box; }
+  .pe-field textarea#pe-note { min-height: 360px; resize: vertical; }
+  .pe-field textarea#pe-trust { min-height: 90px; resize: vertical; }
+  .pe-field select:focus, .pe-field textarea:focus { outline: none; border-color: var(--u1-orange); }
+  .pe-hint { font-size: 11px; color: var(--mute); margin-top: 6px; line-height: 1.45; }
+  .pe-foot {
+    flex: 0 0 auto;
+    border-top: 1.5px solid var(--rule);
+    padding: 14px 28px;
+    display: flex; justify-content: flex-end; gap: 10px;
+    background: white;
+  }
+  .pe-foot button { font-family: inherit; font-size: 13px; padding: 9px 20px; border: 1.5px solid var(--rule); border-radius: 5px; background: white; color: var(--ink); cursor: pointer; }
+  .pe-foot button:hover { border-color: var(--u1-orange); color: var(--u1-orange); }
+  .pe-foot button.primary { background: var(--accent); color: white; border-color: var(--accent); }
+  .pe-foot button.primary:hover { background: var(--u1-orange); border-color: var(--u1-orange); color: white; }
+
   /* ====== MODAL (add post) ====== */
   .modal-backdrop {
     position: fixed; inset: 0;
@@ -856,10 +896,9 @@
   .modal {
     background: white;
     border-radius: 8px;
-    width: 100vw;
-    max-width: 100vw;
-    height: 100vh;
-    max-height: 100vh;
+    width: 540px;
+    max-width: 90vw;
+    max-height: 90vh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -884,10 +923,6 @@
   .modal-body {
     padding: 18px 22px;
     overflow-y: auto;
-    flex: 1;
-    max-width: 920px;
-    margin: 0 auto;
-    width: 100%;
   }
   .modal-body .field { margin-bottom: 14px; }
   .modal-body label.fl {
@@ -909,7 +944,7 @@
     background: white;
     color: var(--ink);
   }
-  .modal-body textarea { resize: vertical; min-height: 220px; font-size: 14px; line-height: 1.55; }
+  .modal-body textarea { resize: vertical; min-height: 60px; }
   .modal-body select:focus, .modal-body input:focus, .modal-body textarea:focus {
     outline: none; border-color: var(--u1-orange);
   }
@@ -1264,6 +1299,22 @@
   </div>
   <div class="detail-body" id="detail-body"></div>
   <div class="detail-footer" id="detail-footer"></div>
+</div>
+
+<!-- Full-screen post editor -->
+<div class="post-editor-overlay" id="post-editor">
+  <div class="pe-head">
+    <div>
+      <div class="pe-title" id="pe-title">...</div>
+      <div class="pe-date" id="pe-date">...</div>
+    </div>
+    <button class="close-btn" id="pe-x" aria-label="Cancel">✕</button>
+  </div>
+  <div class="pe-body"><div class="pe-inner" id="pe-inner"></div></div>
+  <div class="pe-foot">
+    <button id="pe-cancel">Cancel</button>
+    <button class="primary" id="pe-save">Save and close</button>
+  </div>
 </div>
 
 <!-- Modal -->
@@ -2198,7 +2249,7 @@ function renderThemeView() {
 const detailOverlay = document.getElementById('detail-overlay');
 const detailFooter = document.getElementById('detail-footer');
 
-function openDetailPanel(slot, editing) {
+function openDetailPanel(slot) {
   document.getElementById('dh-title').textContent =
     slot.themeName;
   document.getElementById('dh-date').textContent =
@@ -2214,8 +2265,7 @@ function openDetailPanel(slot, editing) {
   // so writer can swap T1 for T4 or T5 (or any theme) when project content
   // is absent for that division. The "default" shown below the dropdown is the
   // division's baked default, not the current slot theme.
-  const canEditThis = !slot.isSpotlight && !slot.isTriggered && canEdit();
-  const isEditable = canEditThis && !!editing;
+  const isEditable = !slot.isSpotlight && !slot.isTriggered && canEdit();
   let defaultThemeId, alternatives;
   if (isEditable) {
     if (slot.divisionId) {
@@ -2262,7 +2312,7 @@ function openDetailPanel(slot, editing) {
   const noteFieldHtml = isEditable
     ? `<div class="section">
         <div class="sec-title">Content note · what this specific post covers</div>
-        <textarea id="slot-note-input" rows="12" style="width:100%; padding:12px 14px; font-family:inherit; font-size:14px; line-height:1.55; border:1.5px solid var(--rule); border-radius:4px; resize:vertical; min-height:300px;" placeholder="e.g., ${escapeHtml(getModalNoteExample(slot.themeId, slot.divisionId))}">${escapeHtml(slot.note || '')}</textarea>
+        <textarea id="slot-note-input" rows="2" style="width:100%; padding:8px 10px; font-family:inherit; font-size:13px; border:1.5px solid var(--rule); border-radius:4px; resize:vertical; min-height:50px;" placeholder="e.g., ${escapeHtml(getModalNoteExample(slot.themeId, slot.divisionId))}">${escapeHtml(slot.note || '')}</textarea>
       </div>`
     : (slot.note
       ? `<div class="section">
@@ -2271,7 +2321,11 @@ function openDetailPanel(slot, editing) {
         </div>`
       : '');
 
-  body.innerHTML = `
+  const fullEditorBtnHtml = isEditable
+    ? `<div class="section" style="border-bottom:none; padding-bottom:4px;"><button id="open-full-editor" style="width:100%; padding:11px 14px; font-family:inherit; font-size:13px; font-weight:600; border:1.5px solid var(--accent); color:#fff; background:var(--accent); border-radius:5px; cursor:pointer;">Open full editor</button></div>`
+    : '';
+
+  body.innerHTML = `${fullEditorBtnHtml}
     <div class="section">
       <div class="theme-strip" style="background: var(--${slot.themeId});">
         <span>${escapeHtml(slot.themeName)}</span>
@@ -2303,7 +2357,7 @@ function openDetailPanel(slot, editing) {
     <div class="section">
       <div class="sec-title">Layer 2 · TRUST line (writer-authored, per post)</div>
       ${isEditable
-        ? `<textarea id="slot-trust-input" rows="4" style="width:100%; padding:12px 14px; font-family:inherit; font-size:14px; line-height:1.55; border:1.5px solid var(--rule); border-radius:4px; resize:vertical; min-height:110px;" placeholder="Name 1 or 2 TRUST values that fit this specific post. e.g., 'Safety on every drop. Responsibility for the asset that lasts.'">${escapeHtml(slot.trustLine || '')}</textarea>
+        ? `<textarea id="slot-trust-input" rows="2" style="width:100%; padding:8px 10px; font-family:inherit; font-size:13px; border:1.5px solid var(--rule); border-radius:4px; resize:vertical; min-height:48px;" placeholder="Name 1 or 2 TRUST values that fit this specific post. e.g., 'Safety on every drop. Responsibility for the asset that lasts.'">${escapeHtml(slot.trustLine || '')}</textarea>
         <div style="font-size:11px; color:var(--mute); margin-top:6px; line-height:1.45;">Writer authors per post. TRUST values: T(raining) R(esponsibility) U(nderstanding) S(afety) T(eamwork). Integrate naturally with the post content; do not stamp boilerplate.</div>`
         : `<div class="body-close-quote" style="background: var(--panel-2); border-left-color: var(--accent); color: var(--ink-soft);">"${escapeHtml(slot.trustLine || '(none authored)')}"</div>
         <div style="font-size:11px; color:var(--mute); margin-top:6px; line-height:1.4;">Authored when the event was added.</div>`
@@ -2333,13 +2387,14 @@ function openDetailPanel(slot, editing) {
   // Wire up live editing for scheduled slots
   if (isEditable) {
     const dateIso = slot.date;
+    { const ofe = document.getElementById('open-full-editor'); if (ofe) ofe.addEventListener('click', () => openPostEditor(slot)); }
     const setTheme = (newThemeId) => {
       if (!state.slotOverrides[dateIso]) state.slotOverrides[dateIso] = {};
       state.slotOverrides[dateIso].themeId = newThemeId;
       saveState();
       renderMonthGrid();
       const updated = getAllSlotsForMonth(isoMonth(currentMonthDate())).find(s => s.date === dateIso && !s.isSpotlight && !s.isTriggered);
-      if (updated) openDetailPanel(updated, true);
+      if (updated) openDetailPanel(updated);
     };
     document.getElementById('slot-theme-select').addEventListener('change', (e) => {
       setTheme(e.target.value);
@@ -2386,7 +2441,6 @@ function openDetailPanel(slot, editing) {
   } else if (isEditable) {
     detailFooter.innerHTML = `
       <button id="slot-revert" data-date="${escapeHtml(slot.date)}">Revert to default</button>
-      <button id="slot-back-view" data-date="${escapeHtml(slot.date)}">Back to view</button>
       <button id="detail-close-2">Close</button>
     `;
     document.getElementById('slot-revert').addEventListener('click', () => {
@@ -2395,16 +2449,8 @@ function openDetailPanel(slot, editing) {
       saveState();
       renderMonthGrid();
       const updated = getAllSlotsForMonth(isoMonth(currentMonthDate())).find(s => s.date === d && !s.isSpotlight && !s.isTriggered);
-      if (updated) openDetailPanel(updated, true);
+      if (updated) openDetailPanel(updated);
     });
-    document.getElementById('slot-back-view').addEventListener('click', () => { openDetailPanel(slot, false); });
-    document.getElementById('detail-close-2').addEventListener('click', closeDetailPanel);
-  } else if (canEditThis) {
-    detailFooter.innerHTML = `
-      <button id="slot-edit" data-date="${escapeHtml(slot.date)}" style="border-color:var(--accent); color:var(--accent);">Edit this post</button>
-      <button id="detail-close-2">Close</button>
-    `;
-    document.getElementById('slot-edit').addEventListener('click', () => { openDetailPanel(slot, true); });
     document.getElementById('detail-close-2').addEventListener('click', closeDetailPanel);
   } else if (slot.isSpotlight) {
     const canonical = slot.canonicalDate || slot.date;
@@ -2470,9 +2516,52 @@ function openDetailPanel(slot, editing) {
   }
 
   detailOverlay.classList.add('open');
-  detailOverlay.classList.toggle('fullscreen', !!isEditable);
 }
 function closeDetailPanel() { detailOverlay.classList.remove('open'); }
+
+// Full-screen post editor: its own surface, opened from the drawer. Edits a working
+// buffer so Cancel discards and Save commits to the same slotOverrides the drawer uses.
+function openPostEditor(slot) {
+  const pe = document.getElementById('post-editor');
+  document.getElementById('pe-title').textContent = slot.themeName;
+  document.getElementById('pe-date').textContent =
+    fmtDate(slot.dateObj) + ' \u00b7 ' + (slot.channel === 'u1-main' ? 'U1 Main' : slot.divisionName + ' page');
+  const dateIso = slot.date;
+  const buf = { themeId: slot.themeId, note: slot.note || '', trustLine: slot.trustLine || '' };
+  document.getElementById('pe-inner').innerHTML = `
+    <div class="pe-field">
+      <label class="pe-fl">Theme</label>
+      <select id="pe-theme">${THEMES.map(t => `<option value="${t.id}" ${slot.themeId === t.id ? 'selected' : ''}>${escapeHtml(t.name)} (${t.behavior})</option>`).join('')}</select>
+    </div>
+    <div class="pe-field">
+      <label class="pe-fl">Post body \u00b7 what this post says</label>
+      <textarea id="pe-note" placeholder="Write the post body here.">${escapeHtml(buf.note)}</textarea>
+      <div class="pe-hint">Working draft of the post. The locked body close and the hashtag taxonomy stay on the post card.</div>
+    </div>
+    <div class="pe-field">
+      <label class="pe-fl">Layer 2 \u00b7 TRUST line (writer-authored)</label>
+      <textarea id="pe-trust" placeholder="Name 1 or 2 TRUST values that fit this post.">${escapeHtml(buf.trustLine)}</textarea>
+    </div>
+  `;
+  document.getElementById('pe-theme').addEventListener('change', (e) => { buf.themeId = e.target.value; });
+  document.getElementById('pe-note').addEventListener('input', (e) => { buf.note = e.target.value; });
+  document.getElementById('pe-trust').addEventListener('input', (e) => { buf.trustLine = e.target.value; });
+  const closePE = () => { pe.classList.remove('open'); };
+  document.getElementById('pe-x').onclick = closePE;
+  document.getElementById('pe-cancel').onclick = closePE;
+  document.getElementById('pe-save').onclick = () => {
+    if (!state.slotOverrides[dateIso]) state.slotOverrides[dateIso] = {};
+    state.slotOverrides[dateIso].themeId = buf.themeId;
+    state.slotOverrides[dateIso].note = buf.note;
+    state.slotOverrides[dateIso].trustLine = buf.trustLine;
+    saveState();
+    renderMonthGrid();
+    closePE();
+    const updated = getAllSlotsForMonth(isoMonth(currentMonthDate())).find(s => s.date === dateIso && !s.isSpotlight && !s.isTriggered);
+    if (updated) openDetailPanel(updated);
+  };
+  pe.classList.add('open');
+}
 document.getElementById('detail-close').addEventListener('click', closeDetailPanel);
 
 // Modals: add Career Arc, U1 Way, generic add
@@ -2655,12 +2744,12 @@ function renderModalBody() {
     </div>
     <div class="field">
       <label class="fl" for="m-trustline">TRUST line (Layer 2) · surfaces in the body before the brand-heart close</label>
-      <textarea id="m-trustline" rows="4" style="resize:vertical; min-height:110px;">${escapeHtml(modalState.trustLine || '')}</textarea>
+      <textarea id="m-trustline" rows="2" style="resize:vertical; min-height:50px;">${escapeHtml(modalState.trustLine || '')}</textarea>
       <div style="font-size:11px; color:var(--mute); margin-top:4px; line-height:1.4;">Default for this theme is prefilled. Edit to fit the specific event content (1 or 2 TRUST values named naturally).</div>
     </div>
     <div class="field">
       <label class="fl" for="m-note">Event note (optional)</label>
-      <textarea id="m-note" rows="12" placeholder="e.g., ${escapeHtml(getModalNoteExample(modalState.themeId, modalState.divisionId))}">${escapeHtml(modalState.note || '')}</textarea>
+      <textarea id="m-note" placeholder="e.g., ${escapeHtml(getModalNoteExample(modalState.themeId, modalState.divisionId))}">${escapeHtml(modalState.note || '')}</textarea>
     </div>
     ${modalMode === 'generic' ? renderCrossDivisionExamples() : ''}
     <div class="validation" id="m-validation"></div>

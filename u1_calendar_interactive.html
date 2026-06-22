@@ -1334,7 +1334,7 @@ const BRAND_CONFIG = {
     { id: 't5', num: 5, name: 'From Financed Paper to Delivered Field', behavior: 'scheduled', scope: 'cross',      tagline: 'From paper to field.',            trustLine: '', u1Way: true  },
     // T6 REOPENED 2026-06-08 (brand-voice review): removed eligibleDivisions + utilityCustomerOverride; added bodyActivationRequired. Open to all 8 specialties when post body activates "utility / useful / usefulness / the use of" in older usefulness sense before tagline. See the Utility Guidance.
     { id: 't6', num: 6, name: 'One Company, Every Utility',             behavior: 'scheduled', scope: 'cross',      tagline: 'One Company. Every Utility.',     trustLine: '', u1Way: false, bodyActivationRequired: true },
-    { id: 't7', num: 7, name: 'U1 Culture',                              behavior: 'triggered', scope: 'company',    tagline: 'Built to Hold.',                  trustLine: '', u1Way: false }
+    { id: 't7', num: 7, name: 'U1 Culture',                              behavior: 'triggered', scope: 'company',    tagline: '',                                trustLine: '', u1Way: false }
   ],
   // Default theme per unit for scheduled rotation slots. T1 is triggered so
   // mature divisions fall back to T5 (industry direction) / T6 (cross-portfolio).
@@ -2146,7 +2146,7 @@ function renderThemeView() {
       : '<span class="behavior-pill">SCHEDULED</span>';
     html += `<div class="theme-section ${t.id} ${dim}">`;
     html += `<h2>${escapeHtml(t.name)} ${behaviorPill}</h2>`;
-    html += `<div class="tmeta"><span class="count">${tSlots.length}</span> in 6-month window · scope: <strong>${t.scope === 'cross' ? 'cross-divisional' : t.scope === 'company' ? 'company-wide' : 'divisional'}</strong> · tagline: <em>"${escapeHtml(t.tagline)}"</em> · U1 Way: ${t.u1Way ? 'yes' : 'no'}</div>
+    html += `<div class="tmeta"><span class="count">${tSlots.length}</span> in 6-month window · scope: <strong>${t.scope === 'cross' ? 'cross-divisional' : t.scope === 'company' ? 'company-wide' : 'divisional'}</strong> · tagline: ${t.tagline ? '<em>"' + escapeHtml(t.tagline) + '"</em>' : '<em>signature only</em>'} · U1 Way: ${t.u1Way ? 'yes' : 'no'}</div>
       <div style="font-size: 12px; color: var(--ink-soft); margin-bottom: 12px; padding: 8px 10px; background: var(--panel-2); border-left: 3px solid var(--${t.id}); border-radius: 3px;"><strong>TRUST line in body:</strong> <em>"${escapeHtml(t.trustLine)}"</em></div>`;
     html += `<div class="tusage" style="font-size:12px; color:var(--ink-soft); margin:0 0 12px; padding:8px 10px; background:var(--panel-2); border-left:3px solid var(--${t.id}); border-radius:3px;"><strong>When to use:</strong> ${escapeHtml(THEME_USAGE[t.id] || '')}</div>`;
     if (tSlots.length === 0) {
@@ -2289,7 +2289,7 @@ function openDetailPanel(slot) {
 
     <div class="section">
       <div class="sec-title">Visual surface tagline</div>
-      <div class="sec-content italic">"${escapeHtml(slot.tagline)}"</div>
+      <div class="sec-content italic">${slot.tagline ? '"' + escapeHtml(slot.tagline) + '"' : 'Signature only. Pick a visual tagline per post.'}</div>
     </div>
 
     <div class="section">

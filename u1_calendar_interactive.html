@@ -2625,6 +2625,7 @@ function openPostEditor(slot) {
       state.slotOverrides[slot.date] = applyContent(state.slotOverrides[slot.date] || {});
     }
     saveState();
+    if (typeof pushProposalNow === 'function') pushProposalNow();
     renderAll();
     closePE();
     const findDate = (kind === 'event') ? buf.date : slot.date;

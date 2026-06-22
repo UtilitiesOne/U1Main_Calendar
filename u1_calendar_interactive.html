@@ -697,12 +697,12 @@
   .detail-overlay {
     position: fixed;
     top: 0; right: 0;
-    width: 100vw;
+    width: 420px;
     height: 100vh;
     background: white;
     border-left: 1.5px solid var(--rule);
     box-shadow: -8px 0 24px rgba(20,24,28,0.08);
-    transform: translateX(100%);
+    transform: translateX(420px);
     transition: transform 0.22s ease-out;
     z-index: 100;
     overflow-y: auto;
@@ -710,6 +710,7 @@
     flex-direction: column;
   }
   .detail-overlay.open { transform: translateX(0); }
+  .detail-overlay.fullscreen { width: 100vw; }
   .detail-header {
     background: var(--accent);
     color: white;
@@ -2197,7 +2198,7 @@ function renderThemeView() {
 const detailOverlay = document.getElementById('detail-overlay');
 const detailFooter = document.getElementById('detail-footer');
 
-function openDetailPanel(slot) {
+function openDetailPanel(slot, editing) {
   document.getElementById('dh-title').textContent =
     slot.themeName;
   document.getElementById('dh-date').textContent =
@@ -2213,7 +2214,8 @@ function openDetailPanel(slot) {
   // so writer can swap T1 for T4 or T5 (or any theme) when project content
   // is absent for that division. The "default" shown below the dropdown is the
   // division's baked default, not the current slot theme.
-  const isEditable = !slot.isSpotlight && !slot.isTriggered && canEdit();
+  const canEditThis = !slot.isSpotlight && !slot.isTriggered && canEdit();
+  const isEditable = canEditThis && !!editing;
   let defaultThemeId, alternatives;
   if (isEditable) {
     if (slot.divisionId) {
@@ -2337,7 +2339,7 @@ function openDetailPanel(slot) {
       saveState();
       renderMonthGrid();
       const updated = getAllSlotsForMonth(isoMonth(currentMonthDate())).find(s => s.date === dateIso && !s.isSpotlight && !s.isTriggered);
-      if (updated) openDetailPanel(updated);
+      if (updated) openDetailPanel(updated, true);
     };
     document.getElementById('slot-theme-select').addEventListener('change', (e) => {
       setTheme(e.target.value);
@@ -2384,6 +2386,7 @@ function openDetailPanel(slot) {
   } else if (isEditable) {
     detailFooter.innerHTML = `
       <button id="slot-revert" data-date="${escapeHtml(slot.date)}">Revert to default</button>
+      <button id="slot-back-view" data-date="${escapeHtml(slot.date)}">Back to view</button>
       <button id="detail-close-2">Close</button>
     `;
     document.getElementById('slot-revert').addEventListener('click', () => {
@@ -2392,8 +2395,16 @@ function openDetailPanel(slot) {
       saveState();
       renderMonthGrid();
       const updated = getAllSlotsForMonth(isoMonth(currentMonthDate())).find(s => s.date === d && !s.isSpotlight && !s.isTriggered);
-      if (updated) openDetailPanel(updated);
+      if (updated) openDetailPanel(updated, true);
     });
+    document.getElementById('slot-back-view').addEventListener('click', () => { openDetailPanel(slot, false); });
+    document.getElementById('detail-close-2').addEventListener('click', closeDetailPanel);
+  } else if (canEditThis) {
+    detailFooter.innerHTML = `
+      <button id="slot-edit" data-date="${escapeHtml(slot.date)}" style="border-color:var(--accent); color:var(--accent);">Edit this post</button>
+      <button id="detail-close-2">Close</button>
+    `;
+    document.getElementById('slot-edit').addEventListener('click', () => { openDetailPanel(slot, true); });
     document.getElementById('detail-close-2').addEventListener('click', closeDetailPanel);
   } else if (slot.isSpotlight) {
     const canonical = slot.canonicalDate || slot.date;
@@ -2459,6 +2470,7 @@ function openDetailPanel(slot) {
   }
 
   detailOverlay.classList.add('open');
+  detailOverlay.classList.toggle('fullscreen', !!isEditable);
 }
 function closeDetailPanel() { detailOverlay.classList.remove('open'); }
 document.getElementById('detail-close').addEventListener('click', closeDetailPanel);

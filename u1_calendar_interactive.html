@@ -3335,22 +3335,44 @@ function submitForApproval() {
   fb.submitted = true;
   setEditButtons();
   pushProposalNow();
+  if (!fb.isOwner) {
+    firebase.firestore().collection('notifications').add({
+      toRole: 'owner',
+      message: (fb.user.email || 'An editor') + ' submitted a proposal for approval.',
+      fromUid: fb.user.uid,
+      at: firebase.firestore.FieldValue.serverTimestamp(),
+      read: false
+    }).catch(function (e) { console.warn('Owner notification skipped:', e.message); });
+  }
   var el = syncEl('sync-savestate'); if (el) el.textContent = 'Submitted for approval at ' + new Date().toLocaleTimeString() + '. The owner reviews and publishes.';
 }
 
 function subscribeNotifications() {
   if (!fb.user) return;
   if (window.__notifUnsub) { window.__notifUnsub(); window.__notifUnsub = null; }
-  window.__notifUnsub = firebase.firestore().collection('notifications').where('toUid', '==', fb.user.uid).onSnapshot(function (snap) {
+  if (window.__notifOwnerUnsub) { window.__notifOwnerUnsub(); window.__notifOwnerUnsub = null; }
+  window.__notifMine = []; window.__notifOwner = [];
+  var db = firebase.firestore();
+  // Notifications addressed to me (e.g. my proposal was approved + published).
+  window.__notifUnsub = db.collection('notifications').where('toUid', '==', fb.user.uid).onSnapshot(function (snap) {
     var items = [];
     snap.forEach(function (d) { var n = d.data(); if (!n.read) items.push({ id: d.id, msg: n.message || 'Your proposal was approved.' }); });
-    renderNotifBanner(items);
+    window.__notifMine = items; renderNotifBanner();
   }, function () {});
+  // Owner also listens for proposals submitted for approval.
+  if (fb.isOwner) {
+    window.__notifOwnerUnsub = db.collection('notifications').where('toRole', '==', 'owner').onSnapshot(function (snap) {
+      var items = [];
+      snap.forEach(function (d) { var n = d.data(); if (!n.read) items.push({ id: d.id, msg: n.message || 'A proposal was submitted for approval.' }); });
+      window.__notifOwner = items; renderNotifBanner();
+    }, function () {});
+  }
 }
 
-function renderNotifBanner(items) {
+function renderNotifBanner() {
   var el = syncEl('notif-banner'); if (!el) return;
-  if (!items || items.length === 0) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  var items = (window.__notifMine || []).concat(window.__notifOwner || []);
+  if (items.length === 0) { el.style.display = 'none'; el.innerHTML = ''; return; }
   var msg = (items.length === 1) ? items[0].msg : (items.length + ' updates. ' + items.map(function (i) { return i.msg; }).join(' '));
   el.innerHTML = '<span style="flex:1;">' + escapeHtml(msg) + '</span><button class="reset" id="notif-dismiss" style="border-color:#fff; color:#fff; flex:0 0 auto;">Dismiss</button>';
   el.style.display = 'flex';
@@ -3406,6 +3428,8 @@ function onAuthChange(user) {
     var rb2 = syncEl('view-review-btn'); if (rb2) rb2.style.display = 'none';
     var nb = syncEl('notif-banner'); if (nb) nb.style.display = 'none';
     if (window.__notifUnsub) { window.__notifUnsub(); window.__notifUnsub = null; }
+    if (window.__notifOwnerUnsub) { window.__notifOwnerUnsub(); window.__notifOwnerUnsub = null; }
+    window.__notifMine = []; window.__notifOwner = [];
     if (state.view === 'review') setView('grid');
   }
   exitToLive();

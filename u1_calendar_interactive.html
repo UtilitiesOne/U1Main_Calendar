@@ -872,6 +872,8 @@
   .pe-field textarea#pe-trust { min-height: 90px; resize: vertical; }
   .pe-field select:focus, .pe-field textarea:focus { outline: none; border-color: var(--u1-orange); }
   .pe-hint { font-size: 11px; color: var(--mute); margin-top: 6px; line-height: 1.45; }
+  .pe-locked { padding: 12px 14px; border: 1.5px dashed var(--rule); border-radius: 4px; background: var(--panel-2, #f6f7f8); color: var(--ink-soft); font-size: 14px; line-height: 1.5; }
+  .pe-lock-note { display: block; margin-top: 4px; font-size: 11px; color: var(--mute); }
   .pe-foot {
     flex: 0 0 auto;
     border-top: 1.5px solid var(--rule);
@@ -1662,12 +1664,13 @@ function generateScheduledSlots(monthIso) {
     slots.push(buildSlot({
       date: dateIso,
       channel: 'u1-main',
-      divisionId: null,
+      divisionId: ('divisionId' in override) ? override.divisionId : null,
       themeId,
       isSpotlight: false,
       isTriggered: false,
       contentNote: override.note || null,
-      trustLineOverride: override.trustLine || ''
+      trustLineOverride: override.trustLine || '',
+      taglineOverride: ('tagline' in override) ? override.tagline : undefined
     }));
   }
 
@@ -1687,12 +1690,13 @@ function generateScheduledSlots(monthIso) {
     slots.push(buildSlot({
       date: dateIso,
       channel: 'u1-main',
-      divisionId: divId,
+      divisionId: ('divisionId' in override) ? override.divisionId : divId,
       themeId,
       isSpotlight: false,
       isTriggered: false,
       contentNote: override.note || null,
-      trustLineOverride: override.trustLine || ''
+      trustLineOverride: override.trustLine || '',
+      taglineOverride: ('tagline' in override) ? override.tagline : undefined
     }));
   }
 
@@ -1776,23 +1780,21 @@ function generateSpotlightSlots(monthIso) {
   const canonical = generateCanonicalSpotlightSlots(monthIso);
   const overridden = [];
   for (const s of canonical) {
-    const ov = state.spotlightOverrides[s.date];
-    if (ov && ov.skipped) continue;
-    if (ov && ov.newDate) {
-      const newSlot = buildSlot({
-        date: ov.newDate,
-        channel: s.channel,
-        divisionId: s.divisionId,
-        themeId: s.themeId,
-        isSpotlight: true,
-        isTriggered: false
-      });
-      newSlot.canonicalDate = s.date;
-      overridden.push(newSlot);
-    } else {
-      s.canonicalDate = s.date;
-      overridden.push(s);
-    }
+    const ov = state.spotlightOverrides[s.date] || {};
+    if (ov.skipped) continue;
+    const newSlot = buildSlot({
+      date: ov.newDate || s.date,
+      channel: s.channel,
+      divisionId: ('divisionId' in ov) ? ov.divisionId : s.divisionId,
+      themeId: ov.themeId || s.themeId,
+      isSpotlight: true,
+      isTriggered: false,
+      contentNote: ('note' in ov) ? ov.note : null,
+      trustLineOverride: ov.trustLine || '',
+      taglineOverride: ('tagline' in ov) ? ov.tagline : undefined
+    });
+    newSlot.canonicalDate = s.date;
+    overridden.push(newSlot);
   }
   return overridden;
 }
@@ -1820,7 +1822,8 @@ function generateTriggeredSlots(monthIso) {
       isSpotlight: false,
       isTriggered: true,
       trustLineOverride: e.trustLine,
-      note: e.note
+      note: e.note,
+      taglineOverride: e.tagline
     }));
 }
 
@@ -1841,7 +1844,7 @@ function buildSlot(src) {
     themeName: theme.name,
     themeBehavior: theme.behavior,
     themeScope: theme.scope,
-    tagline: theme.tagline,
+    tagline: (src.taglineOverride !== undefined && src.taglineOverride !== null) ? src.taglineOverride : theme.tagline,
     trustLine: src.trustLineOverride || theme.trustLine,
     u1Way: theme.u1Way,
     signature: BODY_SIGNATURE,
@@ -2328,7 +2331,7 @@ function openDetailPanel(slot) {
       : '');
 
   const peOffline = (typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON);
-  const peCanEditExisting = !slot.isSpotlight && !slot.isTriggered;
+  const peCanEditExisting = true; /* every post, event, and spotlight is editable */
   const peEditLabel = peCanEditExisting ? ((peOffline || fb.user) ? 'Edit this post' : 'Sign in to edit') : '';
   const editBtnHtml = peEditLabel
     ? `<div class="section" style="border-bottom:none; padding-bottom:4px;"><button id="open-full-editor" style="width:100%; padding:12px 14px; font-family:inherit; font-size:13px; font-weight:700; border:1.5px solid var(--accent); color:#fff; background:var(--accent); border-radius:5px; cursor:pointer;">${peEditLabel}</button></div>`
@@ -2444,25 +2447,24 @@ function openDetailPanel(slot) {
   // Footer actions
   if (slot.isTriggered) {
     detailFooter.innerHTML = `
-      <button id="edit-triggered" data-id="${escapeHtml(slot.id)}">Edit event</button>
       <button class="danger" id="remove-triggered" data-id="${escapeHtml(slot.id)}">Remove</button>
+      <button id="detail-close-2">Close</button>
     `;
-    document.getElementById('edit-triggered').addEventListener('click', () => {
-      closeDetailPanel();
-      openEditTriggeredEvent(slot.id);
-    });
+    document.getElementById('detail-close-2').addEventListener('click', closeDetailPanel);
     document.getElementById('remove-triggered').addEventListener('click', () => {
       removeTriggeredEvent(slot.id);
       closeDetailPanel();
       renderAll();
     });
   } else if (isEditable) {
+    const hasOverride = !!state.slotOverrides[slot.date];
     detailFooter.innerHTML = `
-      <button id="slot-revert" data-date="${escapeHtml(slot.date)}">Revert to default</button>
+      ${hasOverride ? `<button id="slot-revert" data-date="${escapeHtml(slot.date)}">Revert to default</button>` : ''}
       <button id="detail-close-2">Close</button>
     `;
-    document.getElementById('slot-revert').addEventListener('click', () => {
-      const d = document.getElementById('slot-revert').dataset.date;
+    const revertBtn = document.getElementById('slot-revert');
+    if (revertBtn) revertBtn.addEventListener('click', () => {
+      const d = revertBtn.dataset.date;
       delete state.slotOverrides[d];
       saveState();
       renderMonthGrid();
@@ -2541,41 +2543,97 @@ function closeDetailPanel() { detailOverlay.classList.remove('open'); }
 // buffer so Cancel discards and Save commits to the same slotOverrides the drawer uses.
 function openPostEditor(slot) {
   const pe = document.getElementById('post-editor');
+  const kind = slot.isTriggered ? 'event' : (slot.isSpotlight ? 'spotlight' : 'scheduled');
   document.getElementById('pe-title').textContent = slot.themeName;
   document.getElementById('pe-date').textContent =
-    fmtDate(slot.dateObj) + ' \u00b7 ' + (slot.channel === 'u1-main' ? 'U1 Main' : slot.divisionName + ' page');
-  const dateIso = slot.date;
-  const buf = { themeId: slot.themeId, note: slot.note || '', trustLine: slot.trustLine || '' };
+    fmtDate(slot.dateObj) + ' · ' + (slot.channel === 'u1-main' ? 'U1 Main' : slot.divisionName + ' page');
+
+  const APPROVED_TAGLINES = [
+    { v: '', label: 'Signature only (no visual tagline)' },
+    { v: 'One Company. Every Utility.', label: 'One Company. Every Utility.' },
+    { v: 'Built to Hold.', label: 'Built to Hold.' },
+    { v: 'From paper to field.', label: 'From paper to field.' },
+    { v: 'One Way. Talent finds its lane.', label: 'One Way. Talent finds its lane.' }
+  ];
+
+  const buf = {
+    date: slot.date,
+    themeId: slot.themeId,
+    divisionId: slot.divisionId || '',
+    tagline: slot.tagline || '',
+    note: slot.note || '',
+    trustLine: slot.trustLine || ''
+  };
+
+  const themeOpts = THEMES.map(t => `<option value="${t.id}" ${buf.themeId === t.id ? 'selected' : ''}>${escapeHtml(t.name)} (${t.behavior})</option>`).join('');
+  const divOpts = `<option value="" ${!buf.divisionId ? 'selected' : ''}>Cross-divisional / company-wide (no specific division)</option>`
+    + DIVISIONS.map(d => `<option value="${d.id}" ${buf.divisionId === d.id ? 'selected' : ''}>${escapeHtml(d.name)}</option>`).join('');
+  const tagOpts = APPROVED_TAGLINES.map(o => `<option value="${escapeHtml(o.v)}" ${buf.tagline === o.v ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('');
+
+  const dateField = (kind === 'event')
+    ? `<div class="pe-field"><label class="pe-fl">Date</label><input type="date" id="pe-date-input" value="${escapeHtml(buf.date)}"></div>`
+    : `<div class="pe-field"><label class="pe-fl">Date</label><div class="pe-locked">${escapeHtml(fmtDate(slot.dateObj))}<span class="pe-lock-note">Fixed calendar slot. Events move; scheduled posts hold their date.</span></div></div>`;
+
   document.getElementById('pe-inner').innerHTML = `
-    <div class="pe-field">
-      <label class="pe-fl">Theme</label>
-      <select id="pe-theme">${THEMES.map(t => `<option value="${t.id}" ${slot.themeId === t.id ? 'selected' : ''}>${escapeHtml(t.name)} (${t.behavior})</option>`).join('')}</select>
-    </div>
-    <div class="pe-field">
-      <label class="pe-fl">Post body \u00b7 what this post says</label>
-      <textarea id="pe-note" placeholder="Write the post body here.">${escapeHtml(buf.note)}</textarea>
-      <div class="pe-hint">Working draft of the post. The locked body close and the hashtag taxonomy stay on the post card.</div>
-    </div>
-    <div class="pe-field">
-      <label class="pe-fl">Layer 2 \u00b7 TRUST line (writer-authored)</label>
-      <textarea id="pe-trust" placeholder="Name 1 or 2 TRUST values that fit this post.">${escapeHtml(buf.trustLine)}</textarea>
-    </div>
+    ${dateField}
+    <div class="pe-field"><label class="pe-fl">Theme</label><select id="pe-theme">${themeOpts}</select></div>
+    <div class="pe-field"><label class="pe-fl">Division</label><select id="pe-div">${divOpts}</select></div>
+    <div class="pe-field"><label class="pe-fl">Visual tagline</label><select id="pe-tag">${tagOpts}</select>
+      <div class="pe-hint">Approved brand lines only. Pick the one that fits this post, or signature only.</div></div>
+    <div class="pe-field"><label class="pe-fl">Post body · what this post says</label>
+      <textarea id="pe-note" placeholder="Write the post body here.">${escapeHtml(buf.note)}</textarea></div>
+    <div class="pe-field"><label class="pe-fl">Layer 2 · TRUST line (writer-authored)</label>
+      <textarea id="pe-trust" placeholder="Name 1 or 2 TRUST values that fit this post.">${escapeHtml(buf.trustLine)}</textarea></div>
+    <div class="pe-field"><label class="pe-fl">Body close (locked)</label>
+      <div class="pe-locked">"${escapeHtml(slot.signature)}"<span class="pe-lock-note">Sponsor-locked brand signature. Not editable.</span></div></div>
   `;
+
+  if (kind === 'event') {
+    const di = document.getElementById('pe-date-input');
+    if (di) di.addEventListener('change', (e) => { buf.date = e.target.value; });
+  }
   document.getElementById('pe-theme').addEventListener('change', (e) => { buf.themeId = e.target.value; });
+  document.getElementById('pe-div').addEventListener('change', (e) => { buf.divisionId = e.target.value; });
+  document.getElementById('pe-tag').addEventListener('change', (e) => { buf.tagline = e.target.value; });
   document.getElementById('pe-note').addEventListener('input', (e) => { buf.note = e.target.value; });
   document.getElementById('pe-trust').addEventListener('input', (e) => { buf.trustLine = e.target.value; });
+
   const closePE = () => { pe.classList.remove('open'); };
   document.getElementById('pe-x').onclick = closePE;
   document.getElementById('pe-cancel').onclick = closePE;
   document.getElementById('pe-save').onclick = () => {
-    if (!state.slotOverrides[dateIso]) state.slotOverrides[dateIso] = {};
-    state.slotOverrides[dateIso].themeId = buf.themeId;
-    state.slotOverrides[dateIso].note = buf.note;
-    state.slotOverrides[dateIso].trustLine = buf.trustLine;
+    const themeDefaultTag = ((THEMES.find(t => t.id === buf.themeId) || {}).tagline) || '';
+    const applyContent = (ov) => {
+      ov.themeId = buf.themeId;
+      ov.divisionId = buf.divisionId || '';
+      ov.note = buf.note;
+      ov.trustLine = buf.trustLine;
+      if (buf.tagline === themeDefaultTag) { delete ov.tagline; } else { ov.tagline = buf.tagline; }
+      return ov;
+    };
+    if (kind === 'event') {
+      const idx = state.triggeredEvents.findIndex(e => e.id === slot.id);
+      if (idx >= 0) {
+        const ev = { id: slot.id, date: buf.date, themeId: buf.themeId, divisionId: buf.divisionId || '', trustLine: buf.trustLine, note: buf.note };
+        if (buf.tagline !== themeDefaultTag) ev.tagline = buf.tagline;
+        state.triggeredEvents[idx] = ev;
+      }
+    } else if (kind === 'spotlight') {
+      const key = slot.canonicalDate || slot.date;
+      state.spotlightOverrides[key] = applyContent(state.spotlightOverrides[key] || {});
+    } else {
+      state.slotOverrides[slot.date] = applyContent(state.slotOverrides[slot.date] || {});
+    }
     saveState();
-    renderMonthGrid();
+    renderAll();
     closePE();
-    const updated = getAllSlotsForMonth(isoMonth(currentMonthDate())).find(s => s.date === dateIso && !s.isSpotlight && !s.isTriggered);
+    const findDate = (kind === 'event') ? buf.date : slot.date;
+    const mi = isoMonth(parseISO(findDate));
+    state.currentMonth = mi;
+    const updated = getAllSlotsForMonth(mi).find(s =>
+      kind === 'event' ? (s.isTriggered && s.id === slot.id)
+      : kind === 'spotlight' ? (s.isSpotlight && (s.canonicalDate || s.date) === (slot.canonicalDate || slot.date))
+      : (!s.isSpotlight && !s.isTriggered && s.date === slot.date));
     if (updated) openDetailPanel(updated);
   };
   pe.classList.add('open');

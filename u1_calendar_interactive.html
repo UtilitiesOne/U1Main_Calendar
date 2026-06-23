@@ -1350,12 +1350,16 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script>
   // ====== FILL THESE IN (see SETUP.md). Leave as-is to run offline / local-only. ======
   const firebaseConfig = {
     apiKey: "AIzaSyAw4OdzDsO_3CWa6wTWsPyNSIrQEARVr1w",
     authDomain: "u1-calendar.firebaseapp.com",
     projectId: "u1-calendar",
+    // CONFIRM in Firebase console > Storage (shown as gs://...). If it reads
+    // u1-calendar.appspot.com instead, replace this one line.
+    storageBucket: "u1-calendar.firebasestorage.app",
     appId: "1:784693618571:web:0b67641886d0de0a83f18e"
   };
   // Only this account can Publish to the live calendar everyone sees.
@@ -1670,7 +1674,8 @@ function generateScheduledSlots(monthIso) {
       isTriggered: false,
       contentNote: override.note || null,
       trustLineOverride: override.trustLine || '',
-      taglineOverride: ('tagline' in override) ? override.tagline : undefined
+      taglineOverride: ('tagline' in override) ? override.tagline : undefined,
+      image: ('image' in override) ? override.image : null
     }));
   }
 
@@ -1696,7 +1701,8 @@ function generateScheduledSlots(monthIso) {
       isTriggered: false,
       contentNote: override.note || null,
       trustLineOverride: override.trustLine || '',
-      taglineOverride: ('tagline' in override) ? override.tagline : undefined
+      taglineOverride: ('tagline' in override) ? override.tagline : undefined,
+      image: ('image' in override) ? override.image : null
     }));
   }
 
@@ -1791,7 +1797,8 @@ function generateSpotlightSlots(monthIso) {
       isTriggered: false,
       contentNote: ('note' in ov) ? ov.note : null,
       trustLineOverride: ov.trustLine || '',
-      taglineOverride: ('tagline' in ov) ? ov.tagline : undefined
+      taglineOverride: ('tagline' in ov) ? ov.tagline : undefined,
+      image: ('image' in ov) ? ov.image : null
     });
     newSlot.canonicalDate = s.date;
     overridden.push(newSlot);
@@ -1823,7 +1830,8 @@ function generateTriggeredSlots(monthIso) {
       isTriggered: true,
       trustLineOverride: e.trustLine,
       note: e.note,
-      taglineOverride: e.tagline
+      taglineOverride: e.tagline,
+      image: e.image
     }));
 }
 
@@ -1845,6 +1853,7 @@ function buildSlot(src) {
     themeBehavior: theme.behavior,
     themeScope: theme.scope,
     tagline: (src.taglineOverride !== undefined && src.taglineOverride !== null) ? src.taglineOverride : theme.tagline,
+    image: src.image || null,
     trustLine: src.trustLineOverride || theme.trustLine,
     u1Way: theme.u1Way,
     signature: BODY_SIGNATURE,
@@ -2337,7 +2346,11 @@ function openDetailPanel(slot) {
     ? `<div class="section" style="border-bottom:none; padding-bottom:4px;"><button id="open-full-editor" style="width:100%; padding:12px 14px; font-family:inherit; font-size:13px; font-weight:700; border:1.5px solid var(--accent); color:#fff; background:var(--accent); border-radius:5px; cursor:pointer;">${peEditLabel}</button></div>`
     : '';
 
-  body.innerHTML = `${editBtnHtml}
+  const imageSectionHtml = slot.image
+    ? `<div class="section"><div class="sec-title">Visual</div><img src="${escapeHtml(slot.image)}" style="max-width:100%; border:1.5px solid var(--rule); border-radius:4px; display:block;"></div>`
+    : '';
+
+  body.innerHTML = `${editBtnHtml}${imageSectionHtml}
     <div class="section">
       <div class="theme-strip" style="background: var(--${slot.themeId});">
         <span>${escapeHtml(slot.themeName)}</span>
@@ -2562,7 +2575,8 @@ function openPostEditor(slot) {
     divisionId: slot.divisionId || '',
     tagline: slot.tagline || '',
     note: slot.note || '',
-    trustLine: slot.trustLine || ''
+    trustLine: slot.trustLine || '',
+    image: slot.image || ''
   };
 
   const themeOpts = THEMES.map(t => `<option value="${t.id}" ${buf.themeId === t.id ? 'selected' : ''}>${escapeHtml(t.name)} (${t.behavior})</option>`).join('');
@@ -2580,6 +2594,11 @@ function openPostEditor(slot) {
     <div class="pe-field"><label class="pe-fl">Division</label><select id="pe-div">${divOpts}</select></div>
     <div class="pe-field"><label class="pe-fl">Visual tagline</label><select id="pe-tag">${tagOpts}</select>
       <div class="pe-hint">Approved brand lines only. Pick the one that fits this post, or signature only.</div></div>
+    <div class="pe-field"><label class="pe-fl">Visual image</label>
+      <div id="pe-img-wrap">${buf.image ? `<img src="${escapeHtml(buf.image)}" style="max-width:100%; max-height:300px; border:1.5px solid var(--rule); border-radius:4px; display:block; margin-bottom:8px;">` : ''}</div>
+      <input type="file" id="pe-img-file" accept="image/*">
+      <button type="button" id="pe-img-clear" style="margin-left:10px; font-family:inherit; font-size:12px; padding:6px 12px; border:1.5px solid var(--rule); border-radius:5px; background:white; cursor:pointer;">Remove image</button>
+      <div class="pe-hint" id="pe-img-status">PNG or JPG up to 10MB. It uploads to the shared library and the link saves with the post.</div></div>
     <div class="pe-field"><label class="pe-fl">Post body · what this post says</label>
       <textarea id="pe-note" placeholder="Write the post body here.">${escapeHtml(buf.note)}</textarea></div>
     <div class="pe-field"><label class="pe-fl">Layer 2 · TRUST line (writer-authored)</label>
@@ -2597,6 +2616,25 @@ function openPostEditor(slot) {
   document.getElementById('pe-tag').addEventListener('change', (e) => { buf.tagline = e.target.value; });
   document.getElementById('pe-note').addEventListener('input', (e) => { buf.note = e.target.value; });
   document.getElementById('pe-trust').addEventListener('input', (e) => { buf.trustLine = e.target.value; });
+  (function () {
+    var wrap = document.getElementById('pe-img-wrap');
+    var statusEl = document.getElementById('pe-img-status');
+    var setStatus = function (t) { if (statusEl) statusEl.textContent = t; };
+    var setPreview = function (url) { if (wrap) wrap.innerHTML = url ? '<img src="' + escapeHtml(url) + '" style="max-width:100%; max-height:300px; border:1.5px solid var(--rule); border-radius:4px; display:block; margin-bottom:8px;">' : ''; };
+    var fileEl = document.getElementById('pe-img-file');
+    if (fileEl) fileEl.addEventListener('change', function (e) {
+      var f = e.target.files && e.target.files[0]; if (!f) return;
+      if (f.size > 10 * 1024 * 1024) { setStatus('That image is over 10MB. Pick a smaller file.'); return; }
+      if ((typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON) || !fb.user) { setStatus('Sign in to upload an image.'); return; }
+      setStatus('Uploading...');
+      var path = 'post-images/' + fb.user.uid + '/' + Date.now() + '_' + f.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      firebase.storage().ref().child(path).put(f).then(function (snap) { return snap.ref.getDownloadURL(); }).then(function (url) {
+        buf.image = url; setPreview(url); setStatus('Uploaded.');
+      }).catch(function (err) { setStatus('Upload failed: ' + err.message); });
+    });
+    var clearEl = document.getElementById('pe-img-clear');
+    if (clearEl) clearEl.onclick = function () { buf.image = ''; setPreview(''); setStatus('Image removed. Save to apply.'); };
+  })();
 
   const closePE = () => { pe.classList.remove('open'); };
   document.getElementById('pe-x').onclick = closePE;
@@ -2609,6 +2647,7 @@ function openPostEditor(slot) {
       ov.note = buf.note;
       ov.trustLine = buf.trustLine;
       if (buf.tagline === themeDefaultTag) { delete ov.tagline; } else { ov.tagline = buf.tagline; }
+      if (buf.image) { ov.image = buf.image; } else { delete ov.image; }
       return ov;
     };
     if (kind === 'event') {
@@ -2616,6 +2655,7 @@ function openPostEditor(slot) {
       if (idx >= 0) {
         const ev = { id: slot.id, date: buf.date, themeId: buf.themeId, divisionId: buf.divisionId || '', trustLine: buf.trustLine, note: buf.note };
         if (buf.tagline !== themeDefaultTag) ev.tagline = buf.tagline;
+        if (buf.image) ev.image = buf.image;
         state.triggeredEvents[idx] = ev;
       }
     } else if (kind === 'spotlight') {

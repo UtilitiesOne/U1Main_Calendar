@@ -3359,10 +3359,12 @@ function openLanePostEditor(laneId, postId) {
     '<div class="pe-field"><label class="pe-fl">Body close (locked)</label>' +
     '<div class="pe-locked">We don\'t overpromise. We overdeliver.</div></div>' +
     (existing && canEdit ? '<button id="lpe-delete" style="border:1.5px solid #b3261e; color:#b3261e; background:#fff; border-radius:6px; padding:8px 14px; font-family:inherit; font-size:12.5px; font-weight:600; cursor:pointer;">Delete this post</button>' : '');
-  document.getElementById('lpe-date').addEventListener('change', e => { buf.date = e.target.value; });
-  document.getElementById('lpe-cat').addEventListener('change', e => { buf.category = e.target.value; });
-  document.getElementById('lpe-note').addEventListener('input', e => { buf.note = e.target.value; });
-  document.getElementById('lpe-trust').addEventListener('input', e => { buf.trustLine = e.target.value; });
+  ['input', 'change'].forEach(ev => {
+    document.getElementById('lpe-date').addEventListener(ev, e => { buf.date = e.target.value; });
+    document.getElementById('lpe-cat').addEventListener(ev, e => { buf.category = e.target.value; });
+    document.getElementById('lpe-note').addEventListener(ev, e => { buf.note = e.target.value; });
+    document.getElementById('lpe-trust').addEventListener(ev, e => { buf.trustLine = e.target.value; });
+  });
   const fileEl = document.getElementById('lpe-img-file');
   if (fileEl) fileEl.addEventListener('change', function () {
     const f = fileEl.files && fileEl.files[0];
@@ -3389,6 +3391,16 @@ function openLanePostEditor(laneId, postId) {
   document.getElementById('pe-cancel').onclick = closeLPE;
   document.getElementById('pe-save').onclick = () => {
     if (!canEdit) { closeLPE(); return; }
+    // Save-time read of every field (bug fix 2026-08-10, caught live by Alex): a date
+    // edited without a change event firing was silently lost. The DOM is the truth at save.
+    const dEl = document.getElementById('lpe-date');
+    if (dEl && dEl.value) buf.date = dEl.value;
+    const cEl = document.getElementById('lpe-cat');
+    if (cEl && cEl.value) buf.category = cEl.value;
+    const nEl = document.getElementById('lpe-note');
+    if (nEl) buf.note = nEl.value;
+    const tEl = document.getElementById('lpe-trust');
+    if (tEl) buf.trustLine = tEl.value;
     if (!String(buf.note || '').trim()) { alert('The post body is empty.'); return; }
     const dup = findLaneDuplicate(lane.id, buf.id, buf.note);
     if (dup) {

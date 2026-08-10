@@ -1124,6 +1124,8 @@
   </div>
 </header>
 
+<div id="lane-tabs" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; padding:10px 24px 0; background:var(--paper,#fff);"></div>
+
 <div id="notif-banner" style="display:none; align-items:center; gap:12px; background:var(--ok,#1f7a4d); color:#fff; padding:10px 16px; font-size:13px; line-height:1.4;"></div>
 <div class="layout">
 
@@ -1291,6 +1293,10 @@
         <div style="font-size:11px; color:var(--mute); margin-bottom:8px; line-height:1.45;">The last 20 published versions. Restore puts a version back on the live calendar everyone sees.</div>
         <div id="version-list"></div>
       </div>
+    </section>
+    <section id="view-lane" class="view">
+      <div id="lane-header"></div>
+      <div id="lane-list"></div>
     </section>
   </main>
 
@@ -1481,8 +1487,34 @@ function getQuarterlyAnchorFor(date) {
 
 // STATE
 
+// Division lanes (calendar v3, 2026-08-10). One pipeline for all nine pages.
+// The parent lane is the existing root state, untouched; division lanes are additive,
+// so legacy baseline, version history, and rebase semantics stay valid.
+// Colors: Water/Power/Renewable are the canonical glyph hues extracted from
+// Images/U1/Logo/PNG; the other five glyphs carry the master red-orange, so their
+// chips are UI-only tints for scanability, not brand colors.
+const LANES = [
+  { id: 'parent',       name: 'U1 Main',        color: '#EB4B28', tag: '#UtilitiesOne' },
+  { id: 'powerdelivery', name: 'Power Delivery', color: '#F7812F', tag: '#PowerDelivery' },
+  { id: 'water',        name: 'Water',          color: '#33A0E0', tag: '#Water' },
+  { id: 'wireline',     name: 'Wireline',       color: '#C43A20', tag: '#Wireline' },
+  { id: 'wireless',     name: 'Wireless',       color: '#E8734D', tag: '#Wireless' },
+  { id: 'renewable',    name: 'Renewable',      color: '#47B014', tag: '#Renewable' },
+  { id: 'datacenters',  name: 'Data Centers',   color: '#A33B2B', tag: '#DataCenters' },
+  { id: 'fulfillment',  name: 'Fulfillment',    color: '#F09A6A', tag: '#Fulfillment' },
+  { id: 'consulting',   name: 'Consulting',     color: '#8A2E1C', tag: '#Consulting' }
+];
+const DIVISION_LANES = LANES.filter(l => l.id !== 'parent');
+function laneById(id) { return LANES.find(l => l.id === id) || LANES[0]; }
+function emptyLanes() {
+  const m = {};
+  DIVISION_LANES.forEach(l => { m[l.id] = { posts: [] }; });
+  return m;
+}
+
 const DEFAULT_STATE = {
   view: 'grid',
+  activeLane: 'parent',
   currentMonth: null, // ISO 'YYYY-MM'; null = today's month
   spot1Div: '', spot1Uplift: 2,
   spot2Div: '', spot2Uplift: 2,
@@ -1490,6 +1522,10 @@ const DEFAULT_STATE = {
   triggeredEvents: [], // [{id, date(ISO), themeId, divisionId, trustLine, note}]
   slotOverrides: {},   // { 'YYYY-MM-DD': { themeId, note } } per-slot edits
   spotlightOverrides: {}, // { 'YYYY-MM-DD': { skipped: true } | { newDate: 'YYYY-MM-DD' } } keyed by canonical (algorithm-placed) date
+  // { laneId: { posts: [{id, date, category: 'people'|'site'|'capability', note,
+  //   trustLine, tagline: '' (signature-only; parent brand lines never appear on
+  //   division visuals, Alex ruling 2026-08-07), image}] } }
+  lanes: emptyLanes(),
 };
 
 let state = loadState();
@@ -1505,6 +1541,13 @@ function loadState() {
     if (typeof merged.spotlightOverrides !== 'object' || merged.spotlightOverrides === null) merged.spotlightOverrides = {};
     if (typeof merged.themes !== 'object' || merged.themes === null) merged.themes = {};
     THEMES.forEach(t => { if (merged.themes[t.id] === undefined) merged.themes[t.id] = true; });
+    // Migration: division lanes added 2026-08-10 (calendar v3). Old saved state has no
+    // lanes map; seed empty lanes and keep everything else exactly as saved.
+    if (typeof merged.lanes !== 'object' || merged.lanes === null) merged.lanes = emptyLanes();
+    DIVISION_LANES.forEach(l => {
+      if (!merged.lanes[l.id] || !Array.isArray(merged.lanes[l.id].posts)) merged.lanes[l.id] = { posts: [] };
+    });
+    if (!LANES.some(l => l.id === merged.activeLane)) merged.activeLane = 'parent';
     // Migration: T4 retired 2026-06-08 (brand-voice review). Remap any saved t4 theme
     // references to t5 so old saved state stays valid without wiping user overrides.
     const RETIRED_THEME_MAP = { t4: 't5' };
@@ -3161,6 +3204,7 @@ function bindControls() {
 
 function setView(v) {
   if (v === 'review' && !(typeof fb !== 'undefined' && fb && fb.isOwner)) v = 'grid';
+  if (v === 'lane' && state.activeLane === 'parent') v = 'grid';
   state.view = v;
   saveState();
   document.querySelectorAll('.view-toggle button').forEach(b => {
@@ -3169,7 +3213,195 @@ function setView(v) {
   document.getElementById('view-grid').classList.toggle('active', v === 'grid');
   document.getElementById('view-theme').classList.toggle('active', v === 'theme');
   var vr = document.getElementById('view-review'); if (vr) vr.classList.toggle('active', v === 'review');
+  var vl = document.getElementById('view-lane'); if (vl) vl.classList.toggle('active', v === 'lane');
   if (v === 'theme') renderThemeView();
+  if (v === 'lane') renderLaneView();
+}
+
+// DIVISION LANES (calendar v3, 2026-08-10). One pipeline, nine pages.
+
+function switchLane(id) {
+  state.activeLane = laneById(id).id;
+  if (state.activeLane === 'parent') {
+    setView(state.view === 'lane' ? 'grid' : state.view);
+  } else {
+    setView('lane');
+  }
+  renderLaneTabs();
+}
+
+function renderLaneTabs() {
+  const el = document.getElementById('lane-tabs');
+  if (!el) return;
+  el.innerHTML = LANES.map(l => {
+    const active = state.activeLane === l.id;
+    const n = l.id === 'parent' ? '' :
+      ' <span style="opacity:.7; font-weight:500;">' + ((state.lanes[l.id] || { posts: [] }).posts.length) + '</span>';
+    return '<button data-lane="' + l.id + '" style="display:inline-flex; align-items:center; gap:7px; border:1.5px solid ' +
+      (active ? l.color : 'var(--rule,#d8dce2)') + '; background:' + (active ? l.color : '#fff') +
+      '; color:' + (active ? '#fff' : 'var(--ink,#1B1C26)') +
+      '; border-radius:16px; padding:5px 13px; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;">' +
+      '<span style="width:8px; height:8px; border-radius:50%; background:' + (active ? '#fff' : l.color) + ';"></span>' +
+      escapeHtml(l.name) + n + '</button>';
+  }).join('');
+  el.querySelectorAll('button').forEach(b => {
+    b.onclick = () => switchLane(b.dataset.lane);
+  });
+}
+
+function laneCanEdit() {
+  return (typeof fb === 'undefined') || !FIREBASE_ON || !!(fb && fb.editing) || !!(fb && fb.isOwner && fb.editing !== false && !fb.previewing);
+}
+
+// Rolling mix rule per 4 posts: 1 people, 2 named-site or project, 1 capability.
+function laneMixRead(posts) {
+  const last4 = posts.slice(-4);
+  const c = { people: 0, site: 0, capability: 0 };
+  last4.forEach(p => { if (c[p.category] !== undefined) c[p.category]++; });
+  const ok = last4.length < 4 || (c.people >= 1 && c.site >= 2 && c.capability >= 1);
+  return { counts: c, window: last4.length, ok: ok };
+}
+
+function normBody(s) {
+  return String(s || '').toLowerCase().replace(/#[a-z0-9_]+/g, ' ').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+// Duplication guard: the same body may not run on two lanes (rulebook: a post that
+// fits 2+ divisions belongs to U1 Main; duplication across division pages is banned).
+function findLaneDuplicate(laneId, postId, body) {
+  const n = normBody(body);
+  if (n.length < 40) return null;
+  for (const l of DIVISION_LANES) {
+    for (const p of (state.lanes[l.id] || { posts: [] }).posts) {
+      if (l.id === laneId && p.id === postId) continue;
+      if (normBody(p.note) === n) return { lane: l, post: p };
+    }
+  }
+  for (const d in (state.slotOverrides || {})) {
+    const v = state.slotOverrides[d];
+    if (v && v.note && normBody(v.note) === n) return { lane: laneById('parent'), post: { date: d } };
+  }
+  for (const e of (state.triggeredEvents || [])) {
+    if (e && e.note && normBody(e.note) === n) return { lane: laneById('parent'), post: { date: e.date } };
+  }
+  return null;
+}
+
+const LANE_CATEGORIES = [
+  { v: 'people', label: 'People (crew, promotion, welcome)' },
+  { v: 'site', label: 'Named site / project' },
+  { v: 'capability', label: 'Capability' }
+];
+
+function renderLaneView() {
+  const lane = laneById(state.activeLane);
+  if (lane.id === 'parent') return;
+  const posts = (state.lanes[lane.id] || { posts: [] }).posts.slice().sort((a, b) => a.date < b.date ? -1 : 1);
+  const mix = laneMixRead(posts);
+  const head = document.getElementById('lane-header');
+  const canEdit = laneCanEdit();
+  head.innerHTML =
+    '<div style="display:flex; align-items:center; justify-content:space-between; gap:14px; padding:14px 0 10px; border-bottom:2px solid ' + lane.color + '; margin-bottom:14px;">' +
+    '<div><div style="font-size:19px; font-weight:800; color:var(--ink,#1B1C26);">' + escapeHtml(lane.name) + ' lane</div>' +
+    '<div style="font-size:12px; color:var(--mute,#69707a); margin-top:3px;">The division speaks on its own page, part of Utilities One Group. Signature closes every body. Visuals carry no parent brand lines. Weekly cadence.</div></div>' +
+    '<div style="display:flex; align-items:center; gap:10px;">' +
+    '<div style="font-size:11px; color:' + (mix.ok ? 'var(--green,#1f7a4d)' : 'var(--amber,#9a5b00)') + '; font-weight:600;">Mix last ' + mix.window + ': ' +
+      mix.counts.people + ' people · ' + mix.counts.site + ' site · ' + mix.counts.capability + ' capability' + (mix.ok ? '' : ' · off the 1/2/1 rule') + '</div>' +
+    (canEdit ? '<button id="lane-add-btn" style="border:1.5px solid ' + lane.color + '; color:#fff; background:' + lane.color + '; border-radius:6px; padding:8px 14px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer;">+ Add post</button>' : '') +
+    '</div></div>';
+  const list = document.getElementById('lane-list');
+  if (!posts.length) {
+    list.innerHTML = '<div style="font-size:13px; color:var(--mute,#69707a); padding:30px 0;">No posts in this lane yet.' + (canEdit ? ' Add the first one.' : ' Sign in and propose changes to add one.') + '</div>';
+  } else {
+    list.innerHTML = posts.map(p => {
+      const cat = (LANE_CATEGORIES.find(c => c.v === p.category) || {}).label || p.category || '';
+      return '<div class="lane-post" data-id="' + escapeHtml(p.id) + '" style="border:1.5px solid var(--rule,#d8dce2); border-left:5px solid ' + lane.color + '; border-radius:7px; padding:13px 16px; margin-bottom:10px; cursor:pointer; background:#fff;">' +
+        '<div style="display:flex; justify-content:space-between; gap:10px; margin-bottom:6px;">' +
+        '<span style="font-size:12px; font-weight:700; color:var(--ink,#1B1C26);">' + escapeHtml(fmtDate(new Date(p.date + 'T12:00:00'))) + '</span>' +
+        '<span style="font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:' + lane.color + ';">' + escapeHtml(cat) + '</span></div>' +
+        '<div style="font-size:12.5px; color:var(--ink-soft,#464d57); line-height:1.5; max-height:60px; overflow:hidden;">' + escapeHtml(String(p.note || '').slice(0, 220)) + '</div>' +
+        (p.image ? '<div style="font-size:10.5px; color:var(--mute,#69707a); margin-top:5px;">Image attached</div>' : '') +
+        '</div>';
+    }).join('');
+  }
+  const add = document.getElementById('lane-add-btn');
+  if (add) add.onclick = () => openLanePostEditor(lane.id, null);
+  list.querySelectorAll('.lane-post').forEach(el => {
+    el.onclick = () => openLanePostEditor(lane.id, el.dataset.id);
+  });
+}
+
+function openLanePostEditor(laneId, postId) {
+  const lane = laneById(laneId);
+  const laneStore = state.lanes[lane.id] || (state.lanes[lane.id] = { posts: [] });
+  const existing = postId ? laneStore.posts.find(p => p.id === postId) : null;
+  const buf = existing ? JSON.parse(JSON.stringify(existing)) : {
+    id: 'lp' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    date: isoDate(new Date()), category: 'site', note: '', trustLine: '', tagline: '', image: ''
+  };
+  const canEdit = laneCanEdit();
+  const pe = document.getElementById('post-editor');
+  document.getElementById('pe-title').textContent = (existing ? 'Edit' : 'New') + ' ' + lane.name + ' lane post';
+  document.getElementById('pe-date').textContent = lane.name + ' division page · part of Utilities One Group';
+  const catOpts = LANE_CATEGORIES.map(c => '<option value="' + c.v + '" ' + (buf.category === c.v ? 'selected' : '') + '>' + escapeHtml(c.label) + '</option>').join('');
+  document.getElementById('pe-inner').innerHTML =
+    '<div class="pe-field"><label class="pe-fl">Date</label><input type="date" id="lpe-date" value="' + escapeHtml(buf.date) + '"></div>' +
+    '<div class="pe-field"><label class="pe-fl">Category (mix rule per 4 posts: 1 people, 2 named-site, 1 capability)</label><select id="lpe-cat">' + catOpts + '</select></div>' +
+    '<div class="pe-field"><label class="pe-fl">Visual</label><div class="pe-locked">Signature only. Parent brand lines never appear on division visuals.</div></div>' +
+    '<div class="pe-field"><label class="pe-fl">Visual image</label>' +
+    '<div id="lpe-img-wrap">' + (buf.image ? '<img src="' + escapeHtml(buf.image) + '" style="max-width:100%; max-height:300px; border:1.5px solid var(--rule); border-radius:4px; display:block; margin-bottom:8px;">' : '') + '</div>' +
+    '<input type="file" id="lpe-img-file" accept="image/*">' +
+    '<div class="pe-hint" id="lpe-img-status">PNG or JPG up to 10MB. Uploads to the shared library.</div></div>' +
+    '<div class="pe-field"><label class="pe-fl">Post body · the division speaks, collective we</label>' +
+    '<textarea id="lpe-note" placeholder="Write the post body here. Close on the signature.">' + escapeHtml(buf.note) + '</textarea></div>' +
+    '<div class="pe-field"><label class="pe-fl">Layer 2 · TRUST line (writer-authored)</label>' +
+    '<textarea id="lpe-trust" placeholder="Name 1 or 2 TRUST values that fit this post.">' + escapeHtml(buf.trustLine) + '</textarea></div>' +
+    '<div class="pe-field"><label class="pe-fl">Body close (locked)</label>' +
+    '<div class="pe-locked">We don\'t overpromise. We overdeliver.</div></div>' +
+    (existing && canEdit ? '<button id="lpe-delete" style="border:1.5px solid #b3261e; color:#b3261e; background:#fff; border-radius:6px; padding:8px 14px; font-family:inherit; font-size:12.5px; font-weight:600; cursor:pointer;">Delete this post</button>' : '');
+  document.getElementById('lpe-date').addEventListener('change', e => { buf.date = e.target.value; });
+  document.getElementById('lpe-cat').addEventListener('change', e => { buf.category = e.target.value; });
+  document.getElementById('lpe-note').addEventListener('input', e => { buf.note = e.target.value; });
+  document.getElementById('lpe-trust').addEventListener('input', e => { buf.trustLine = e.target.value; });
+  const fileEl = document.getElementById('lpe-img-file');
+  if (fileEl) fileEl.addEventListener('change', function () {
+    const f = fileEl.files && fileEl.files[0];
+    if (!f) return;
+    const st = document.getElementById('lpe-img-status');
+    if (typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON || !fb.user) { st.textContent = 'Sign in to upload images.'; return; }
+    if (f.size > 10 * 1024 * 1024) { st.textContent = 'That file is over 10MB.'; return; }
+    st.textContent = 'Uploading...';
+    const path = 'post-images/' + fb.user.uid + '/' + Date.now() + '_' + f.name.replace(/[^A-Za-z0-9._-]/g, '_');
+    firebase.storage().ref().child(path).put(f).then(function (snap) { return snap.ref.getDownloadURL(); }).then(function (url) {
+      buf.image = url;
+      document.getElementById('lpe-img-wrap').innerHTML = '<img src="' + escapeHtml(url) + '" style="max-width:100%; max-height:300px; border:1.5px solid var(--rule); border-radius:4px; display:block; margin-bottom:8px;">';
+      st.textContent = 'Uploaded.';
+    }).catch(function (e) { st.textContent = 'Upload failed: ' + e.message; });
+  });
+  const closeLPE = () => { pe.classList.remove('open'); };
+  const del = document.getElementById('lpe-delete');
+  if (del) del.onclick = function () {
+    if (!confirm('Delete this lane post?')) return;
+    laneStore.posts = laneStore.posts.filter(p => p.id !== buf.id);
+    saveState(); closeLPE(); renderLaneTabs(); renderLaneView();
+  };
+  document.getElementById('pe-x').onclick = closeLPE;
+  document.getElementById('pe-cancel').onclick = closeLPE;
+  document.getElementById('pe-save').onclick = () => {
+    if (!canEdit) { closeLPE(); return; }
+    if (!String(buf.note || '').trim()) { alert('The post body is empty.'); return; }
+    const dup = findLaneDuplicate(lane.id, buf.id, buf.note);
+    if (dup) {
+      alert('This body already runs on the ' + dup.lane.name + ' lane (' + dup.post.date + '). The same post never runs on two pages: a post that fits more than one division belongs on U1 Main.');
+      return;
+    }
+    const i = laneStore.posts.findIndex(p => p.id === buf.id);
+    if (i === -1) laneStore.posts.push(buf); else laneStore.posts[i] = buf;
+    saveState();
+    if (typeof pushProposalNow === 'function') pushProposalNow();
+    closeLPE(); renderLaneTabs(); renderLaneView();
+  };
+  pe.classList.add('open');
 }
 
 // STATS
@@ -3265,10 +3497,19 @@ function renderStats() {
 // MAIN RENDER
 
 function renderAll() {
+  // Lane guard at the single choke point: live-state applies, previews, restores,
+  // and imports replace `state` wholesale, and pre-v3 states carry no lanes map.
+  if (typeof state.lanes !== 'object' || state.lanes === null) state.lanes = emptyLanes();
+  DIVISION_LANES.forEach(l => {
+    if (!state.lanes[l.id] || !Array.isArray(state.lanes[l.id].posts)) state.lanes[l.id] = { posts: [] };
+  });
+  if (!LANES.some(l => l.id === state.activeLane)) state.activeLane = 'parent';
   renderStats();
   renderTriggeredList();
   renderMonthGrid();
   renderThemeView();
+  renderLaneTabs();
+  if (state.view === 'lane') renderLaneView();
 }
 
 // INIT
@@ -3602,6 +3843,12 @@ function subscribeVersions() {
 
 initFirebaseSync();
 </script>
+
+<script src="u1_baseline.js"></script>
+<script src="u1_gate.js"></script>
+<script src="u1_scope.js"></script>
+<script src="u1_review_ui.js"></script>
+<script src="u1_review_panel.js"></script>
 
 </body>
 </html>

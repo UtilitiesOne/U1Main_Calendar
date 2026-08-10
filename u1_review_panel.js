@@ -125,6 +125,7 @@
     document.body.appendChild(el);
     document.getElementById('u1rp-close').onclick = toggle;
     STATE.open = true;
+    if (!STATE.unsub) listen();
     render();
   }
 
@@ -170,6 +171,14 @@
       setTimeout(wait, 400);
     }
   })();
+  // Sign-in usually completes AFTER the retry window above (the OAuth popup takes as
+  // long as it takes), which left the panel permanently unsubscribed and empty.
+  // Re-attach on every auth change (caught live by Alex 2026-08-10).
+  try {
+    if (typeof firebase !== 'undefined' && firebase.auth) {
+      firebase.auth().onAuthStateChanged(function () { setTimeout(listen, 300); });
+    }
+  } catch (e) {}
 
   window.U1ReviewPanel = { toggle: toggle, render: render, state: STATE, badge: badge,
     load: function (rs) { STATE.reviews = rs; badge(); if (STATE.open) render(); } };

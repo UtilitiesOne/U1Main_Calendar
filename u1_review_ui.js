@@ -184,7 +184,7 @@
         (blocked ? 'Nothing was sent. Your work is saved.' : 'Sent to the owner for review.') +
       '</p><div class="u1g-btns">' +
         '<button class="u1g-b" data-x="close">' + (blocked ? 'Back to the post' : 'Close') + '</button>' +
-        (blocked && window.__u1gOwner ? '<button class="u1g-b pri" data-x="force">Override and submit</button>' : '') +
+        (blocked && window.fb && fb.isOwner ? '<button class="u1g-b pri" data-x="force">Override and submit</button>' : '') +
       '</div></div></div>';
     document.body.appendChild(back);
     back.addEventListener('click', function (e) {

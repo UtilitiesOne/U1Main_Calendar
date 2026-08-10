@@ -3335,6 +3335,14 @@ function openLanePostEditor(laneId, postId) {
   const lane = laneById(laneId);
   const laneStore = state.lanes[lane.id] || (state.lanes[lane.id] = { posts: [] });
   const existing = postId ? laneStore.posts.find(p => p.id === postId) : null;
+  if (postId && !existing) {
+    // Ghost-card guard (2026-08-10): the card belongs to a post no longer in the
+    // current draft (a discarded proposal, or a live refresh). Refresh instead of
+    // silently opening a new-post editor pretending to be an edit.
+    renderLaneTabs(); renderLaneView();
+    alert('That post is no longer in the current draft, so the lane view has been refreshed. It may have been removed together with a discarded proposal.');
+    return;
+  }
   const buf = existing ? JSON.parse(JSON.stringify(existing)) : {
     id: 'lp' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
     date: isoDate(new Date()), category: 'site', note: '', trustLine: '', tagline: '', image: ''

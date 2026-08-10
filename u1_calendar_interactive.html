@@ -3250,7 +3250,11 @@ function renderLaneTabs() {
 }
 
 function laneCanEdit() {
-  return (typeof fb === 'undefined') || !FIREBASE_ON || !!(fb && fb.editing) || !!(fb && fb.isOwner && fb.editing !== false && !fb.previewing);
+  // Lane edits follow the app's own rule: you edit inside a proposal (Propose changes),
+  // owner included. The earlier owner shortcut let posts be created OUTSIDE proposal
+  // mode, where saves never reach Firestore and the next live refresh wipes them
+  // (caught live by Alex 2026-08-10: vanishing posts, ghost cards, empty submits).
+  return (typeof fb === 'undefined') || !FIREBASE_ON || !!(fb && fb.editing);
 }
 
 // Rolling mix rule per 4 posts: 1 people, 2 named-site or project, 1 capability.
@@ -3585,15 +3589,32 @@ function applyLiveToView() {
 function enterEditMode() {
   if (!(typeof FIREBASE_ON !== 'undefined' && FIREBASE_ON) || !fb.user) return;
   fb.previewing = false;
-  fb.editing = true;
-  fb.submitted = false;
-  fb.baseVersion = window.__liveVersion || 0;
-  fb.baseState = fbClone(window.__liveState || state);
-  state = fbClone(window.__liveState || state);
-  if (!state.currentMonth) state.currentMonth = TODAY_MONTH_ISO;
-  renderAll();
-  setEditButtons(); updateModeIndicator();
-  pushProposalNow();
+  // Draft resume (2026-08-10, caught live by Alex): re-entering edit mode used to
+  // reseed from live unconditionally and immediately overwrite the server draft,
+  // wiping any lane posts drafted earlier. Auto-save promises a resumable draft,
+  // so resume the saved draft when one exists; seed from live only without one.
+  var seed = function (st, baseV, baseS, resumed) {
+    fb.editing = true;
+    fb.submitted = false;
+    fb.baseVersion = baseV;
+    fb.baseState = baseS;
+    state = fbClone(st);
+    if (!state.currentMonth) state.currentMonth = TODAY_MONTH_ISO;
+    renderAll();
+    setEditButtons(); updateModeIndicator();
+    if (resumed) { var el = syncEl('sync-savestate'); if (el) el.textContent = 'Resumed your saved draft.'; }
+    pushProposalNow();
+  };
+  var liveB = window.__liveVersion || 0;
+  var liveS = fbClone(window.__liveState || state);
+  firebase.firestore().collection('proposals').doc(fb.user.uid).get().then(function (doc) {
+    var d = doc.exists ? doc.data() : null;
+    if (d && d.state) {
+      seed(d.state, d.baseVersion || liveB, d.baseState || liveS, true);
+    } else {
+      seed(liveS, liveB, liveS, false);
+    }
+  }).catch(function () { seed(liveS, liveB, liveS, false); });
 }
 
 function ensureEditing() {
@@ -3864,11 +3885,11 @@ function subscribeVersions() {
 initFirebaseSync();
 </script>
 
-<script src="u1_baseline.js"></script>
-<script src="u1_gate.js"></script>
-<script src="u1_scope.js"></script>
-<script src="u1_review_ui.js"></script>
-<script src="u1_review_panel.js"></script>
+<script src="u1_baseline.js?v=3.2"></script>
+<script src="u1_gate.js?v=3.2"></script>
+<script src="u1_scope.js?v=3.2"></script>
+<script src="u1_review_ui.js?v=3.2"></script>
+<script src="u1_review_panel.js?v=3.2"></script>
 
 </body>
 </html>

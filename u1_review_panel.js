@@ -5,7 +5,8 @@
 (function () {
   'use strict';
 
-  var STATE = { reviews: [], open: false, unsub: null };
+  var STATE = { reviews: [], open: false, unsub: null, status: 'starting', error: null };
+  var PANEL_VERSION = '3.3';
 
   var CSS = [
     '#u1rp-btn{position:relative}',
@@ -63,7 +64,13 @@
     var body = document.getElementById('u1rp-body');
     if (!body) return;
     if (!STATE.reviews.length) {
-      body.innerHTML = '<p class="u1rp-empty">No review feedback yet.</p>';
+      // Diagnostic footer (2026-08-10): when the panel is empty, show WHY, so a
+      // stale script, an unattached listener, or a rules error is visible instead
+      // of indistinguishable from a genuinely empty collection.
+      body.innerHTML = '<p class="u1rp-empty">No review feedback yet.<br>' +
+        '<span style="font-size:10.5px;opacity:.75">' + esc(STATE.status) +
+        (STATE.error ? ' &middot; error: ' + esc(STATE.error) : '') +
+        ' &middot; panel v' + PANEL_VERSION + '</span></p>';
       return;
     }
     body.innerHTML = STATE.reviews.map(function (r, ri) {
@@ -119,7 +126,7 @@
     var el = document.createElement('div');
     el.id = 'u1rp-panel';
     el.innerHTML = '<header><div><h3>Review feedback</h3>' +
-      '<p class="sub">What to change, and why. Tick items as you fix them.</p></div>' +
+      '<p class="sub">What to change, and why. Tick items as you fix them. <span style="opacity:.55">panel v' + PANEL_VERSION + '</span></p></div>' +
       '<button class="u1rp-x" id="u1rp-close">&times;</button></header>' +
       '<div id="u1rp-body"></div>';
     document.body.appendChild(el);
@@ -130,12 +137,18 @@
   }
 
   function listen() {
-    if (typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON || !window.fb || !fb.user) return;
+    if (typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON || !window.fb || !fb.user) {
+      STATE.status = 'not listening: waiting for sign-in';
+      if (STATE.open) render();
+      return;
+    }
     window.__u1rpOwner = !!fb.isOwner;
     if (STATE.unsub) { STATE.unsub(); STATE.unsub = null; }
     var db = firebase.firestore();
     var q = fb.isOwner ? db.collection('reviews')
                        : db.collection('reviews').where('toUid', '==', fb.user.uid);
+    STATE.status = 'listening as ' + (fb.user.email || fb.user.uid) + (fb.isOwner ? ' (owner, all reviews)' : ' (own reviews)');
+    STATE.error = null;
     STATE.unsub = q.onSnapshot(function (snap) {
       STATE.reviews = snap.docs.map(function (d) {
         var o = d.data(); o.id = d.id; return o;
@@ -146,7 +159,12 @@
       });
       badge();
       if (STATE.open) render();
-    }, function (e) { console.warn('reviews listener:', e.message); });
+    }, function (e) {
+      STATE.error = e.message;
+      STATE.status = 'listener failed';
+      if (STATE.open) render();
+      console.warn('reviews listener:', e.message);
+    });
   }
 
   function mountButton() {

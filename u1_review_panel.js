@@ -6,7 +6,7 @@
   'use strict';
 
   var STATE = { reviews: [], open: false, unsub: null, status: 'starting', error: null };
-  var PANEL_VERSION = '3.3';
+  var PANEL_VERSION = "3.4";
 
   var CSS = [
     '#u1rp-btn{position:relative}',
@@ -181,22 +181,24 @@
     return true;
   }
 
-  var t = 0;
-  (function wait() {
+  mountButton();
+  // Attach when a user actually appears, however long that takes. The earlier
+  // bounded retry expired before sign-in and the onAuthStateChanged hook could not
+  // bind because this script runs before the app initializes Firebase. A standing
+  // poller costs nothing and cannot miss the transition (caught live 2026-08-10:
+  // the panel reported "not listening: waiting for sign-in" indefinitely).
+  var lastUid = null;
+  setInterval(function () {
     mountButton();
-    listen();
-    if (++t < 40 && (typeof FIREBASE_ON === 'undefined' || !window.fb || !fb.user)) {
-      setTimeout(wait, 400);
+    var uid = (window.fb && fb.user && fb.user.uid) ? fb.user.uid : null;
+    if (uid !== lastUid) {
+      lastUid = uid;
+      if (uid) listen();
+      else { if (STATE.unsub) { STATE.unsub(); STATE.unsub = null; }
+             STATE.status = 'not listening: waiting for sign-in';
+             STATE.reviews = []; badge(); if (STATE.open) render(); }
     }
-  })();
-  // Sign-in usually completes AFTER the retry window above (the OAuth popup takes as
-  // long as it takes), which left the panel permanently unsubscribed and empty.
-  // Re-attach on every auth change (caught live by Alex 2026-08-10).
-  try {
-    if (typeof firebase !== 'undefined' && firebase.auth) {
-      firebase.auth().onAuthStateChanged(function () { setTimeout(listen, 300); });
-    }
-  } catch (e) {}
+  }, 700);
 
   window.U1ReviewPanel = { toggle: toggle, render: render, state: STATE, badge: badge,
     load: function (rs) { STATE.reviews = rs; badge(); if (STATE.open) render(); } };

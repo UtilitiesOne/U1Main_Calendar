@@ -6,7 +6,16 @@
   'use strict';
 
   var STATE = { reviews: [], open: false, unsub: null, status: 'starting', error: null };
-  var PANEL_VERSION = "3.4";
+  var PANEL_VERSION = "3.5";
+
+  // The app declares `let fb = {...}` at script top level. A top-level `let` is a global
+  // LEXICAL binding, not a property of window, so `window.fb` is undefined forever and
+  // every window.fb check silently failed. Read the bare binding instead.
+  // (Root cause of the panel never attaching; caught 2026-08-10 after three timing fixes
+  // that were all treating the symptom.)
+  function FB() {
+    try { return (typeof fb !== 'undefined' && fb) ? fb : null; } catch (e) { return null; }
+  }
 
   var CSS = [
     '#u1rp-btn{position:relative}',
@@ -137,17 +146,18 @@
   }
 
   function listen() {
-    if (typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON || !window.fb || !fb.user) {
+    var F = FB();
+    if (typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON || !F || !F.user) {
       STATE.status = 'not listening: waiting for sign-in';
       if (STATE.open) render();
       return;
     }
-    window.__u1rpOwner = !!fb.isOwner;
+    window.__u1rpOwner = !!F.isOwner;
     if (STATE.unsub) { STATE.unsub(); STATE.unsub = null; }
     var db = firebase.firestore();
-    var q = fb.isOwner ? db.collection('reviews')
-                       : db.collection('reviews').where('toUid', '==', fb.user.uid);
-    STATE.status = 'listening as ' + (fb.user.email || fb.user.uid) + (fb.isOwner ? ' (owner, all reviews)' : ' (own reviews)');
+    var q = F.isOwner ? db.collection('reviews')
+                      : db.collection('reviews').where('toUid', '==', F.user.uid);
+    STATE.status = 'listening as ' + (F.user.email || F.user.uid) + (F.isOwner ? ' (owner, all reviews)' : ' (own reviews)');
     STATE.error = null;
     STATE.unsub = q.onSnapshot(function (snap) {
       STATE.reviews = snap.docs.map(function (d) {
@@ -190,7 +200,8 @@
   var lastUid = null;
   setInterval(function () {
     mountButton();
-    var uid = (window.fb && fb.user && fb.user.uid) ? fb.user.uid : null;
+    var F = FB();
+    var uid = (F && F.user && F.user.uid) ? F.user.uid : null;
     if (uid !== lastUid) {
       lastUid = uid;
       if (uid) listen();

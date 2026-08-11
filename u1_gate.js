@@ -64,7 +64,44 @@
   /* Checks shared by every surface: AI tells, retired lines, production leftovers,
      TRUST line, consumer register, triadic lists. Factored out 2026-08-10 so the
      parent path and the division-lane path run one implementation. */
+  // The visual is part of the post, not decoration: a body without artwork is an
+  // incomplete post, and an asset we do not host is not an asset. Locked by Alex
+  // 2026-08-11 (image is a BLOCK; consistency is what the owner reads first).
+  var OWN_BUCKET = /^https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/u1-calendar\.firebasestorage\.app\//i;
+  var MIN_IMAGE_WIDTH = 1080;
+
+  function checkVisual(out, post) {
+    var img = String(post.image || '').trim();
+    if (!img) {
+      out.push(item('BLOCK', 'Visual missing',
+        'Every post ships with its visual. The artwork carries the line and the division mark, so a post without one is half a post.',
+        'Upload the visual on this post before submitting.'));
+      return;
+    }
+    if (!OWN_BUCKET.test(img)) {
+      out.push(item('BLOCK', 'Visual is not in our library',
+        'This image points somewhere we do not control, so it can move or disappear after publication.',
+        'Upload the file through the post editor so it lands in the shared library.',
+        img.slice(0, 60)));
+    }
+    var m = post.imageMeta;
+    if (m && m.w && m.h) {
+      if (m.w < MIN_IMAGE_WIDTH) {
+        out.push(item('WARN', 'Visual is small for the feed',
+          'This image is ' + m.w + 'px wide. Below about ' + MIN_IMAGE_WIDTH + 'px it renders soft on a retina feed.',
+          'Export it at 1200px wide or more.'));
+      }
+      var ratio = m.w / m.h;
+      if (ratio < 0.5 || ratio > 2.0) {
+        out.push(item('WARN', 'Unusual aspect ratio',
+          'This image is ' + m.w + ' by ' + m.h + '. The feed crops hard outside roughly 1:2 to 2:1.',
+          'Re-crop to square, 4:5 portrait, or 1.91:1 landscape.'));
+      }
+    }
+  }
+
   function checkCommon(out, text, body, post) {
+    checkVisual(out, post);
     if (/[—–]/.test(text)) {
       out.push(item('BLOCK', 'Long-dash AI-tell',
         'Long dashes are banned across every U1 surface.',

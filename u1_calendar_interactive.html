@@ -2671,12 +2671,15 @@ function openPostEditor(slot) {
       if ((typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON) || !fb.user) { setStatus('Sign in to upload an image.'); return; }
       setStatus('Uploading...');
       var path = 'post-images/' + fb.user.uid + '/' + Date.now() + '_' + f.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      firebase.storage().ref().child(path).put(f).then(function (snap) { return snap.ref.getDownloadURL(); }).then(function (url) {
-        buf.image = url; setPreview(url); setStatus('Uploaded.');
+      readImageMeta(f).then(function (meta) {
+        return firebase.storage().ref().child(path).put(f).then(function (snap) { return snap.ref.getDownloadURL(); }).then(function (url) {
+          buf.image = url; buf.imageMeta = meta; setPreview(url);
+          setStatus('Uploaded.' + (meta && meta.w ? ' ' + meta.w + ' by ' + meta.h + '.' : ''));
+        });
       }).catch(function (err) { setStatus('Upload failed: ' + err.message); });
     });
     var clearEl = document.getElementById('pe-img-clear');
-    if (clearEl) clearEl.onclick = function () { buf.image = ''; setPreview(''); setStatus('Image removed. Save to apply.'); };
+    if (clearEl) clearEl.onclick = function () { buf.image = ''; buf.imageMeta = null; setPreview(''); setStatus('Image removed. Save to apply.'); };
   })();
 
   const closePE = () => { pe.classList.remove('open'); };
@@ -2691,6 +2694,7 @@ function openPostEditor(slot) {
       ov.trustLine = buf.trustLine;
       if (buf.tagline === themeDefaultTag) { delete ov.tagline; } else { ov.tagline = buf.tagline; }
       if (buf.image) { ov.image = buf.image; } else { delete ov.image; }
+      if (buf.image && buf.imageMeta) { ov.imageMeta = buf.imageMeta; } else { delete ov.imageMeta; }
       return ov;
     };
     if (kind === 'event') {
@@ -2699,6 +2703,7 @@ function openPostEditor(slot) {
         const ev = { id: slot.id, date: buf.date, themeId: buf.themeId, divisionId: buf.divisionId || '', trustLine: buf.trustLine, note: buf.note };
         if (buf.tagline !== themeDefaultTag) ev.tagline = buf.tagline;
         if (buf.image) ev.image = buf.image;
+        if (buf.image && buf.imageMeta) ev.imageMeta = buf.imageMeta;
         state.triggeredEvents[idx] = ev;
       }
     } else if (kind === 'spotlight') {
@@ -3249,6 +3254,24 @@ function renderLaneTabs() {
   });
 }
 
+// Reads the real pixel dimensions before upload so the gate can judge the asset,
+// not just its presence (2026-08-11). Resolves null on any failure: metadata is a
+// nice-to-have, never a reason to lose an upload.
+function readImageMeta(file) {
+  return new Promise(function (resolve) {
+    try {
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () {
+        var m = { w: img.naturalWidth, h: img.naturalHeight, bytes: file.size };
+        URL.revokeObjectURL(url); resolve(m);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); resolve(null); };
+      img.src = url;
+    } catch (e) { resolve(null); }
+  });
+}
+
 function laneCanEdit() {
   // Lane edits follow the app's own rule: you edit inside a proposal (Propose changes),
   // owner included. The earlier owner shortcut let posts be created OUTSIDE proposal
@@ -3386,10 +3409,12 @@ function openLanePostEditor(laneId, postId) {
     if (f.size > 10 * 1024 * 1024) { st.textContent = 'That file is over 10MB.'; return; }
     st.textContent = 'Uploading...';
     const path = 'post-images/' + fb.user.uid + '/' + Date.now() + '_' + f.name.replace(/[^A-Za-z0-9._-]/g, '_');
-    firebase.storage().ref().child(path).put(f).then(function (snap) { return snap.ref.getDownloadURL(); }).then(function (url) {
-      buf.image = url;
-      document.getElementById('lpe-img-wrap').innerHTML = '<img src="' + escapeHtml(url) + '" style="max-width:100%; max-height:300px; border:1.5px solid var(--rule); border-radius:4px; display:block; margin-bottom:8px;">';
-      st.textContent = 'Uploaded.';
+    readImageMeta(f).then(function (meta) {
+      return firebase.storage().ref().child(path).put(f).then(function (snap) { return snap.ref.getDownloadURL(); }).then(function (url) {
+        buf.image = url; buf.imageMeta = meta;
+        document.getElementById('lpe-img-wrap').innerHTML = '<img src="' + escapeHtml(url) + '" style="max-width:100%; max-height:300px; border:1.5px solid var(--rule); border-radius:4px; display:block; margin-bottom:8px;">';
+        st.textContent = 'Uploaded.' + (meta && meta.w ? ' ' + meta.w + ' by ' + meta.h + '.' : '');
+      });
     }).catch(function (e) { st.textContent = 'Upload failed: ' + e.message; });
   });
   const closeLPE = () => { pe.classList.remove('open'); };
@@ -3893,11 +3918,11 @@ function subscribeVersions() {
 initFirebaseSync();
 </script>
 
-<script src="u1_baseline.js?v=3.6"></script>
-<script src="u1_gate.js?v=3.6"></script>
-<script src="u1_scope.js?v=3.6"></script>
-<script src="u1_review_ui.js?v=3.6"></script>
-<script src="u1_review_panel.js?v=3.6"></script>
+<script src="u1_baseline.js?v=3.7"></script>
+<script src="u1_gate.js?v=3.7"></script>
+<script src="u1_scope.js?v=3.7"></script>
+<script src="u1_review_ui.js?v=3.7"></script>
+<script src="u1_review_panel.js?v=3.7"></script>
 
 </body>
 </html>

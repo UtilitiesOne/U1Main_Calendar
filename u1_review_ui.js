@@ -51,7 +51,8 @@
       var items = window.U1Gate.checkPost({
         date: r.post.date, themeId: th, themeName: meta.name,
         tagline: declared, bodyActivationRequired: needsAct,
-        text: r.post.text, trustLine: r.post.trustLine
+        text: r.post.text, trustLine: r.post.trustLine,
+        image: r.post.image, imageMeta: r.post.imageMeta
       });
       items = window.U1Scope.applyScope(items, r.scope);
       if (!items.length) return;
@@ -70,6 +71,7 @@
           date: p.date, themeId: '', themeName: l.name + ' lane',
           tagline: p.tagline || '', bodyActivationRequired: false,
           text: p.note, trustLine: p.trustLine,
+          image: p.image, imageMeta: p.imageMeta,
           laneId: l.id, laneName: l.name, laneTag: l.tag
         });
         if (typeof findLaneDuplicate === 'function' && target === state) {

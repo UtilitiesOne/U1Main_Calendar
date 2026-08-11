@@ -35,14 +35,16 @@
       if (!v || !v.note) return;
       out.push({ key: keyFor('sched', date), kind: 'sched', date: date,
                  themeId: v.themeId || '', text: v.note, trustLine: v.trustLine || '',
-                 tagline: ('tagline' in v) ? v.tagline : undefined });
+                 tagline: ('tagline' in v) ? v.tagline : undefined,
+                 image: v.image || '', imageMeta: v.imageMeta || null });
     });
     ((state && state.triggeredEvents) || []).forEach(function (e, i) {
       var text = (e.note && e.note.trim()) ? e.note : (e.trustLine || '');
       var trust = (e.note && e.note.trim()) ? (e.trustLine || '') : '';
       out.push({ key: keyFor('event', e.date, e.id || i), kind: 'event', date: e.date,
                  themeId: e.themeId || '', text: text, trustLine: trust,
-                 tagline: ('tagline' in e) ? e.tagline : undefined });
+                 tagline: ('tagline' in e) ? e.tagline : undefined,
+                 image: e.image || '', imageMeta: e.imageMeta || null });
     });
     return out;
   }

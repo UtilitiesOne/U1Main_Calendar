@@ -3386,6 +3386,7 @@ function openLanePostEditor(laneId, postId) {
     '<div class="pe-field"><label class="pe-fl">Visual image</label>' +
     '<div id="lpe-img-wrap">' + (buf.image ? '<img src="' + escapeHtml(buf.image) + '" style="max-width:100%; max-height:300px; border:1.5px solid var(--rule); border-radius:4px; display:block; margin-bottom:8px;">' : '') + '</div>' +
     '<input type="file" id="lpe-img-file" accept="image/*">' +
+    '<button type="button" id="lpe-img-clear" style="margin-left:10px; font-family:inherit; font-size:12px; padding:6px 12px; border:1.5px solid var(--rule); border-radius:5px; background:white; cursor:pointer;">Remove image</button>' +
     '<div class="pe-hint" id="lpe-img-status">PNG or JPG up to 10MB. Uploads to the shared library.</div></div>' +
     '<div class="pe-field"><label class="pe-fl">Post body · the division speaks, collective we</label>' +
     '<textarea id="lpe-note" placeholder="Write the post body here. Close on the signature.">' + escapeHtml(buf.note) + '</textarea></div>' +
@@ -3417,6 +3418,13 @@ function openLanePostEditor(laneId, postId) {
       });
     }).catch(function (e) { st.textContent = 'Upload failed: ' + e.message; });
   });
+  const clearLPEImg = document.getElementById('lpe-img-clear');
+  if (clearLPEImg) clearLPEImg.onclick = function () {
+    buf.image = ''; buf.imageMeta = null;
+    document.getElementById('lpe-img-wrap').innerHTML = '';
+    document.getElementById('lpe-img-status').textContent = 'Image removed. Save to apply. A post needs a visual before it can be submitted.';
+  };
+
   const closeLPE = () => { pe.classList.remove('open'); };
   const del = document.getElementById('lpe-delete');
   if (del) del.onclick = function () {
@@ -3918,11 +3926,11 @@ function subscribeVersions() {
 initFirebaseSync();
 </script>
 
-<script src="u1_baseline.js?v=3.7"></script>
-<script src="u1_gate.js?v=3.7"></script>
-<script src="u1_scope.js?v=3.7"></script>
-<script src="u1_review_ui.js?v=3.7"></script>
-<script src="u1_review_panel.js?v=3.7"></script>
+<script src="u1_baseline.js?v=3.8"></script>
+<script src="u1_gate.js?v=3.8"></script>
+<script src="u1_scope.js?v=3.8"></script>
+<script src="u1_review_ui.js?v=3.8"></script>
+<script src="u1_review_panel.js?v=3.8"></script>
 
 </body>
 </html>

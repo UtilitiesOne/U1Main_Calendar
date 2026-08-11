@@ -3640,15 +3640,23 @@ function pushProposal() {
 
 function pushProposalNow() {
   if (!(typeof FIREBASE_ON !== 'undefined' && FIREBASE_ON) || !fb.user || fb.previewing || !fb.editing) return;
-  firebase.firestore().collection('proposals').doc(fb.user.uid).set({
+  // l1/l2 ride on every write (2026-08-11). The proposal doc is written with set(),
+  // which replaces it, so the gate verdict has to travel with the same payload:
+  // the server rule refuses submitted:true unless l1 is 'clean', and dropping l2
+  // on an autosave would trip the l2-protection rule.
+  var payload = {
     email: fb.user.email,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     state: state,
     baseVersion: fb.baseVersion || 0,
     baseState: fb.baseState || null,
     submitted: !!fb.submitted,
-    submittedAt: fb.submitted ? firebase.firestore.FieldValue.serverTimestamp() : null
-  }).then(function () { updateModeIndicator(); })
+    submittedAt: fb.submitted ? firebase.firestore.FieldValue.serverTimestamp() : null,
+    l1: (typeof fb.l1 === 'string' ? fb.l1 : 'unchecked')
+  };
+  if (typeof fb.l2 === 'string') payload.l2 = fb.l2;
+  firebase.firestore().collection('proposals').doc(fb.user.uid).set(payload)
+    .then(function () { updateModeIndicator(); })
     .catch(function (e) { var el = syncEl('sync-savestate'); if (el) el.textContent = 'Save error: ' + e.message; });
 }
 
@@ -3885,11 +3893,11 @@ function subscribeVersions() {
 initFirebaseSync();
 </script>
 
-<script src="u1_baseline.js?v=3.5"></script>
-<script src="u1_gate.js?v=3.5"></script>
-<script src="u1_scope.js?v=3.5"></script>
-<script src="u1_review_ui.js?v=3.5"></script>
-<script src="u1_review_panel.js?v=3.5"></script>
+<script src="u1_baseline.js?v=3.6"></script>
+<script src="u1_gate.js?v=3.6"></script>
+<script src="u1_scope.js?v=3.6"></script>
+<script src="u1_review_ui.js?v=3.6"></script>
+<script src="u1_review_panel.js?v=3.6"></script>
 
 </body>
 </html>

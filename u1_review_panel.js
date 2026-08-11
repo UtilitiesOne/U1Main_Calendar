@@ -6,7 +6,7 @@
   'use strict';
 
   var STATE = { reviews: [], open: false, unsub: null, status: 'starting', error: null };
-  var PANEL_VERSION = "3.5";
+  var PANEL_VERSION = "3.6";
 
   // The app declares `let fb = {...}` at script top level. A top-level `let` is a global
   // LEXICAL binding, not a property of window, so `window.fb` is undefined forever and

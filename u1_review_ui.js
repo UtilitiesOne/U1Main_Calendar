@@ -27,10 +27,17 @@
     return 't6';
   }
 
-  /* Runs gate + scope over the current editing state. */
-  function evaluateCurrent() {
+  // The app declares `let fb`, a lexical global that never lands on window.
+  function FB() {
+    try { return (typeof fb !== 'undefined' && fb) ? fb : null; } catch (e) { return null; }
+  }
+
+  /* Runs gate + scope over a calendar state. Defaults to the one being edited;
+     the publish gate passes the state about to go live (2026-08-11). */
+  function evaluateState(st) {
+    var target = st || state;
     var TH = themeMap();
-    var scoped = window.U1Scope.resolve(state, BASELINE);
+    var scoped = window.U1Scope.resolve(target, BASELINE);
     var groups = [];
     scoped.forEach(function (r) {
       if (r.scope === 'silent') return;
@@ -55,7 +62,7 @@
     // Division lanes (calendar v3, 2026-08-10): always governed, never legacy.
     // The lane metadata comes from the app's LANES table when present.
     var lanesDef = (typeof LANES !== 'undefined') ? LANES : [];
-    var laneMap = (state && state.lanes) || {};
+    var laneMap = (target && target.lanes) || {};
     lanesDef.forEach(function (l) {
       if (l.id === 'parent') return;
       (((laneMap[l.id] || {}).posts) || []).forEach(function (p) {
@@ -65,7 +72,7 @@
           text: p.note, trustLine: p.trustLine,
           laneId: l.id, laneName: l.name, laneTag: l.tag
         });
-        if (typeof findLaneDuplicate === 'function') {
+        if (typeof findLaneDuplicate === 'function' && target === state) {
           var dup = findLaneDuplicate(l.id, p.id, p.note);
           if (dup) items2.push({ level: 'BLOCK', rule: 'Duplicate across pages',
             why: 'This body also runs on the ' + dup.lane.name + ' lane. The same post never runs on two pages; a post that fits more than one division belongs on U1 Main.',
@@ -159,15 +166,18 @@
     } catch (e) { return d; }
   }
 
-  function showAdvisory(res, onProceed) {
+  function showAdvisory(res, onProceed, opts) {
     ensureStyle();
+    var pub = !!(opts && opts.publish);
     var blocked = !res.canSubmit;
     var title = blocked
-      ? 'Not submitted yet. ' + res.blocks + (res.blocks === 1 ? ' thing' : ' things') + ' to fix first.'
-      : 'Submitted. ' + (res.advise + res.warns) + ' note' + ((res.advise + res.warns) === 1 ? '' : 's') + ' for you.';
+      ? (pub ? 'Not published. ' : 'Not submitted yet. ') + res.blocks + (res.blocks === 1 ? ' thing' : ' things') + ' to fix first.'
+      : (pub ? 'Published. ' : 'Submitted. ') + (res.advise + res.warns) + ' note' + ((res.advise + res.warns) === 1 ? '' : 's') + ' for you.';
     var sub = blocked
-      ? 'These are the brand rules the calendar runs on. Fix them in the post and submit again.'
-      : 'Nothing here blocked your submission. Worth a look while the post is still open.';
+      ? (pub
+          ? 'These posts would go live carrying brand-rule violations. Fix them, or override and it goes on the record.'
+          : 'These are the brand rules the calendar runs on. Fix them in the post and submit again.')
+      : 'Nothing here blocked it. Worth a look while the post is still open.';
 
     var body = res.groups.map(function (g) {
       return '<div class="u1g-post"><div class="u1g-pt">' + fmtDate(g.date) + ' &middot; ' + esc(g.theme) +
@@ -181,11 +191,12 @@
       '<p class="u1g-h">' + esc(title) + '</p><p class="u1g-sub">' + esc(sub) + '</p></div>' +
       '<div class="u1g-body">' + body + '</div>' +
       '<div class="u1g-foot"><p class="u1g-note">' +
-        (blocked ? 'Nothing was sent. Your work is saved.' : 'Sent to the owner for review.') +
+        (blocked ? (pub ? 'Nothing went live. The proposal is untouched.' : 'Nothing was sent. Your work is saved.')
+                 : (pub ? 'Live calendar updated.' : 'Sent to the owner for review.')) +
       '</p><div class="u1g-btns">' +
-        '<button class="u1g-b" data-x="close">' + (blocked ? 'Back to the post' : 'Close') + '</button>' +
-        (blocked && (function () { try { return typeof fb !== 'undefined' && fb && fb.isOwner; } catch (e) { return false; } })()
-          ? '<button class="u1g-b pri" data-x="force">Override and submit</button>' : '') +
+        '<button class="u1g-b" data-x="close">' + (blocked ? (pub ? 'Back' : 'Back to the post') : 'Close') + '</button>' +
+        (blocked && (function () { var F = FB(); return F && F.isOwner; })()
+          ? '<button class="u1g-b pri" data-x="force">' + (pub ? 'Override and publish' : 'Override and submit') + '</button>' : '') +
       '</div></div></div>';
     document.body.appendChild(back);
     back.addEventListener('click', function (e) {
@@ -236,45 +247,107 @@
     } catch (e) {}
   }
 
+  /* An override is a decision on the record: who, when, what was pushed through.
+     Immutable by rule. Added 2026-08-11 with the server-side enforcement. */
+  function logOverride(kind, res, note) {
+    try {
+      var F = FB();
+      if (typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON || !F || !F.user) return;
+      var rules = [];
+      (res.groups || []).forEach(function (g) {
+        (g.items || []).forEach(function (i) {
+          if (i.level === 'BLOCK') rules.push(g.date + ' ' + g.theme + ': ' + i.rule);
+        });
+      });
+      firebase.firestore().collection('overrides').add({
+        kind: kind,
+        by: F.user.email || '',
+        uid: F.user.uid,
+        blocks: res.blocks,
+        rules: rules,
+        note: note || '',
+        at: firebase.firestore.FieldValue.serverTimestamp()
+      }).catch(function (e) { console.warn('override log skipped:', e.message); });
+    } catch (e) {}
+  }
+
+  /* Stamps the gate verdict on the client state BEFORE the app writes the
+     proposal, so submitted:true and l1:'clean' land in one document. The
+     server rule refuses a submitted proposal whose l1 is not clean, so the
+     order matters (2026-08-11). */
+  function stampVerdict(clean) {
+    var F = FB();
+    if (!F) return;
+    F.l1 = clean ? 'clean' : 'blocked';
+    if (clean) F.l2 = 'pending';
+  }
+
   function install() {
     if (typeof window.submitForApproval !== 'function') return false;
     if (window.__u1gInstalled) return true;
     var original = window.submitForApproval;
-    window.__u1gOwner = !!(window.fb && fb.isOwner);
+    var F0 = FB();
+    window.__u1gOwner = !!(F0 && F0.isOwner);
 
     window.submitForApproval = function () {
       var res;
-      try { res = evaluateCurrent(); }
-      catch (e) { console.warn('U1 gate error, submitting unchecked:', e); return original.apply(this, arguments); }
+      try { res = evaluateState(); }
+      catch (e) { console.warn('U1 gate error, submitting unchecked:', e); stampVerdict(true); return original.apply(this, arguments); }
 
       if (!res.all.length) {
+        stampVerdict(true);
         original.apply(this, arguments);
         markStages(true);
         return;
       }
 
       if (res.canSubmit) {
+        stampVerdict(true);
         original.apply(this, arguments);
         markStages(true);
         writeReview(res);
         showAdvisory(res, function () {});
         return;
       }
+      stampVerdict(false);
       markStages(false);
       writeReview(res);
       showAdvisory(res, function (force) {
-        if (force) { original.call(window); markStages(true); }
+        if (force) { logOverride('submit', res, 'blocked submit pushed through by owner'); stampVerdict(true); original.call(window); markStages(true); }
       });
     };
     window.__u1gInstalled = true;
-    window.U1GateUI = { evaluate: evaluateCurrent, show: showAdvisory };
+    window.U1GateUI = { evaluate: evaluateState, show: showAdvisory };
+    return true;
+  }
+
+  /* Publish gate (2026-08-11). guardedPublish is the single choke point for every
+     path that writes the live calendar: direct publish, rebase and publish, and
+     version restore. Wrapping it closes the owner-shaped hole, where edits made
+     and published directly never met the gate. */
+  function installPublish() {
+    if (typeof window.guardedPublish !== 'function') return false;
+    if (window.__u1gPublishInstalled) return true;
+    var orig = window.guardedPublish;
+    window.guardedPublish = function (stateObj, expectedVersion, source, proposalId) {
+      var self = this, args = arguments, res;
+      try { res = evaluateState(stateObj); }
+      catch (e) { console.warn('U1 gate error on publish, publishing unchecked:', e); return orig.apply(self, args); }
+      if (res.canSubmit) return orig.apply(self, args);
+      showAdvisory(res, function (force) {
+        if (force) { logOverride('publish', res, String(source || '')); orig.apply(self, args); }
+      }, { publish: true });
+      return undefined;
+    };
+    window.__u1gPublishInstalled = true;
     return true;
   }
 
   var tries = 0;
   (function wait() {
-    if (install()) return;
-    if (++tries > 60) { console.warn('U1 gate: submitForApproval not found'); return; }
+    var a = install(), b = installPublish();
+    if (a && b) return;
+    if (++tries > 60) { console.warn('U1 gate: submit or publish hook not found'); return; }
     setTimeout(wait, 250);
   })();
 })();

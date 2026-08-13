@@ -1164,7 +1164,7 @@
 
     <div class="section">
       <h3 class="section-title">Triggered events <span class="pill">EVENT-DRIVEN</span></h3>
-      <p style="font-size:11.5px; color:var(--mute); margin: 0 0 10px 0; line-height: 1.45;">Project Delivery, Career Arc, U1 Way On Site, and U1 Culture post when a real event happens (project milestone, promotion, new hire, storm, coordination moment, leadership visit, annual meeting). Add when the event lands.</p>
+      <p style="font-size:11.5px; color:var(--mute); margin: 0 0 10px 0; line-height: 1.45;">Event-driven posts: project milestones, promotions, new hires, field moments, culture, company events (meetings, all-hands) and industry events (Mountain Connect, Fiber Connect, expos). One entry = one post on one date; a conference worth a pre-event, live, and recap post gets three entries. Add when the event lands.</p>
 
       <div class="triggered-queue">
         <button class="triggered-add" id="add-project-btn">
@@ -1185,6 +1185,16 @@
         <button class="triggered-add" id="add-culture-btn">
           <span class="dot" style="background:var(--t7);"></span>
           <span>Add U1 Culture post</span>
+          <span class="plus">+</span>
+        </button>
+        <button class="triggered-add" id="add-newhire-btn">
+          <span class="dot" style="background:var(--t2);"></span>
+          <span>Add New Hire post</span>
+          <span class="plus">+</span>
+        </button>
+        <button class="triggered-add" id="add-companyevent-btn">
+          <span class="dot" style="background:var(--t7);"></span>
+          <span>Add Company Event post</span>
           <span class="plus">+</span>
         </button>
       </div>
@@ -1874,7 +1884,8 @@ function generateTriggeredSlots(monthIso) {
       trustLineOverride: e.trustLine,
       note: e.note,
       taglineOverride: e.tagline,
-      image: e.image
+      image: e.image,
+      subtype: e.subtype
     }));
 }
 
@@ -1887,8 +1898,8 @@ function buildSlot(src) {
     dateObj: parseISO(src.date),
     channel: src.channel,
     divisionId: src.divisionId,
-    divisionName: div ? div.name : (theme.scope === 'company' ? 'Company-wide' : 'Cross-divisional'),
-    divisionAbbr: div ? div.abbr : (theme.scope === 'company' ? 'U1' : 'XD'),
+    divisionName: div ? div.name : ((theme.scope === 'company' || src.subtype === 'newhire') ? 'Company-wide' : 'Cross-divisional'),
+    divisionAbbr: div ? div.abbr : ((theme.scope === 'company' || src.subtype === 'newhire') ? 'U1' : 'XD'),
     divisionTier: div ? div.tier : null,
     themeId: src.themeId,
     themeNum: theme.num,
@@ -1902,6 +1913,7 @@ function buildSlot(src) {
     signature: BODY_SIGNATURE,
     isSpotlight: !!src.isSpotlight,
     isTriggered: !!src.isTriggered,
+    subtype: src.subtype || null,
     note: src.note || src.contentNote || null
   };
 }
@@ -2623,7 +2635,7 @@ function openPostEditor(slot) {
   };
 
   const themeOpts = THEMES.map(t => `<option value="${t.id}" ${buf.themeId === t.id ? 'selected' : ''}>${escapeHtml(t.name)} (${t.behavior})</option>`).join('');
-  const divOpts = `<option value="" ${!buf.divisionId ? 'selected' : ''}>Cross-divisional / company-wide (no specific division)</option>`
+  const divOpts = `<option value="" ${!buf.divisionId ? 'selected' : ''}>U1 · company-wide / cross-divisional (no specific division)</option>`
     + DIVISIONS.map(d => `<option value="${d.id}" ${buf.divisionId === d.id ? 'selected' : ''}>${escapeHtml(d.name)}</option>`).join('');
   const tagOpts = APPROVED_TAGLINES.map(o => `<option value="${escapeHtml(o.v)}" ${buf.tagline === o.v ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('');
 
@@ -2701,6 +2713,7 @@ function openPostEditor(slot) {
       const idx = state.triggeredEvents.findIndex(e => e.id === slot.id);
       if (idx >= 0) {
         const ev = { id: slot.id, date: buf.date, themeId: buf.themeId, divisionId: buf.divisionId || '', trustLine: buf.trustLine, note: buf.note };
+        if (slot.subtype) ev.subtype = slot.subtype;
         if (buf.tagline !== themeDefaultTag) ev.tagline = buf.tagline;
         if (buf.image) ev.image = buf.image;
         if (buf.image && buf.imageMeta) ev.imageMeta = buf.imageMeta;
@@ -2737,7 +2750,7 @@ const modalTitle = document.getElementById('modal-title');
 const modalSub = document.getElementById('modal-sub');
 const modalSave = document.getElementById('modal-save');
 
-let modalMode = null; // 'career' | 'u1way' | 'project' | 'generic' | 'culture'
+let modalMode = null; // 'career' | 'u1way' | 'project' | 'generic' | 'culture' | 'newhire' | 'companyevent'
 let modalEditId = null;
 let modalState = null;
 
@@ -2751,6 +2764,8 @@ function openModal({ mode, prefilledDate = null, editEvent = null }) {
   else if (mode === 'u1way') initialThemeId = 't3';
   else if (mode === 'project') initialThemeId = 't1';
   else if (mode === 'culture') initialThemeId = 't7';
+  else if (mode === 'newhire') initialThemeId = 't2';
+  else if (mode === 'companyevent') initialThemeId = 't7';
   else initialThemeId = 't1'; // generic fallback
   const initialTheme = THEMES.find(t => t.id === initialThemeId);
   modalState = editEvent ? structuredClone(editEvent) : {
@@ -2760,6 +2775,9 @@ function openModal({ mode, prefilledDate = null, editEvent = null }) {
     note: '',
     themeId: initialThemeId
   };
+  if (mode === 'companyevent' && !modalState.eventKind) {
+    modalState.eventKind = (modalState.subtype === 'company-industry') ? 'industry' : 'internal';
+  }
 
   if (mode === 'career') {
     modalTitle.textContent = editEvent ? 'Edit Career Arc post' : 'Add Career Arc post';
@@ -2773,6 +2791,12 @@ function openModal({ mode, prefilledDate = null, editEvent = null }) {
   } else if (mode === 'culture') {
     modalTitle.textContent = editEvent ? 'Edit U1 Culture post' : 'Add U1 Culture post';
     modalSub.textContent = 'Theme 7 · event-driven · company-wide';
+  } else if (mode === 'newhire') {
+    modalTitle.textContent = editEvent ? 'Edit New Hire post' : 'Add New Hire post';
+    modalSub.textContent = 'Theme 2 · event-driven · U1 company-wide or any division';
+  } else if (mode === 'companyevent') {
+    modalTitle.textContent = editEvent ? 'Edit Company Event post' : 'Add Company Event post';
+    modalSub.textContent = 'Theme 7 · event-driven · internal meeting or industry event';
   } else {
     modalTitle.textContent = 'Add custom post';
     modalSub.textContent = 'Free-form scheduled post';
@@ -2860,7 +2884,13 @@ const MODAL_NOTE_EXAMPLES = {
     '': 'e.g., Leadership visit to a field office; annual meeting recap; team award or milestone'
   }
 };
-function getModalNoteExample(themeId, divisionId) {
+function getModalNoteExample(themeId, divisionId, mode, eventKind) {
+  if (mode === 'newhire') return 'New hire announcement: role and where they land (a division or U1 corporate), one line on what they bring';
+  if (mode === 'companyevent') {
+    return eventKind === 'industry'
+      ? 'Industry event: Mountain Connect booth, speaking slot, or recap. One entry per post: pre-event, live, recap'
+      : 'Internal event: annual meeting recap, all-hands, leadership visit, team award';
+  }
   const themeMap = MODAL_NOTE_EXAMPLES[themeId] || {};
   return themeMap[divisionId || ''] || themeMap[''] || 'Free-form note for this post';
 }
@@ -2893,6 +2923,19 @@ function renderModalBody() {
   const themeFieldHtml = modalMode === 'generic'
     ? `<div class="field"><label class="fl">Theme</label><select id="m-theme">${themeOptions}</select></div>`
     : '';
+  const kindFieldHtml = modalMode === 'companyevent'
+    ? `<div class="field"><label class="fl" for="m-kind">Event kind</label><select id="m-kind">
+        <option value="internal" ${modalState.eventKind !== 'industry' ? 'selected' : ''}>Internal · meeting, all-hands, leadership event</option>
+        <option value="industry" ${modalState.eventKind === 'industry' ? 'selected' : ''}>Industry · conference, expo, trade show (Mountain Connect, Fiber Connect...)</option>
+      </select></div>`
+    : '';
+  const companyScopeOk = ['culture', 'newhire', 'companyevent'].includes(modalMode);
+  const divLabelNote = modalMode === 'career' ? '(mature tier only)'
+    : modalMode === 'project' ? '(any division)'
+    : companyScopeOk ? '(optional · U1 or a division)' : '';
+  const firstDivOption = companyScopeOk
+    ? `<option value="" ${!modalState.divisionId ? 'selected' : ''}>U1 · company-wide</option>`
+    : `<option value="">(pick division)</option>`;
 
   modalBody.innerHTML = `
     <div class="field">
@@ -2900,10 +2943,11 @@ function renderModalBody() {
       <input type="date" id="m-date" value="${modalState.date}" min="${isoDate(TODAY)}" />
     </div>
     ${themeFieldHtml}
+    ${kindFieldHtml}
     <div class="field">
-      <label class="fl" for="m-div">Division ${modalMode === 'career' ? '(mature tier only)' : modalMode === 'project' ? '(any division)' : modalMode === 'culture' ? '(optional · company-wide)' : ''}</label>
+      <label class="fl" for="m-div">Division ${divLabelNote}</label>
       <select id="m-div">
-        <option value="">(pick division)</option>
+        ${firstDivOption}
         ${eligibleDivs.map(d => `<option value="${d.id}" ${modalState.divisionId === d.id ? 'selected' : ''}>${escapeHtml(d.name)} (${escapeHtml(d.tier)})</option>`).join('')}
       </select>
     </div>
@@ -2914,7 +2958,7 @@ function renderModalBody() {
     </div>
     <div class="field">
       <label class="fl" for="m-note">Event note (optional)</label>
-      <textarea id="m-note" rows="14" style="min-height:320px; resize:vertical;" placeholder="e.g., ${escapeHtml(getModalNoteExample(modalState.themeId, modalState.divisionId))}">${escapeHtml(modalState.note || '')}</textarea>
+      <textarea id="m-note" rows="14" style="min-height:320px; resize:vertical;" placeholder="e.g., ${escapeHtml(getModalNoteExample(modalState.themeId, modalState.divisionId, modalMode, modalState.eventKind))}">${escapeHtml(modalState.note || '')}</textarea>
     </div>
     ${modalMode === 'generic' ? renderCrossDivisionExamples() : ''}
     <div class="validation" id="m-validation"></div>
@@ -2922,10 +2966,16 @@ function renderModalBody() {
 
   function refreshNotePlaceholder() {
     const el = document.getElementById('m-note');
-    if (el) el.setAttribute('placeholder', 'e.g., ' + getModalNoteExample(modalState.themeId, modalState.divisionId));
+    if (el) el.setAttribute('placeholder', 'e.g., ' + getModalNoteExample(modalState.themeId, modalState.divisionId, modalMode, modalState.eventKind));
   }
 
   document.getElementById('m-date').addEventListener('change', e => { modalState.date = e.target.value; });
+  if (document.getElementById('m-kind')) {
+    document.getElementById('m-kind').addEventListener('change', e => {
+      modalState.eventKind = e.target.value;
+      refreshNotePlaceholder();
+    });
+  }
   document.getElementById('m-div').addEventListener('change', e => {
     modalState.divisionId = e.target.value;
     refreshNotePlaceholder();
@@ -2949,6 +2999,8 @@ function getEligibleDivisions(mode) {
   if (mode === 'u1way') return DIVISIONS.filter(d => U1WAY_ELIGIBLE_TIERS.includes(d.tier));
   if (mode === 'project') return DIVISIONS.filter(d => d.tier !== 'backbone'); // T1 needs a real project; Fulfillment surfaces inside other divisions
   if (mode === 'culture') return DIVISIONS; // company-wide; division optional
+  if (mode === 'newhire') return DIVISIONS; // any division, or U1 company-wide; no tier restriction
+  if (mode === 'companyevent') return DIVISIONS; // company-wide default; division optional
   return DIVISIONS.filter(d => d.tier !== 'backbone');
 }
 
@@ -2961,7 +3013,7 @@ modalSave.addEventListener('click', () => {
     validation.classList.add('show');
     return;
   }
-  if (!modalState.divisionId && modalMode !== 'culture') {
+  if (!modalState.divisionId && !['culture', 'newhire', 'companyevent'].includes(modalMode)) {
     validation.textContent = 'Pick a division.';
     validation.classList.add('show');
     return;
@@ -2974,14 +3026,19 @@ modalSave.addEventListener('click', () => {
     return;
   }
 
-  const event = {
+  // On edit, start from the stored event so fields the modal does not surface
+  // (image, imageMeta, tagline, subtype) survive a quick-modal save.
+  const existing = modalEditId ? state.triggeredEvents.find(e => e.id === modalEditId) : null;
+  const event = Object.assign({}, existing || {}, {
     id: modalEditId || ('e-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7)),
     date: modalState.date,
     themeId: modalState.themeId,
     divisionId: modalState.divisionId,
     trustLine: modalState.trustLine || '',
     note: modalState.note || ''
-  };
+  });
+  if (modalMode === 'newhire') event.subtype = 'newhire';
+  else if (modalMode === 'companyevent') event.subtype = (modalState.eventKind === 'industry') ? 'company-industry' : 'company-internal';
 
   if (modalEditId) {
     const idx = state.triggeredEvents.findIndex(e => e.id === modalEditId);
@@ -3001,9 +3058,12 @@ function openEditTriggeredEvent(id) {
   const evt = state.triggeredEvents.find(e => e.id === id);
   if (!evt) return;
   let mode;
-  if (evt.themeId === 't1') mode = 'project';
+  if (evt.subtype === 'newhire') mode = 'newhire';
+  else if (evt.subtype === 'company-internal' || evt.subtype === 'company-industry') mode = 'companyevent';
+  else if (evt.themeId === 't1') mode = 'project';
   else if (evt.themeId === 't2') mode = 'career';
   else if (evt.themeId === 't3') mode = 'u1way';
+  else if (evt.themeId === 't7') mode = 'culture';
   else mode = 'generic';
   openModal({ mode, editEvent: evt });
 }
@@ -3149,6 +3209,8 @@ function bindControls() {
   document.getElementById('add-career-btn').addEventListener('click', () => openModal({ mode: 'career' }));
   document.getElementById('add-u1way-btn').addEventListener('click', () => openModal({ mode: 'u1way' }));
   document.getElementById('add-culture-btn').addEventListener('click', () => openModal({ mode: 'culture' }));
+  document.getElementById('add-newhire-btn').addEventListener('click', () => openModal({ mode: 'newhire' }));
+  document.getElementById('add-companyevent-btn').addEventListener('click', () => openModal({ mode: 'companyevent' }));
 
   document.getElementById('reset-btn').addEventListener('click', () => {
     if (!confirm('Reset all selections and triggered events?')) return;

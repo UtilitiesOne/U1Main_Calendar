@@ -3474,7 +3474,9 @@ function renderLaneView() {
       return '<div class="lane-post" data-id="' + escapeHtml(p.id) + '" style="border:1.5px solid var(--rule,#d8dce2); border-left:5px solid ' + lane.color + '; border-radius:7px; padding:13px 16px; margin-bottom:10px; cursor:pointer; background:#fff;">' +
         '<div style="display:flex; justify-content:space-between; gap:10px; margin-bottom:6px;">' +
         '<span style="font-size:12px; font-weight:700; color:var(--ink,#1B1C26);">' + escapeHtml(fmtDate(new Date(p.date + 'T12:00:00'))) + '</span>' +
-        '<span style="font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:' + lane.color + ';">' + escapeHtml(cat) + '</span></div>' +
+        '<span style="font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:' + lane.color + ';">' + escapeHtml(cat) + '</span>' +
+        (canEdit ? '<button class="lane-post-x" data-id="' + escapeHtml(p.id) + '" title="Remove this post" style="border:none; background:none; color:#b3261e; font-size:16px; font-weight:700; cursor:pointer; padding:0 2px; line-height:1;">&times;</button>' : '') +
+        '</div>' +
         '<div style="font-size:12.5px; color:var(--ink-soft,#464d57); line-height:1.5; max-height:60px; overflow:hidden;">' + escapeHtml(String(p.note || '').slice(0, 220)) + '</div>' +
         (p.image ? '<div style="font-size:10.5px; color:var(--mute,#69707a); margin-top:5px;">Image attached</div>' : '') +
         '</div>';
@@ -3484,6 +3486,17 @@ function renderLaneView() {
   if (add) add.onclick = () => openLanePostEditor(lane.id, null);
   list.querySelectorAll('.lane-post').forEach(el => {
     el.onclick = () => openLanePostEditor(lane.id, el.dataset.id);
+  });
+  list.querySelectorAll('.lane-post-x').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      if (!confirm('Delete this lane post?')) return;
+      const store = state.lanes[lane.id];
+      store.posts = store.posts.filter(p => p.id !== el.dataset.id);
+      saveState();
+      if (typeof pushProposalNow === 'function') pushProposalNow();
+      renderLaneTabs(); renderLaneView();
+    };
   });
 }
 
@@ -3524,6 +3537,11 @@ function openLanePostEditor(laneId, postId) {
     '<div class="pe-field"><label class="pe-fl">Body close (locked)</label>' +
     '<div class="pe-locked">We don\'t overpromise. We overdeliver.</div></div>' +
     (existing && canEdit ? '<button id="lpe-delete" style="border:1.5px solid #b3261e; color:#b3261e; background:#fff; border-radius:6px; padding:8px 14px; font-family:inherit; font-size:12.5px; font-weight:600; cursor:pointer;">Delete this post</button>' : '');
+  if (!canEdit) {
+    document.getElementById('pe-inner').innerHTML =
+      '<div style="border:1.5px solid var(--amber,#9a5b00); background:#fdf6ea; color:#5c4a1e; border-radius:6px; padding:10px 12px; font-size:12.5px; margin-bottom:12px;">Viewing the live calendar. Enter Propose changes to edit or delete this post; Save is disabled here.</div>'
+      + document.getElementById('pe-inner').innerHTML;
+  }
   ['input', 'change'].forEach(ev => {
     document.getElementById('lpe-date').addEventListener(ev, e => { buf.date = e.target.value; });
     document.getElementById('lpe-cat').addEventListener(ev, e => { buf.category = e.target.value; });
@@ -3559,12 +3577,14 @@ function openLanePostEditor(laneId, postId) {
   if (del) del.onclick = function () {
     if (!confirm('Delete this lane post?')) return;
     laneStore.posts = laneStore.posts.filter(p => p.id !== buf.id);
-    saveState(); closeLPE(); renderLaneTabs(); renderLaneView();
+    saveState();
+    if (typeof pushProposalNow === 'function') pushProposalNow();
+    closeLPE(); renderLaneTabs(); renderLaneView();
   };
   document.getElementById('pe-x').onclick = closeLPE;
   document.getElementById('pe-cancel').onclick = closeLPE;
   document.getElementById('pe-save').onclick = () => {
-    if (!canEdit) { closeLPE(); return; }
+    if (!canEdit) { alert('You are viewing the live calendar. Enter Propose changes first; nothing was saved.'); closeLPE(); return; }
     // Save-time read of every field (bug fix 2026-08-10, caught live by Alex): a date
     // edited without a change event firing was silently lost. The DOM is the truth at save.
     const dEl = document.getElementById('lpe-date');

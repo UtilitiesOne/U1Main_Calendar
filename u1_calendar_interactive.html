@@ -2751,12 +2751,14 @@ const modalSub = document.getElementById('modal-sub');
 const modalSave = document.getElementById('modal-save');
 
 let modalMode = null; // 'career' | 'u1way' | 'project' | 'generic' | 'culture' | 'newhire' | 'companyevent'
+let modalOrigin = null; // 'plus' when opened from a day-cell +; shows the post-type chooser
 let modalEditId = null;
 let modalState = null;
 
-function openModal({ mode, prefilledDate = null, editEvent = null }) {
+function openModal({ mode, prefilledDate = null, editEvent = null, origin = null, preserve = null }) {
   ensureEditing();
   modalMode = mode;
+  modalOrigin = editEvent ? null : (origin || (mode === 'generic' ? 'plus' : null));
   modalEditId = editEvent ? editEvent.id : null;
   const today = isoDate(TODAY);
   let initialThemeId;
@@ -2766,7 +2768,7 @@ function openModal({ mode, prefilledDate = null, editEvent = null }) {
   else if (mode === 'culture') initialThemeId = 't7';
   else if (mode === 'newhire') initialThemeId = 't2';
   else if (mode === 'companyevent') initialThemeId = 't7';
-  else initialThemeId = 't1'; // generic fallback
+  else initialThemeId = 't5'; // generic default matches the first scheduled option shown
   const initialTheme = THEMES.find(t => t.id === initialThemeId);
   modalState = editEvent ? structuredClone(editEvent) : {
     date: prefilledDate || today,
@@ -2775,6 +2777,7 @@ function openModal({ mode, prefilledDate = null, editEvent = null }) {
     note: '',
     themeId: initialThemeId
   };
+  if (preserve && !editEvent) Object.assign(modalState, preserve);
   if (mode === 'companyevent' && !modalState.eventKind) {
     modalState.eventKind = (modalState.subtype === 'company-industry') ? 'industry' : 'internal';
   }
@@ -2798,8 +2801,8 @@ function openModal({ mode, prefilledDate = null, editEvent = null }) {
     modalTitle.textContent = editEvent ? 'Edit Company Event post' : 'Add Company Event post';
     modalSub.textContent = 'Theme 7 · event-driven · internal meeting or industry event';
   } else {
-    modalTitle.textContent = 'Add custom post';
-    modalSub.textContent = 'Free-form scheduled post';
+    modalTitle.textContent = 'Add post';
+    modalSub.textContent = 'Pick a post type · scheduled themes or event-driven';
   }
 
   modalSave.textContent = editEvent ? 'Save changes' : 'Add to calendar';
@@ -2808,7 +2811,7 @@ function openModal({ mode, prefilledDate = null, editEvent = null }) {
 }
 function closeModal() {
   modalBackdrop.classList.remove('open');
-  modalMode = null; modalEditId = null; modalState = null;
+  modalMode = null; modalOrigin = null; modalEditId = null; modalState = null;
 }
 document.getElementById('modal-close').addEventListener('click', closeModal);
 document.getElementById('modal-cancel').addEventListener('click', closeModal);
@@ -2915,26 +2918,40 @@ function renderCrossDivisionExamples() {
   </details>`;
 }
 
+// Post types offered by the day-cell + chooser. Values are either a scheduled
+// themeId (stays generic mode) or a modal mode (switches the modal into it).
+const PLUS_POST_TYPES = [
+  ['t5', 'Scheduled · From Financed Paper to Delivered Field'],
+  ['t6', 'Scheduled · One Company, Every Utility'],
+  ['project', 'Event · Project Delivery'],
+  ['career', 'Event · Career Arc (promotion)'],
+  ['newhire', 'Event · New Hire'],
+  ['u1way', 'Event · U1 Way On Site'],
+  ['culture', 'Event · U1 Culture'],
+  ['companyevent', 'Event · Company Event (meeting / industry)']
+];
+
 function renderModalBody() {
   const eligibleDivs = getEligibleDivisions(modalMode);
-  const themeOptions = modalMode === 'generic'
-    ? THEMES.filter(t => t.behavior === 'scheduled').map(t => `<option value="${t.id}" ${modalState.themeId === t.id ? 'selected' : ''}>${escapeHtml(t.name)}</option>`).join('')
+  const currentType = modalMode === 'generic' ? modalState.themeId : modalMode;
+  const typeFieldHtml = modalOrigin === 'plus'
+    ? `<div class="field"><label class="fl" for="m-ptype">Post type</label><select id="m-ptype">
+        ${PLUS_POST_TYPES.map(([v, label]) => `<option value="${v}" ${currentType === v ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('')}
+      </select></div>`
     : '';
-  const themeFieldHtml = modalMode === 'generic'
-    ? `<div class="field"><label class="fl">Theme</label><select id="m-theme">${themeOptions}</select></div>`
-    : '';
+  const themeFieldHtml = '';
   const kindFieldHtml = modalMode === 'companyevent'
     ? `<div class="field"><label class="fl" for="m-kind">Event kind</label><select id="m-kind">
         <option value="internal" ${modalState.eventKind !== 'industry' ? 'selected' : ''}>Internal · meeting, all-hands, leadership event</option>
         <option value="industry" ${modalState.eventKind === 'industry' ? 'selected' : ''}>Industry · conference, expo, trade show (Mountain Connect, Fiber Connect...)</option>
       </select></div>`
     : '';
-  const companyScopeOk = ['culture', 'newhire', 'companyevent'].includes(modalMode);
+  const companyScopeOk = ['culture', 'newhire', 'companyevent', 'generic'].includes(modalMode);
   const divLabelNote = modalMode === 'career' ? '(mature tier only)'
     : modalMode === 'project' ? '(any division)'
     : companyScopeOk ? '(optional · U1 or a division)' : '';
   const firstDivOption = companyScopeOk
-    ? `<option value="" ${!modalState.divisionId ? 'selected' : ''}>U1 · company-wide</option>`
+    ? `<option value="" ${!modalState.divisionId ? 'selected' : ''}>${modalMode === 'generic' ? 'U1 · company-wide / cross-divisional' : 'U1 · company-wide'}</option>`
     : `<option value="">(pick division)</option>`;
 
   modalBody.innerHTML = `
@@ -2942,6 +2959,7 @@ function renderModalBody() {
       <label class="fl" for="m-date">Date</label>
       <input type="date" id="m-date" value="${modalState.date}" min="${isoDate(TODAY)}" />
     </div>
+    ${typeFieldHtml}
     ${themeFieldHtml}
     ${kindFieldHtml}
     <div class="field">
@@ -2982,14 +3000,16 @@ function renderModalBody() {
   });
   document.getElementById('m-note').addEventListener('input', e => { modalState.note = e.target.value; });
   document.getElementById('m-trustline').addEventListener('input', e => { modalState.trustLine = e.target.value; });
-  if (document.getElementById('m-theme')) {
-    document.getElementById('m-theme').addEventListener('change', e => {
-      modalState.themeId = e.target.value;
-      // When theme changes, refresh the TRUST line default unless user already customised
-      const newTheme = THEMES.find(t => t.id === e.target.value);
-      modalState.trustLine = newTheme.trustLine;
-      document.getElementById('m-trustline').value = newTheme.trustLine;
-      refreshNotePlaceholder();
+  if (document.getElementById('m-ptype')) {
+    document.getElementById('m-ptype').addEventListener('change', e => {
+      const v = e.target.value;
+      const preserve = { note: modalState.note || '', trustLine: modalState.trustLine || '' };
+      if (v === 't5' || v === 't6') {
+        preserve.themeId = v;
+        openModal({ mode: 'generic', prefilledDate: modalState.date, origin: 'plus', preserve });
+      } else {
+        openModal({ mode: v, prefilledDate: modalState.date, origin: 'plus', preserve });
+      }
     });
   }
 }
@@ -3013,7 +3033,7 @@ modalSave.addEventListener('click', () => {
     validation.classList.add('show');
     return;
   }
-  if (!modalState.divisionId && !['culture', 'newhire', 'companyevent'].includes(modalMode)) {
+  if (!modalState.divisionId && !['culture', 'newhire', 'companyevent', 'generic'].includes(modalMode)) {
     validation.textContent = 'Pick a division.';
     validation.classList.add('show');
     return;

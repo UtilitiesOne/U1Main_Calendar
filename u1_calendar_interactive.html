@@ -2971,6 +2971,13 @@ function renderModalBody() {
       </select>
     </div>
     <div class="field">
+      <label class="fl">Visual image</label>
+      <div id="m-img-wrap">${modalState.image ? `<img src="${escapeHtml(modalState.image)}" style="max-width:100%; max-height:220px; border:1.5px solid var(--rule); border-radius:4px; display:block; margin-bottom:8px;">` : ''}</div>
+      <input type="file" id="m-img-file" accept="image/*">
+      <button type="button" id="m-img-clear" style="margin-left:10px; font-family:inherit; font-size:12px; padding:6px 12px; border:1.5px solid var(--rule); border-radius:5px; background:white; cursor:pointer;">Remove image</button>
+      <div style="font-size:11px; color:var(--mute); margin-top:4px;" id="m-img-status">PNG or JPG up to 10MB. Uploads to the shared library; the gate requires a visual before submission.</div>
+    </div>
+    <div class="field">
       <label class="fl" for="m-trustline">${modalMode === 'companyevent' ? 'TRUST line (optional here)' : 'TRUST line (Layer 2) · surfaces in the body before the brand-heart close'}</label>
       <textarea id="m-trustline" rows="3" style="resize:vertical; min-height:90px;">${escapeHtml(modalState.trustLine || '')}</textarea>
       <div style="font-size:11px; color:var(--mute); margin-top:4px; line-height:1.4;">${modalMode === 'companyevent'
@@ -3003,10 +3010,33 @@ function renderModalBody() {
   });
   document.getElementById('m-note').addEventListener('input', e => { modalState.note = e.target.value; });
   document.getElementById('m-trustline').addEventListener('input', e => { modalState.trustLine = e.target.value; });
+  (function () {
+    var wrap = document.getElementById('m-img-wrap');
+    var statusEl = document.getElementById('m-img-status');
+    var setStatus = function (t) { if (statusEl) statusEl.textContent = t; };
+    var setPreview = function (url) { if (wrap) wrap.innerHTML = url ? '<img src="' + escapeHtml(url) + '" style="max-width:100%; max-height:220px; border:1.5px solid var(--rule); border-radius:4px; display:block; margin-bottom:8px;">' : ''; };
+    var fileEl = document.getElementById('m-img-file');
+    if (fileEl) fileEl.addEventListener('change', function (e) {
+      var f = e.target.files && e.target.files[0]; if (!f) return;
+      if (f.size > 10 * 1024 * 1024) { setStatus('That image is over 10MB. Pick a smaller file.'); return; }
+      if ((typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON) || !fb.user) { setStatus('Sign in to upload an image.'); return; }
+      setStatus('Uploading...');
+      var path = 'post-images/' + fb.user.uid + '/' + Date.now() + '_' + f.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      readImageMeta(f).then(function (meta) {
+        return firebase.storage().ref().child(path).put(f).then(function (snap) { return snap.ref.getDownloadURL(); }).then(function (url) {
+          modalState.image = url; modalState.imageMeta = meta; modalState.imageCleared = false; setPreview(url);
+          setStatus('Uploaded.' + (meta && meta.w ? ' ' + meta.w + ' by ' + meta.h + '.' : ''));
+        });
+      }).catch(function (err) { setStatus('Upload failed: ' + err.message); });
+    });
+    var clearEl = document.getElementById('m-img-clear');
+    if (clearEl) clearEl.onclick = function () { modalState.image = ''; modalState.imageMeta = null; modalState.imageCleared = true; setPreview(''); setStatus('Image removed.'); };
+  })();
   if (document.getElementById('m-ptype')) {
     document.getElementById('m-ptype').addEventListener('change', e => {
       const v = e.target.value;
-      const preserve = { note: modalState.note || '', trustLine: modalState.trustLine || '' };
+      const preserve = { note: modalState.note || '', trustLine: modalState.trustLine || '',
+                         image: modalState.image || '', imageMeta: modalState.imageMeta || null };
       if (v === 't5' || v === 't6') {
         preserve.themeId = v;
         openModal({ mode: 'generic', prefilledDate: modalState.date, origin: 'plus', preserve });
@@ -3067,6 +3097,13 @@ modalSave.addEventListener('click', () => {
   if (!modalEditId) {
     if (modalMode === 'career') event.tagline = 'Talent is the entry. Hard work is the rise.';
     else if (modalMode === 'companyevent' && modalState.eventKind === 'industry') event.tagline = 'From paper to field.';
+  }
+  if (modalState.image) {
+    event.image = modalState.image;
+    if (modalState.imageMeta) event.imageMeta = modalState.imageMeta;
+  } else if (modalState.imageCleared) {
+    delete event.image;
+    delete event.imageMeta;
   }
 
   if (modalEditId) {

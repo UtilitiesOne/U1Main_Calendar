@@ -2621,7 +2621,8 @@ function openPostEditor(slot) {
     { v: 'One Company. Every Utility.', label: 'One Company. Every Utility.' },
     { v: 'Built to Hold.', label: 'Built to Hold.' },
     { v: 'From paper to field.', label: 'From paper to field.' },
-    { v: 'One Way. Talent finds its lane.', label: 'One Way. Talent finds its lane.' }
+    { v: 'One Way. Talent finds its lane.', label: 'One Way. Talent finds its lane.' },
+    { v: 'Talent is the entry. Hard work is the rise.', label: 'Talent is the entry. Hard work is the rise.' }
   ];
 
   const buf = {
@@ -2784,7 +2785,7 @@ function openModal({ mode, prefilledDate = null, editEvent = null, origin = null
 
   if (mode === 'career') {
     modalTitle.textContent = editEvent ? 'Edit Career Arc post' : 'Add Career Arc post';
-    modalSub.textContent = 'Theme 2 · event-driven · mature divisions only';
+    modalSub.textContent = 'Theme 2 · promotion · visual carries "Talent is the entry. Hard work is the rise." · mature divisions only';
   } else if (mode === 'u1way') {
     modalTitle.textContent = editEvent ? 'Edit U1 Way On Site event' : 'Add U1 Way On Site event';
     modalSub.textContent = 'Theme 3 · event-driven · any division';
@@ -2970,9 +2971,11 @@ function renderModalBody() {
       </select>
     </div>
     <div class="field">
-      <label class="fl" for="m-trustline">TRUST line (Layer 2) · surfaces in the body before the brand-heart close</label>
+      <label class="fl" for="m-trustline">${modalMode === 'companyevent' ? 'TRUST line (optional here)' : 'TRUST line (Layer 2) · surfaces in the body before the brand-heart close'}</label>
       <textarea id="m-trustline" rows="3" style="resize:vertical; min-height:90px;">${escapeHtml(modalState.trustLine || '')}</textarea>
-      <div style="font-size:11px; color:var(--mute); margin-top:4px; line-height:1.4;">Default for this theme is prefilled. Edit to fit the specific event content (1 or 2 TRUST values named naturally).</div>
+      <div style="font-size:11px; color:var(--mute); margin-top:4px; line-height:1.4;">${modalMode === 'companyevent'
+        ? 'Not required for company events. The post anchors to the brand line instead: industry events carry "From paper to field." on the visual; internal events run signature-only.'
+        : 'Default for this theme is prefilled. Edit to fit the specific event content (1 or 2 TRUST values named naturally).'}</div>
     </div>
     <div class="field">
       <label class="fl" for="m-note">Event note (optional)</label>
@@ -3059,6 +3062,12 @@ modalSave.addEventListener('click', () => {
   });
   if (modalMode === 'newhire') event.subtype = 'newhire';
   else if (modalMode === 'companyevent') event.subtype = (modalState.eventKind === 'industry') ? 'company-industry' : 'company-internal';
+  // Brand anchors on creation (lineup routing, Alex 2026-08-13). Edits keep whatever
+  // the writer set; new hires ride the T2 theme default "One Way. Talent finds its lane."
+  if (!modalEditId) {
+    if (modalMode === 'career') event.tagline = 'Talent is the entry. Hard work is the rise.';
+    else if (modalMode === 'companyevent' && modalState.eventKind === 'industry') event.tagline = 'From paper to field.';
+  }
 
   if (modalEditId) {
     const idx = state.triggeredEvents.findIndex(e => e.id === modalEditId);
@@ -4009,7 +4018,7 @@ initFirebaseSync();
 </script>
 
 <script src="u1_baseline.js?v=3.8"></script>
-<script src="u1_gate.js?v=3.8"></script>
+<script src="u1_gate.js?v=3.9"></script>
 <script src="u1_scope.js?v=3.8"></script>
 <script src="u1_review_ui.js?v=3.8"></script>
 <script src="u1_review_panel.js?v=3.8"></script>

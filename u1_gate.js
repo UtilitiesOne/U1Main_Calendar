@@ -8,7 +8,7 @@
 
   var TAX = {
     parent: ['#UtilitiesOne'],
-    brandLine: ['#OneCompanyEveryUtility', '#BuiltToHold', '#FromPaperToField', '#OneWay'],
+    brandLine: ['#OneCompanyEveryUtility', '#BuiltToHold', '#FromPaperToField', '#OneWay', '#HardWorkIsTheRise'],
     ethos: ['#Overdeliver', '#SelfPerform'],
     division: ['#PowerDelivery', '#Wireline', '#Wireless', '#Water', '#Renewable',
                '#DataCenters', '#Fulfillment', '#Consulting'],
@@ -25,7 +25,8 @@
     'one company. every utility.': '#OneCompanyEveryUtility',
     'built to hold.': '#BuiltToHold',
     'from paper to field.': '#FromPaperToField',
-    'one way. talent finds its lane.': '#OneWay'
+    'one way. talent finds its lane.': '#OneWay',
+    'talent is the entry. hard work is the rise.': '#HardWorkIsTheRise'
   };
 
   var RETIRED_LINES = [

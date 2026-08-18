@@ -44,6 +44,10 @@
     ((state && state.triggeredEvents) || []).forEach(function (e, i) {
       var text = (e.note && e.note.trim()) ? e.note : (e.trustLine || '');
       var trust = (e.note && e.note.trim()) ? (e.trustLine || '') : '';
+      // A placeholder event with no content is not a post yet: nothing to check,
+      // and never blessed by a baseline, so its future content is governed as
+      // new work the moment it is written (Paul's welcome, 2026-08-18).
+      if (!String(text).trim()) return;
       out.push({ key: keyFor('event', e.date, e.id || i), kind: 'event', date: e.date,
                  themeId: e.themeId || '', text: text, trustLine: trust,
                  tagline: ('tagline' in e) ? e.tagline : undefined,
@@ -64,10 +68,25 @@
     });
   }
 
+  /* Stable identity + fingerprint for a division lane post, shared by the
+     baseline build and the gate UI so grandfathering means the same thing on
+     both sides (lanes joined the baseline 2026-08-18; before that every lane
+     post was hardcoded as governed, which re-blocked published lane work). */
+  function laneKey(laneId, postId) { return 'lane|' + laneId + '|' + postId; }
+  function laneFingerprint(p) {
+    return fingerprint({ text: p.note || '', trustLine: p.trustLine || '', themeId: '' });
+  }
+
   /* Builds the frozen baseline from the state that is live at go-live. */
   function buildBaseline(liveState, label) {
     var keys = {};
     postsFrom(liveState).forEach(function (p) { keys[p.key] = fingerprint(p); });
+    var lanes = (liveState && liveState.lanes) || {};
+    Object.keys(lanes).forEach(function (id) {
+      (((lanes[id] || {}).posts) || []).forEach(function (p) {
+        keys[laneKey(id, p.id)] = laneFingerprint(p);
+      });
+    });
     return { label: label || 'go-live', createdAt: new Date().toISOString(),
              count: Object.keys(keys).length, keys: keys };
   }
@@ -93,5 +112,6 @@
   }
 
   root.U1Scope = { resolve: resolve, buildBaseline: buildBaseline, applyScope: applyScope,
-                   canSubmit: canSubmit, postsFrom: postsFrom, fingerprint: fingerprint };
+                   canSubmit: canSubmit, postsFrom: postsFrom, fingerprint: fingerprint,
+                   laneKey: laneKey, laneFingerprint: laneFingerprint };
 })(typeof window !== 'undefined' ? window : globalThis);

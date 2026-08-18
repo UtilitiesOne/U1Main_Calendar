@@ -92,6 +92,14 @@
       if (l.id === 'parent') return;
       (((laneMap[l.id] || {}).posts) || []).forEach(function (p) {
         if (mine && mine['lane|' + l.id + '|' + p.id] === JSON.stringify([p.date, p.note, p.trustLine, p.tagline, p.image, p.category])) return;
+        // Lane grandfathering (2026-08-18): lane posts in the frozen baseline are
+        // legacy like parent posts. Untouched -> silent, edited -> advise, new ->
+        // enforce. Before this every lane post was hardcoded governed, which
+        // re-blocked lane work the owner had already published.
+        var known = (BASELINE.keys || {})[window.U1Scope.laneKey(l.id, p.id)];
+        var laneScope = known === undefined ? 'enforce'
+                      : known === window.U1Scope.laneFingerprint(p) ? 'silent' : 'advise';
+        if (laneScope === 'silent') return;
         var items2 = window.U1Gate.checkPost({
           date: p.date, themeId: '', themeName: l.name + ' lane',
           tagline: p.tagline || '', bodyActivationRequired: false,
@@ -105,10 +113,11 @@
             why: 'This body also runs on the ' + dup.lane.name + ' lane. The same post never runs on two pages; a post that fits more than one division belongs on U1 Main.',
             change: 'Keep it on one lane, or move it to U1 Main.', quote: null });
         }
+        items2 = window.U1Scope.applyScope(items2, laneScope);
         if (!items2.length) return;
         items2.sort(function (a, b) { return LEVEL_ORDER[a.level] - LEVEL_ORDER[b.level]; });
-        groups.push({ date: p.date, theme: l.name + ' lane', legacy: false,
-                      scope: 'enforce', items: items2 });
+        groups.push({ date: p.date, theme: l.name + ' lane', legacy: laneScope === 'advise',
+                      scope: laneScope, items: items2 });
       });
     });
     // Blocking posts first: what is stopping the submission has to be what the

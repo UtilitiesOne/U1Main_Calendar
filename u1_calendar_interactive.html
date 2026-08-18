@@ -4063,6 +4063,7 @@ function renderProposalList() {
       };
       btnRow.appendChild(force);
     }
+    var discard = document.createElement('button'); discard.className = 'reset'; discard.textContent = 'Discard';
     discard.onclick = function () { if (confirm('Delete this proposal? The editor keeps their local copy.')) firebase.firestore().collection('proposals').doc(doc.id).delete(); };
     btnRow.appendChild(discard);
     row.appendChild(btnRow); list.appendChild(row);

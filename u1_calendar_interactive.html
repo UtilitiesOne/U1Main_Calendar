@@ -3949,7 +3949,12 @@ function initFirebaseSync() {
   syncEl('signout-btn').addEventListener('click', function () { firebase.auth().signOut(); });
   if (syncEl('edit-mode-btn')) syncEl('edit-mode-btn').addEventListener('click', enterEditMode);
   if (syncEl('view-live-btn')) syncEl('view-live-btn').addEventListener('click', exitToLive);
-  if (syncEl('submit-approval-btn')) syncEl('submit-approval-btn').addEventListener('click', submitForApproval);
+  // Resolve at click time, never capture at startup: the brand gate wraps
+  // window.submitForApproval AFTER this script runs, and a captured direct
+  // reference bypassed the gate on every real button click from 2026-08-07
+  // to 2026-08-18 (found from production data: editors' docs never carried a
+  // gate stamp, and the reviews collection stayed empty forever).
+  if (syncEl('submit-approval-btn')) syncEl('submit-approval-btn').addEventListener('click', function () { window.submitForApproval(); });
   if (syncEl('review-mydraft-btn')) syncEl('review-mydraft-btn').addEventListener('click', exitToLive);
 
   firebase.auth().onAuthStateChanged(onAuthChange);

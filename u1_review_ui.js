@@ -352,8 +352,8 @@
   function markStages(clean) {
     try {
       if (typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON || !fb.user) return;
+      // l2 is server-owned since 2026-08-18 night; the client stamps l1 only.
       var patch = { l1: clean ? 'clean' : 'blocked', l1At: firebase.firestore.FieldValue.serverTimestamp() };
-      if (clean) patch.l2 = 'pending';
       // merge, not update: the proposal doc may still be mid-write from the
       // app's own save when this runs.
       firebase.firestore().collection('proposals').doc(fb.user.uid)
@@ -397,7 +397,6 @@
     var F = FB();
     if (!F) return;
     F.l1 = clean ? 'clean' : 'blocked';
-    if (clean) F.l2 = 'pending';
   }
 
   function install() {

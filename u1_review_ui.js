@@ -33,14 +33,38 @@
   }
 
   /* Runs gate + scope over a calendar state. Defaults to the one being edited;
-     the publish gate passes the state about to go live (2026-08-11). */
-  function evaluateState(st) {
+     the publish gate passes the state about to go live (2026-08-11).
+
+     ownBase (2026-08-18): the state this editor started from. When present, a
+     post identical to the editor's starting point is someone else's problem and
+     is skipped entirely, so a submission blocks only on work THIS editor added
+     or changed. Without it two unfixed posts in the shared calendar froze every
+     editor's submission and the modal told them to fix posts they never wrote.
+     The publish path passes no ownBase: the owner judges the whole calendar. */
+  function ownKeys(ownBase) {
+    if (!ownBase) return null;
+    var m = {};
+    window.U1Scope.postsFrom(ownBase).forEach(function (p) {
+      m[p.key] = window.U1Scope.fingerprint(p) + '||' + (p.tagline || '') + '||' + (p.image || '');
+    });
+    var lanes = ownBase.lanes || {};
+    Object.keys(lanes).forEach(function (id) {
+      ((lanes[id] || {}).posts || []).forEach(function (p) {
+        m['lane|' + id + '|' + p.id] = JSON.stringify([p.date, p.note, p.trustLine, p.tagline, p.image, p.category]);
+      });
+    });
+    return m;
+  }
+
+  function evaluateState(st, ownBase) {
     var target = st || state;
     var TH = themeMap();
+    var mine = ownKeys(ownBase);
     var scoped = window.U1Scope.resolve(target, BASELINE);
     var groups = [];
     scoped.forEach(function (r) {
       if (r.scope === 'silent') return;
+      if (mine && mine[r.post.key] === window.U1Scope.fingerprint(r.post) + '||' + (r.post.tagline || '') + '||' + (r.post.image || '')) return;
       var th = inferTheme(r.post.text, r.post.themeId, TH);
       var meta = TH[th] || { name: th, tagline: '', act: false };
       // Recalibrated 2026-08-10 (approved): the submitter's per-post tagline is the
@@ -67,6 +91,7 @@
     lanesDef.forEach(function (l) {
       if (l.id === 'parent') return;
       (((laneMap[l.id] || {}).posts) || []).forEach(function (p) {
+        if (mine && mine['lane|' + l.id + '|' + p.id] === JSON.stringify([p.date, p.note, p.trustLine, p.tagline, p.image, p.category])) return;
         var items2 = window.U1Gate.checkPost({
           date: p.date, themeId: '', themeName: l.name + ' lane',
           tagline: p.tagline || '', bodyActivationRequired: false,
@@ -208,11 +233,39 @@
     });
   }
 
-  /* Writes the findings so the editor keeps them after the modal closes. */
+  /* A failure the editor should know about is shown, not logged. The strip is
+     dismissible and non-modal: it must never block the work it reports on. */
+  function notice(msg) {
+    try {
+      var el = document.getElementById('u1g-notice');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'u1g-notice';
+        el.style.cssText = 'position:fixed;bottom:14px;left:14px;right:14px;z-index:99997;' +
+          'background:#3a2c14;color:#ffd9a0;border:1px solid #9a5b00;border-radius:8px;' +
+          'padding:10px 40px 10px 14px;font-size:12.5px;line-height:1.5;box-shadow:0 8px 30px rgba(0,0,0,.35)';
+        var x = document.createElement('button');
+        x.textContent = '×';
+        x.style.cssText = 'position:absolute;right:8px;top:6px;border:0;background:transparent;color:#ffd9a0;font-size:18px;cursor:pointer';
+        x.onclick = function () { el.remove(); };
+        el.appendChild(x);
+        var span = document.createElement('span');
+        span.id = 'u1g-notice-text';
+        el.insertBefore(span, x);
+        document.body.appendChild(el);
+      }
+      document.getElementById('u1g-notice-text').textContent = msg;
+    } catch (e) { console.warn(msg); }
+  }
+
+  /* Writes the findings so the editor keeps them after the modal closes.
+     One document per editor, replaced on every run (2026-08-18): the findings
+     are derived state, so stale sets from earlier attempts only mislead. The
+     override audit trail lives in /overrides and is untouched by this. */
   function writeReview(res) {
     try {
       if (typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON || !fb.user) return;
-      firebase.firestore().collection('reviews').add({
+      firebase.firestore().collection('reviews').doc('auto_' + fb.user.uid).set({
         toUid: fb.user.uid,
         toEmail: fb.user.email || '',
         reviewer: 'auto',
@@ -228,7 +281,10 @@
         }),
         at: firebase.firestore.FieldValue.serverTimestamp(),
         read: false
-      }).catch(function (e) { console.warn('review write skipped:', e.message); });
+      }).catch(function (e) {
+        console.warn('review write skipped:', e.message);
+        notice('Your feedback list could not be saved to the server (' + e.message + '). The submission itself is not affected, but Review Feedback may show an older list. Tell Alex.');
+      });
     } catch (e) { console.warn('review write error', e); }
   }
 
@@ -245,7 +301,10 @@
       // app's own save when this runs.
       firebase.firestore().collection('proposals').doc(fb.user.uid)
         .set(patch, { merge: true })
-        .catch(function (e) { console.warn('stage stamp skipped:', e.message); });
+        .catch(function (e) {
+          console.warn('stage stamp skipped:', e.message);
+          notice('The review stage could not be recorded on the server (' + e.message + '). Your submission may not appear as ready in the Review tab. Tell Alex.');
+        });
     } catch (e) {}
   }
 
@@ -293,8 +352,15 @@
 
     window.submitForApproval = function () {
       var res;
-      try { res = evaluateState(); }
-      catch (e) { console.warn('U1 gate error, submitting unchecked:', e); stampVerdict(true); return original.apply(this, arguments); }
+      // Fail CLOSED (2026-08-18). This catch used to stamp l1 clean and submit
+      // unchecked, so a crash in the gate certified a post as having passed it.
+      // A gate that cannot run refuses and says so; it never vouches blind.
+      try { res = evaluateState(state, FB() && FB().baseState); }
+      catch (e) {
+        console.warn('U1 gate error, submission refused:', e);
+        notice('The brand check itself failed to run (' + (e && e.message ? e.message : e) + '), so nothing was submitted. Reload the page and try again; if it repeats, tell Alex.');
+        return;
+      }
 
       if (!res.all.length) {
         stampVerdict(true);
@@ -334,7 +400,13 @@
     window.guardedPublish = function (stateObj, expectedVersion, source, proposalId) {
       var self = this, args = arguments, res;
       try { res = evaluateState(stateObj); }
-      catch (e) { console.warn('U1 gate error on publish, publishing unchecked:', e); return orig.apply(self, args); }
+      catch (e) {
+        // Fail closed here too, but the owner keeps an explicit way through:
+        // publishing is their call, so a broken gate asks instead of deciding.
+        console.warn('U1 gate error on publish:', e);
+        if (confirm('The brand check itself failed to run, so this publish is UNCHECKED.\n\nPublish anyway?')) return orig.apply(self, args);
+        return undefined;
+      }
       if (res.canSubmit) return orig.apply(self, args);
       showAdvisory(res, function (force) {
         if (force) { logOverride('publish', res, String(source || '')); orig.apply(self, args); }

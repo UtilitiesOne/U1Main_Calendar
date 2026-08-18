@@ -3748,7 +3748,14 @@ function updateModeIndicator() {
   var el = syncEl('sync-savestate'); if (!el) return;
   if (!fb.user) { el.textContent = ''; return; }
   if (fb.previewing) { el.textContent = 'Previewing (read-only). Return to live anytime.'; return; }
-  if (fb.editing) { el.textContent = 'Editing your proposal, based on live v' + (fb.baseVersion || 0) + '. Auto-saves; the owner publishes to live.'; return; }
+  if (fb.editing) {
+    el.textContent = fb.submitted
+      ? 'SUBMITTED and waiting for the owner to review. Editing any post withdraws it so you can resubmit.'
+      : (fb.l1 === 'blocked'
+          ? 'NOT submitted: the brand check found things to fix in your posts. Open Review Feedback for the list.'
+          : 'Editing your proposal, based on live v' + (fb.baseVersion || 0) + '. Auto-saves; the owner publishes to live.');
+    return;
+  }
   el.textContent = 'Viewing the live calendar (v' + (window.__liveVersion || 0) + '). Click "Propose changes" to edit.';
 }
 
@@ -3775,16 +3782,30 @@ function enterEditMode() {
   // reseed from live unconditionally and immediately overwrite the server draft,
   // wiping any lane posts drafted earlier. Auto-save promises a resumable draft,
   // so resume the saved draft when one exists; seed from live only without one.
-  var seed = function (st, baseV, baseS, resumed) {
+  // Entering edit mode is not editing. A resumed draft keeps the submission it
+  // already made, so opening a post no longer retracts it silently. The gate
+  // verdict has to travel with the flag because the server rule refuses
+  // submitted:true unless l1 is 'clean', and a submission without that verdict
+  // falls back to unsubmitted rather than failing the write.
+  var seed = function (st, baseV, baseS, resumed, prior) {
+    var priorL1 = (prior && typeof prior.l1 === 'string') ? prior.l1 : null;
     fb.editing = true;
-    fb.submitted = false;
+    fb.submitted = !!(prior && prior.submitted) && priorL1 === 'clean';
+    fb.l1 = priorL1 || undefined;
+    fb.l2 = (prior && typeof prior.l2 === 'string') ? prior.l2 : undefined;
     fb.baseVersion = baseV;
     fb.baseState = baseS;
     state = fbClone(st);
     if (!state.currentMonth) state.currentMonth = TODAY_MONTH_ISO;
+    fb.lastContent = contentFingerprint();
     renderAll();
     setEditButtons(); updateModeIndicator();
-    if (resumed) { var el = syncEl('sync-savestate'); if (el) el.textContent = 'Resumed your saved draft.'; }
+    if (resumed) {
+      var el = syncEl('sync-savestate');
+      if (el) el.textContent = fb.submitted
+        ? 'Resumed your draft. It is still submitted and waiting for approval.'
+        : 'Resumed your saved draft.';
+    }
     pushProposalNow();
   };
   var liveB = window.__liveVersion || 0;
@@ -3792,11 +3813,11 @@ function enterEditMode() {
   firebase.firestore().collection('proposals').doc(fb.user.uid).get().then(function (doc) {
     var d = doc.exists ? doc.data() : null;
     if (d && d.state) {
-      seed(d.state, d.baseVersion || liveB, d.baseState || liveS, true);
+      seed(d.state, d.baseVersion || liveB, d.baseState || liveS, true, d);
     } else {
-      seed(liveS, liveB, liveS, false);
+      seed(liveS, liveB, liveS, false, null);
     }
-  }).catch(function () { seed(liveS, liveB, liveS, false); });
+  }).catch(function () { seed(liveS, liveB, liveS, false, null); });
 }
 
 function ensureEditing() {
@@ -3813,8 +3834,20 @@ function exitToLive() {
   setEditButtons(); updateModeIndicator();
 }
 
+/* Content only: switching view or month is not an edit and must not retract a
+   submission. saveState() runs on both, so comparing the whole state here would
+   clear the flag every time someone looked at the theme tab. */
+function contentFingerprint() {
+  var copy = {};
+  Object.keys(state || {}).forEach(function (k) { if (!MERGE_VIEW_KEYS[k]) copy[k] = state[k]; });
+  return JSON.stringify(copy);
+}
+
 function pushProposal() {
   if (!(typeof FIREBASE_ON !== 'undefined' && FIREBASE_ON) || !fb.user || fb.previewing || !fb.editing) return;
+  var fingerprint = contentFingerprint();
+  if (fingerprint === fb.lastContent) return;
+  fb.lastContent = fingerprint;
   if (fb.submitted) { fb.submitted = false; setEditButtons(); }
   clearTimeout(fb.saveTimer);
   fb.saveTimer = setTimeout(pushProposalNow, 800);
@@ -3978,14 +4011,38 @@ function renderProposalList() {
     var preview = document.createElement('button'); preview.className = 'reset'; preview.textContent = 'Preview';
     preview.onclick = function () { if (d.state) { fb.previewing = true; fb.editing = false; state = fbClone(d.state); setView('grid'); renderAll(); setEditButtons(); syncEl('sync-savestate').textContent = 'Previewing ' + (d.email || doc.id) + ' (read-only). Switch to Review to publish.'; } };
     btnRow.appendChild(preview);
-    if (ready && !stale) {
-      var publish = document.createElement('button'); publish.className = 'reset'; publish.style.cssText = 'border-color:var(--accent);color:var(--accent);'; publish.textContent = 'Publish';
-      publish.onclick = function () { if (confirm('Publish ' + (d.email || doc.id) + "'s proposal to the LIVE calendar everyone sees?")) { guardedPublish(d.state, base, 'published from proposal by ' + (d.email || doc.id), doc.id); } };
+    var who = d.email || doc.id;
+    var pushIt = function (forced) {
+      var payload = stale ? mergeOntoLive(window.__liveState, d.baseState, d.state) : d.state;
+      var basedOn = stale ? (window.__liveVersion || 0) : base;
+      guardedPublish(payload, basedOn,
+        (stale ? 'rebased + published' : 'published') + ' from proposal by ' + who +
+          (forced ? ' (author had not submitted it)' : ''),
+        doc.id,
+        forced ? 'The owner published your draft as v{V}. You had not submitted it for approval.'
+               : 'Your proposal was approved and published as v{V}.');
+    };
+    if (ready) {
+      var publish = document.createElement('button'); publish.className = 'reset';
+      publish.style.cssText = 'border-color:var(--accent);color:var(--accent);';
+      publish.textContent = stale ? 'Rebase & publish' : 'Publish';
+      publish.onclick = function () {
+        if (confirm((stale ? 'Rebase ' + who + "'s proposal onto the current live calendar and publish? Their day-level changes win on any same-day conflict."
+                           : 'Publish ' + who + "'s proposal to the LIVE calendar everyone sees?"))) pushIt(false);
+      };
       btnRow.appendChild(publish);
-    } else if (ready && stale) {
-      var rebase = document.createElement('button'); rebase.className = 'reset'; rebase.style.cssText = 'border-color:var(--accent);color:var(--accent);'; rebase.textContent = 'Rebase & publish';
-      rebase.onclick = function () { if (confirm('Rebase ' + (d.email || doc.id) + "'s proposal onto the current live calendar and publish? Their day-level changes win on any same-day conflict.")) { var merged = mergeOntoLive(window.__liveState, d.baseState, d.state); guardedPublish(merged, window.__liveVersion || 0, 'rebased + published from proposal by ' + (d.email || doc.id), doc.id); } };
-      btnRow.appendChild(rebase);
+    } else {
+      // The escape hatch. An editor whose submission never landed still has real
+      // work sitting here, and without this the owner can read it but not move it.
+      // Deliberately worded so it is never mistaken for an approval: the author
+      // did not mark this ready, the whole draft goes live, and they get told.
+      var force = document.createElement('button'); force.className = 'reset';
+      force.style.cssText = 'border-color:var(--warn);color:var(--warn);';
+      force.textContent = 'Publish anyway';
+      force.onclick = function () {
+        if (confirm(who + ' has NOT submitted this for approval.\n\nPublishing it puts their entire working draft on the live calendar, including anything they still consider unfinished. The brand gate still runs and will show you what it finds before anything goes live.\n\nThey will be notified that you published it. Continue?')) pushIt(true);
+      };
+      btnRow.appendChild(force);
     }
     var discard = document.createElement('button'); discard.className = 'reset'; discard.textContent = 'Discard';
     discard.onclick = function () { if (confirm('Delete this proposal? The editor keeps their local copy.')) firebase.firestore().collection('proposals').doc(doc.id).delete(); };
@@ -3994,7 +4051,7 @@ function renderProposalList() {
   });
 }
 
-function guardedPublish(stateObj, expectedVersion, source, proposalId) {
+function guardedPublish(stateObj, expectedVersion, source, proposalId, notifyMsg) {
   var db = firebase.firestore();
   var liveRef = db.collection('calendar').doc('live');
   db.runTransaction(function (tx) {
@@ -4015,7 +4072,7 @@ function guardedPublish(stateObj, expectedVersion, source, proposalId) {
       .then(function () { db.collection('calendar_versions').orderBy('publishedAt', 'desc').get().then(function (ss) { ss.docs.slice(20).forEach(function (dd) { dd.ref.delete(); }); }).catch(function () {}); })
       .catch(function (e) { console.warn('Version history write skipped:', e.message); });
     if (proposalId) { db.collection('proposals').doc(proposalId).delete().catch(function () {}); }
-    if (proposalId && proposalId !== fb.user.uid) { db.collection('notifications').add({ toUid: proposalId, message: 'Your proposal was approved and published as v' + newV + '.', version: newV, at: firebase.firestore.FieldValue.serverTimestamp(), read: false }).catch(function (e) { console.warn('Notification skipped:', e.message); }); }
+    if (proposalId && proposalId !== fb.user.uid) { db.collection('notifications').add({ toUid: proposalId, message: (notifyMsg || 'Your proposal was approved and published as v{V}.').replace('{V}', newV), version: newV, at: firebase.firestore.FieldValue.serverTimestamp(), read: false }).catch(function (e) { console.warn('Notification skipped:', e.message); }); }
     window.__liveState = stateObj; window.__liveVersion = newV;
     fb.previewing = false; fb.editing = false;
     state = fbClone(stateObj); renderAll(); setEditButtons();
@@ -4027,24 +4084,86 @@ function guardedPublish(stateObj, expectedVersion, source, proposalId) {
   });
 }
 
+/* Rebase an editor's proposal onto the current live calendar.
+
+   The key list is derived from the states themselves rather than hardcoded. The
+   previous version named the keys it merged, so every key added to the schema
+   afterwards was silently dropped on rebase: division lanes and the spotlight
+   uplifts were being lost, and two keys in the list (spot1Count, spot2Count) no
+   longer existed. A new content key is now carried by default; a new view-local
+   key has to be added to MERGE_VIEW_KEYS, and forgetting that is cosmetic.
+
+   Strategy per node: collections whose entries carry an id merge by id, maps
+   keyed by date merge by date with the editor's day winning whole (the promise
+   made in the rebase confirmation), and anything else the editor changed
+   replaces live. A key the editor left untouched keeps live's value, so a
+   concurrent editor's work survives. */
+var MERGE_VIEW_KEYS = { view: 1, currentMonth: 1, activeLane: 1 };
+
+function isMergeObj(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+function sameJson(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+
+function mergeKeyUnion(nodes) {
+  var out = {};
+  nodes.forEach(function (o) { if (isMergeObj(o)) Object.keys(o).forEach(function (k) { out[k] = 1; }); });
+  return Object.keys(out);
+}
+function isIdList(v) {
+  return Array.isArray(v) && v.some(function (e) { return isMergeObj(e) && e.id != null; });
+}
+function isDateMap(nodes) {
+  var ks = mergeKeyUnion(nodes);
+  return ks.length > 0 && ks.every(function (k) { return /^\d{4}-\d{2}-\d{2}$/.test(k); });
+}
+function hasContainerChild(nodes) {
+  return mergeKeyUnion(nodes).some(function (k) {
+    return nodes.some(function (o) { return isMergeObj(o) && (isMergeObj(o[k]) || Array.isArray(o[k])); });
+  });
+}
+
+function mergeIdList(live, base, edited) {
+  var byId = {};
+  (Array.isArray(live) ? live : []).forEach(function (e) { if (isMergeObj(e)) byId[e.id] = e; });
+  var editedIds = {};
+  (Array.isArray(edited) ? edited : []).forEach(function (e) {
+    if (!isMergeObj(e)) return;
+    editedIds[e.id] = 1;
+    byId[e.id] = fbClone(e);
+  });
+  (Array.isArray(base) ? base : []).forEach(function (e) {
+    if (isMergeObj(e) && !(e.id in editedIds)) delete byId[e.id];
+  });
+  return Object.keys(byId).map(function (k) { return byId[k]; });
+}
+
+function mergeNode(live, base, edited) {
+  if (isIdList(live) || isIdList(base) || isIdList(edited)) return mergeIdList(live, base, edited);
+  if (isMergeObj(live) || isMergeObj(base) || isMergeObj(edited)) {
+    var nodes = [live, base, edited];
+    var deep = !isDateMap(nodes) && hasContainerChild(nodes);
+    var out = isMergeObj(live) ? fbClone(live) : {};
+    mergeKeyUnion(nodes).forEach(function (k) {
+      var l = isMergeObj(live) ? live[k] : undefined;
+      var b = isMergeObj(base) ? base[k] : undefined;
+      var e = isMergeObj(edited) ? edited[k] : undefined;
+      if (sameJson(e, b)) return;
+      if (e === undefined) { delete out[k]; return; }
+      out[k] = deep ? mergeNode(l, b, e) : fbClone(e);
+    });
+    return out;
+  }
+  return sameJson(edited, base) ? live : fbClone(edited);
+}
+
 function mergeOntoLive(live, base, edited) {
   var result = fbClone(live || {});
   base = base || {}; edited = edited || {};
-  ['slotOverrides', 'spotlightOverrides'].forEach(function (key) {
-    var b = base[key] || {}, ed = edited[key] || {};
-    if (typeof result[key] !== 'object' || result[key] === null) result[key] = {};
-    Object.keys(ed).forEach(function (date) { if (JSON.stringify(ed[date]) !== JSON.stringify(b[date])) result[key][date] = fbClone(ed[date]); });
-    Object.keys(b).forEach(function (date) { if (!(date in ed) && (date in result[key])) delete result[key][date]; });
-  });
-  var bEv = base.triggeredEvents || [], edEv = edited.triggeredEvents || [];
-  var edIds = {}; edEv.forEach(function (e) { edIds[e.id] = e; });
-  if (!Array.isArray(result.triggeredEvents)) result.triggeredEvents = [];
-  var resById = {}; result.triggeredEvents.forEach(function (e) { resById[e.id] = e; });
-  edEv.forEach(function (e) { resById[e.id] = fbClone(e); });
-  bEv.forEach(function (e) { if (!(e.id in edIds)) delete resById[e.id]; });
-  result.triggeredEvents = Object.keys(resById).map(function (k) { return resById[k]; });
-  ['spot1Div', 'spot2Div', 'spot1Count', 'spot2Count', 'themes'].forEach(function (key) {
-    if (JSON.stringify(edited[key]) !== JSON.stringify(base[key])) result[key] = fbClone(edited[key]);
+  mergeKeyUnion([result, base, edited]).forEach(function (key) {
+    if (MERGE_VIEW_KEYS[key]) return;
+    var e = edited[key], b = base[key];
+    if (sameJson(e, b)) return;
+    if (e === undefined) { delete result[key]; return; }
+    result[key] = mergeNode(result[key], b, e);
   });
   return result;
 }
@@ -4075,11 +4194,11 @@ function subscribeVersions() {
 initFirebaseSync();
 </script>
 
-<script src="u1_baseline.js?v=3.8"></script>
+<script src="u1_baseline.js?v=4.0"></script>
 <script src="u1_gate.js?v=3.9"></script>
 <script src="u1_scope.js?v=3.8"></script>
-<script src="u1_review_ui.js?v=3.8"></script>
-<script src="u1_review_panel.js?v=3.8"></script>
+<script src="u1_review_ui.js?v=4.0"></script>
+<script src="u1_review_panel.js?v=4.0"></script>
 
 </body>
 </html>

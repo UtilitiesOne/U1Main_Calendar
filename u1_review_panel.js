@@ -6,7 +6,7 @@
   'use strict';
 
   var STATE = { reviews: [], open: false, unsub: null, status: 'starting', error: null };
-  var PANEL_VERSION = "3.6";
+  var PANEL_VERSION = "4.0";
 
   // The app declares `let fb = {...}` at script top level. A top-level `let` is a global
   // LEXICAL binding, not a property of window, so `window.fb` is undefined forever and
@@ -73,12 +73,19 @@
     var body = document.getElementById('u1rp-body');
     if (!body) return;
     if (!STATE.reviews.length) {
-      // Diagnostic footer (2026-08-10): when the panel is empty, show WHY, so a
-      // stale script, an unattached listener, or a rules error is visible instead
-      // of indistinguishable from a genuinely empty collection.
-      body.innerHTML = '<p class="u1rp-empty">No review feedback yet.<br>' +
-        '<span style="font-size:10.5px;opacity:.75">' + esc(STATE.status) +
-        (STATE.error ? ' &middot; error: ' + esc(STATE.error) : '') +
+      // Empty is ambiguous, so say WHY in words an editor can act on
+      // (2026-08-18; the raw diagnostic string moved to the small print).
+      var friendly =
+        STATE.error && /permission/i.test(STATE.error)
+          ? 'Feedback cannot load: the server is not set up to share it yet. This is a setup problem on our side, not something you did. Tell Alex.'
+        : STATE.error
+          ? 'Feedback could not load. Reload the page; if this repeats, tell Alex.'
+        : /waiting for sign-in/.test(STATE.status)
+          ? 'Sign in to see your feedback.'
+          : 'No review feedback yet. It appears here after you submit.';
+      body.innerHTML = '<p class="u1rp-empty">' + esc(friendly) + '<br>' +
+        '<span style="font-size:10.5px;opacity:.6">' + esc(STATE.status) +
+        (STATE.error ? ' &middot; ' + esc(STATE.error) : '') +
         ' &middot; panel v' + PANEL_VERSION + '</span></p>';
       return;
     }

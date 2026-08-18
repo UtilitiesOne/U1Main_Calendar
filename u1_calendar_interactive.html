@@ -4012,15 +4012,33 @@ function renderProposalList() {
     preview.onclick = function () { if (d.state) { fb.previewing = true; fb.editing = false; state = fbClone(d.state); setView('grid'); renderAll(); setEditButtons(); syncEl('sync-savestate').textContent = 'Previewing ' + (d.email || doc.id) + ' (read-only). Switch to Review to publish.'; } };
     btnRow.appendChild(preview);
     var who = d.email || doc.id;
+    // Per-post publish (2026-08-18): the candidate is always the FULL merge of
+    // their draft onto whatever is live right now (identical to the old
+    // rebase step even when not technically stale, so a direct publish and a
+    // rebase publish are the same code path). U1GateUI.publishPerPost then
+    // judges every changed post on its own: clean ones go live and create a
+    // new version, held ones stay exactly as drafted in their proposal. One
+    // bad post can no longer freeze everything else in the same batch.
     var pushIt = function (forced) {
-      var payload = stale ? mergeOntoLive(window.__liveState, d.baseState, d.state) : d.state;
-      var basedOn = stale ? (window.__liveVersion || 0) : base;
-      guardedPublish(payload, basedOn,
-        (stale ? 'rebased + published' : 'published') + ' from proposal by ' + who +
-          (forced ? ' (author had not submitted it)' : ''),
-        doc.id,
-        forced ? 'The owner published your draft as v{V}. You had not submitted it for approval.'
-               : 'Your proposal was approved and published as v{V}.');
+      var merged = mergeOntoLive(window.__liveState, d.baseState, d.state);
+      window.U1GateUI.publishPerPost(
+        merged,
+        'published from proposal by ' + who + (forced ? ' (author had not submitted it)' : ''),
+        doc.id, who,
+        forced ? 'The owner published your draft as v{V}. You had not submitted it for approval.' : null
+      ).then(function (res) {
+        var el = syncEl('sync-savestate');
+        if (!el) return;
+        if (!res.published) {
+          el.textContent = res.held.length
+            ? who + "'s proposal has " + res.held.length + ' thing' + (res.held.length === 1 ? '' : 's') + ' to fix; nothing published yet.'
+            : who + "'s proposal matched what is already live; nothing to publish.";
+        } else if (res.held.length) {
+          el.textContent = 'Published ' + res.publishedCount + ' change' + (res.publishedCount === 1 ? '' : 's') + ' from ' + who + '. ' +
+            res.held.length + ' still ' + (res.held.length === 1 ? 'needs' : 'need') + ' work and ' +
+            (res.held.length === 1 ? 'stays' : 'stay') + ' in their draft, untouched.';
+        }
+      }).catch(function (e) { console.warn('per-post publish failed:', e); });
     };
     if (ready) {
       var publish = document.createElement('button'); publish.className = 'reset';
@@ -4028,33 +4046,39 @@ function renderProposalList() {
       publish.textContent = stale ? 'Rebase & publish' : 'Publish';
       publish.onclick = function () {
         if (confirm((stale ? 'Rebase ' + who + "'s proposal onto the current live calendar and publish? Their day-level changes win on any same-day conflict."
-                           : 'Publish ' + who + "'s proposal to the LIVE calendar everyone sees?"))) pushIt(false);
+                           : 'Publish ' + who + "'s proposal to the LIVE calendar everyone sees?") +
+                    '\n\nEach change is judged on its own: whatever is clean goes live now, and anything with an issue stays in their draft for them to fix, without holding back the rest.')) pushIt(false);
       };
       btnRow.appendChild(publish);
     } else {
       // The escape hatch. An editor whose submission never landed still has real
       // work sitting here, and without this the owner can read it but not move it.
       // Deliberately worded so it is never mistaken for an approval: the author
-      // did not mark this ready, the whole draft goes live, and they get told.
+      // did not mark this ready, and they get told what actually went live.
       var force = document.createElement('button'); force.className = 'reset';
       force.style.cssText = 'border-color:var(--warn);color:var(--warn);';
       force.textContent = 'Publish anyway';
       force.onclick = function () {
-        if (confirm(who + ' has NOT submitted this for approval.\n\nPublishing it puts their entire working draft on the live calendar, including anything they still consider unfinished. The brand gate still runs and will show you what it finds before anything goes live.\n\nThey will be notified that you published it. Continue?')) pushIt(true);
+        if (confirm(who + ' has NOT submitted this for approval.\n\nEach of their changes is judged on its own: whatever is clean goes live, whatever has an issue stays in their draft untouched. They will be notified of exactly what published. Continue?')) pushIt(true);
       };
       btnRow.appendChild(force);
     }
-    var discard = document.createElement('button'); discard.className = 'reset'; discard.textContent = 'Discard';
     discard.onclick = function () { if (confirm('Delete this proposal? The editor keeps their local copy.')) firebase.firestore().collection('proposals').doc(doc.id).delete(); };
     btnRow.appendChild(discard);
     row.appendChild(btnRow); list.appendChild(row);
   });
 }
 
-function guardedPublish(stateObj, expectedVersion, source, proposalId, notifyMsg) {
+/* skipProposalDelete (2026-08-18): the per-post publish path calls this with
+   only the CLEAN changes already selected, and needs the proposal doc kept
+   alive (with its still-held content intact) instead of deleted, so the
+   editor never loses work that did not clear the gate this round. The
+   caller does its own follow-up write to the proposal doc in that case.
+   Returns the promise chain so callers can react to success or failure. */
+function guardedPublish(stateObj, expectedVersion, source, proposalId, notifyMsg, skipProposalDelete) {
   var db = firebase.firestore();
   var liveRef = db.collection('calendar').doc('live');
-  db.runTransaction(function (tx) {
+  return db.runTransaction(function (tx) {
     return tx.get(liveRef).then(function (snap) {
       var cur = snap.exists ? (snap.data().version || 0) : 0;
       if (cur !== expectedVersion) { throw new Error('STALE:' + cur); }
@@ -4071,16 +4095,18 @@ function guardedPublish(stateObj, expectedVersion, source, proposalId, notifyMsg
     db.collection('calendar_versions').add({ state: stateObj, version: newV, publishedAt: firebase.firestore.FieldValue.serverTimestamp(), publishedBy: fb.user.email, source: source })
       .then(function () { db.collection('calendar_versions').orderBy('publishedAt', 'desc').get().then(function (ss) { ss.docs.slice(20).forEach(function (dd) { dd.ref.delete(); }); }).catch(function () {}); })
       .catch(function (e) { console.warn('Version history write skipped:', e.message); });
-    if (proposalId) { db.collection('proposals').doc(proposalId).delete().catch(function () {}); }
-    if (proposalId && proposalId !== fb.user.uid) { db.collection('notifications').add({ toUid: proposalId, message: (notifyMsg || 'Your proposal was approved and published as v{V}.').replace('{V}', newV), version: newV, at: firebase.firestore.FieldValue.serverTimestamp(), read: false }).catch(function (e) { console.warn('Notification skipped:', e.message); }); }
+    if (proposalId && !skipProposalDelete) { db.collection('proposals').doc(proposalId).delete().catch(function () {}); }
+    if (proposalId && proposalId !== fb.user.uid && notifyMsg !== null) { db.collection('notifications').add({ toUid: proposalId, message: (notifyMsg || 'Your proposal was approved and published as v{V}.').replace('{V}', newV), version: newV, at: firebase.firestore.FieldValue.serverTimestamp(), read: false }).catch(function (e) { console.warn('Notification skipped:', e.message); }); }
     window.__liveState = stateObj; window.__liveVersion = newV;
     fb.previewing = false; fb.editing = false;
     state = fbClone(stateObj); renderAll(); setEditButtons();
     syncEl('sync-savestate').textContent = 'Published to live as v' + newV + ' at ' + new Date().toLocaleTimeString() + '. Everyone now sees this.';
+    return newV;
   }).catch(function (e) {
     var msg = String((e && e.message) || e);
     if (msg.indexOf('STALE:') === 0) { alert('Live already advanced to v' + msg.split(':')[1] + ' since this was drafted. Use "Rebase & publish" to apply it on top of the current live calendar.'); }
     else { alert('Publish error: ' + msg); }
+    throw e;
   });
 }
 
@@ -4196,8 +4222,8 @@ initFirebaseSync();
 
 <script src="u1_baseline.js?v=4.2"></script>
 <script src="u1_gate.js?v=3.9"></script>
-<script src="u1_scope.js?v=4.2"></script>
-<script src="u1_review_ui.js?v=4.2"></script>
+<script src="u1_scope.js?v=5.0"></script>
+<script src="u1_review_ui.js?v=5.0"></script>
 <script src="u1_review_panel.js?v=4.0"></script>
 
 </body>

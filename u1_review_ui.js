@@ -138,6 +138,54 @@
              warns:  all.filter(function (i) { return i.level === 'WARN'; }).length };
   }
 
+
+  /* Per-change publish gate (2026-08-18). Judges one changed unit at a time
+     against exactly what caused the earlier whole-batch freeze: a single
+     broken post held the entire proposal hostage, and the only way through
+     was the owner overriding everything, blocked content included. Every
+     changed key gets its own verdict here, tied to whoever changed it, so a
+     clean change can go live regardless of what else nearby is not ready. */
+  function evaluatePerChange(changes) {
+    var TH = themeMap();
+    var out = [];
+    changes.forEach(function (c) {
+      if (c.removed) { out.push({ key: c.key, date: c.date, pass: true, removed: true, items: [] }); return; }
+      var obj = c.candidate.obj;
+      var items;
+      if (c.kind === 'lane') {
+        var known = (BASELINE.keys || {})[window.U1Scope.laneKey(c.laneId, obj.id)];
+        var laneScope = known === undefined ? 'enforce'
+                      : known === window.U1Scope.laneFingerprint(obj) ? 'silent' : 'advise';
+        items = laneScope === 'silent' ? [] : window.U1Gate.checkPost({
+          date: obj.date, themeId: '', themeName: c.laneId + ' lane',
+          tagline: obj.tagline || '', bodyActivationRequired: false,
+          text: obj.note, trustLine: obj.trustLine,
+          image: obj.image, imageMeta: obj.imageMeta,
+          laneId: c.laneId, laneName: c.laneId, laneTag: '#' + c.laneId
+        });
+        items = window.U1Scope.applyScope(items, laneScope);
+      } else {
+        var th = inferTheme(obj.note, obj.themeId, TH);
+        var meta = TH[th] || { name: th, tagline: '', act: false };
+        var declared = ('tagline' in obj) ? obj.tagline : meta.tagline;
+        var needsAct = String(declared || '').trim().toLowerCase() === 'one company. every utility.';
+        var fp = window.U1Scope.fingerprint({ text: obj.note, trustLine: obj.trustLine, themeId: obj.themeId });
+        var known2 = (BASELINE.keys || {})[c.key];
+        var scope = known2 === undefined ? 'enforce' : known2 === fp ? 'silent' : 'advise';
+        items = scope === 'silent' ? [] : window.U1Gate.checkPost({
+          date: c.date, themeId: th, themeName: meta.name,
+          tagline: declared, bodyActivationRequired: needsAct,
+          text: obj.note, trustLine: obj.trustLine,
+          image: obj.image, imageMeta: obj.imageMeta
+        });
+        items = window.U1Scope.applyScope(items, scope);
+      }
+      var pass = !items.some(function (i) { return i.level === 'BLOCK'; });
+      out.push({ key: c.key, date: c.date, pass: pass, removed: false, items: items });
+    });
+    return out;
+  }
+
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -394,7 +442,56 @@
       });
     };
     window.__u1gInstalled = true;
-    window.U1GateUI = { evaluate: evaluateState, show: showAdvisory };
+
+  /* Per-post publish (2026-08-18). This is the fix for the freeze: a proposal
+     is no longer accepted or refused as one unit. Every changed post is judged
+     on its own; whatever clears goes live, whatever does not stays exactly as
+     drafted in the editor's own proposal, held for them to fix, never lost and
+     never blocking anyone else's clean work. */
+  function publishPerPost(candidateState, source, proposalId, proposerEmail, notifyOwner) {
+    var live = window.__liveState || {};
+    var changes = window.U1Scope.diffAgainstLive(candidateState, live);
+    var verdicts = evaluatePerChange(changes);
+    var passKeys = {};
+    verdicts.forEach(function (v) { if (v.pass) passKeys[v.key] = 1; });
+    var held = verdicts.filter(function (v) { return !v.pass; });
+    var toPublish = window.U1Scope.applySelectedChanges(live, changes, passKeys);
+    var nothingChanged = JSON.stringify(toPublish) === JSON.stringify(live);
+
+    var result = { publishedCount: changes.length - held.length, held: held, published: !nothingChanged };
+
+    var afterPublish = function () {
+      // The proposal doc is kept alive only when real work is still held; a
+      // clean sweep behaves exactly like the old all-or-nothing publish.
+      if (!proposalId) return Promise.resolve(result);
+      if (!held.length) {
+        return firebase.firestore().collection('proposals').doc(proposalId).delete()
+          .catch(function () {}).then(function () { return result; });
+      }
+      return firebase.firestore().collection('proposals').doc(proposalId).set({
+        baseVersion: window.__liveVersion,
+        baseState: fbClone(window.__liveState),
+        submitted: false,
+        l1: 'blocked',
+        l1At: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true }).catch(function (e) { console.warn('proposal follow-up write skipped:', e.message); })
+        .then(function () { return result; });
+    };
+
+    if (nothingChanged) {
+      return afterPublish();
+    }
+
+    var msg = held.length
+      ? ('The owner published ' + result.publishedCount + ' of your changes as v{V}. ' +
+         held.length + ' still need work, and are sitting in your draft, unchanged.')
+      : (notifyOwner || 'Your proposal was approved and published as v{V}.');
+
+    return guardedPublish(toPublish, window.__liveVersion, source, proposalId, msg, true)
+      .then(afterPublish);
+  }
+
+    window.U1GateUI = { evaluate: evaluateState, show: showAdvisory, publishPerPost: publishPerPost };
     return true;
   }
 
@@ -407,20 +504,27 @@
     if (window.__u1gPublishInstalled) return true;
     var orig = window.guardedPublish;
     window.guardedPublish = function (stateObj, expectedVersion, source, proposalId) {
+      // Every branch returns a real promise now (2026-08-18): publishPerPost
+      // depends on that to know whether its already-filtered, should-always-
+      // pass payload genuinely went live, rather than silently reporting
+      // success on a call that actually stopped for a manual click.
       var self = this, args = arguments, res;
       try { res = evaluateState(stateObj); }
       catch (e) {
-        // Fail closed here too, but the owner keeps an explicit way through:
-        // publishing is their call, so a broken gate asks instead of deciding.
         console.warn('U1 gate error on publish:', e);
         if (confirm('The brand check itself failed to run, so this publish is UNCHECKED.\n\nPublish anyway?')) return orig.apply(self, args);
-        return undefined;
+        return Promise.reject(new Error('publish cancelled: gate error, not confirmed'));
       }
       if (res.canSubmit) return orig.apply(self, args);
-      showAdvisory(res, function (force) {
-        if (force) { logOverride('publish', res, String(source || '')); orig.apply(self, args); }
-      }, { publish: true });
-      return undefined;
+      // Should not happen: publishPerPost only ever sends content it has
+      // already gated clean. If this fires, something disagrees with itself,
+      // and that is worth a loud modal, not a silent false success.
+      return new Promise(function (resolve, reject) {
+        showAdvisory(res, function (force) {
+          if (force) { logOverride('publish', res, String(source || '')); resolve(orig.apply(self, args)); }
+          else reject(new Error('publish held: the whole-state check disagreed with the per-post check'));
+        }, { publish: true });
+      });
     };
     window.__u1gPublishInstalled = true;
     return true;

@@ -111,7 +111,108 @@
     return !allItems.some(function (i) { return i.level === 'BLOCK'; });
   }
 
+
+  /* Per-post publish partitioning (2026-08-18). The gate exists to hold back
+     ONE broken post, never to freeze everyone else's clean work behind it.
+     This computes exactly what a candidate state CHANGES relative to what is
+     actually live right now, key by key (parent slot / event / lane post),
+     independent of the merge machinery above, so the publish path can gate
+     each change on its own instead of accepting or refusing the whole batch. */
+
+  function keyedItem(kind, key, date, obj) {
+    return { kind: kind, key: key, date: date, obj: obj || null };
+  }
+
+  /* Every addressable content unit in a state, keyed the same way postsFrom
+     keys parent content plus lane posts, but keeping the raw object (not the
+     gate-shaped post) so the caller can rebuild a filtered state from it. */
+  function allKeyedUnits(state) {
+    var out = {};
+    var so = (state && state.slotOverrides) || {};
+    Object.keys(so).forEach(function (date) {
+      out[keyFor('sched', date)] = keyedItem('sched', keyFor('sched', date), date, so[date]);
+    });
+    ((state && state.triggeredEvents) || []).forEach(function (e, i) {
+      var k = keyFor('event', e.date, e.id || i);
+      out[k] = keyedItem('event', k, e.date, e);
+    });
+    var lanes = (state && state.lanes) || {};
+    Object.keys(lanes).forEach(function (laneId) {
+      (((lanes[laneId] || {}).posts) || []).forEach(function (p) {
+        var k = 'lane|' + laneId + '|' + p.id;
+        out[k] = keyedItem('lane', k, p.date, p);
+        out[k].laneId = laneId;
+      });
+    });
+    return out;
+  }
+
+  function unitFingerprint(unit) {
+    if (!unit || !unit.obj) return '';
+    if (unit.kind === 'lane') return laneFingerprint(unit.obj);
+    var o = unit.obj;
+    return fingerprint({ text: o.note, trustLine: o.trustLine, themeId: o.themeId })
+      + '||' + (o.tagline || '') + '||' + (o.image || '') + '||' + !!o.skipped;
+  }
+
+  /* candidate vs live: every key where the fingerprint differs, keyed so the
+     caller can gate each one and rebuild a filtered state from the result. */
+  function diffAgainstLive(candidate, live) {
+    var a = allKeyedUnits(live), b = allKeyedUnits(candidate);
+    var keys = {};
+    Object.keys(a).forEach(function (k) { keys[k] = 1; });
+    Object.keys(b).forEach(function (k) { keys[k] = 1; });
+    var changes = [];
+    Object.keys(keys).forEach(function (k) {
+      var liveU = a[k], candU = b[k];
+      var liveFp = unitFingerprint(liveU), candFp = unitFingerprint(candU);
+      if (liveFp === candFp) return;
+      changes.push({
+        key: k,
+        kind: (candU || liveU).kind,
+        laneId: (candU || liveU).laneId,
+        date: (candU || liveU).date,
+        removed: !candU || !candU.obj || (candU.kind === 'sched' && candU.obj.skipped),
+        live: liveU,
+        candidate: candU
+      });
+    });
+    return changes;
+  }
+
+  /* Rebuilds a state that starts from `live` and applies ONLY the changes
+     whose key is in `passKeys` (a Set or plain object of keys). Removals pass
+     through unconditionally: taking something down is never a brand risk. */
+  function applySelectedChanges(live, changes, passKeys) {
+    var out = fbCloneLike(live);
+    if (!out.slotOverrides) out.slotOverrides = {};
+    if (!out.triggeredEvents) out.triggeredEvents = [];
+    if (!out.lanes) out.lanes = {};
+    changes.forEach(function (c) {
+      var allowed = c.removed || (passKeys && (passKeys.has ? passKeys.has(c.key) : passKeys[c.key]));
+      if (!allowed) return;
+      if (c.kind === 'sched') {
+        if (!c.candidate || !c.candidate.obj) delete out.slotOverrides[c.date];
+        else out.slotOverrides[c.date] = fbCloneLike(c.candidate.obj);
+      } else if (c.kind === 'event') {
+        var id = c.key.split('|')[2];
+        out.triggeredEvents = out.triggeredEvents.filter(function (e) { return (e.id || '') !== id; });
+        if (c.candidate && c.candidate.obj) out.triggeredEvents.push(fbCloneLike(c.candidate.obj));
+      } else if (c.kind === 'lane') {
+        var laneId = c.laneId;
+        if (!out.lanes[laneId]) out.lanes[laneId] = { posts: [] };
+        var pid = c.key.split('|')[2];
+        out.lanes[laneId].posts = (out.lanes[laneId].posts || []).filter(function (p) { return p.id !== pid; });
+        if (c.candidate && c.candidate.obj) out.lanes[laneId].posts.push(fbCloneLike(c.candidate.obj));
+      }
+    });
+    return out;
+  }
+
+  function fbCloneLike(o) { return o == null ? o : JSON.parse(JSON.stringify(o)); }
+
   root.U1Scope = { resolve: resolve, buildBaseline: buildBaseline, applyScope: applyScope,
                    canSubmit: canSubmit, postsFrom: postsFrom, fingerprint: fingerprint,
-                   laneKey: laneKey, laneFingerprint: laneFingerprint };
+                   laneKey: laneKey, laneFingerprint: laneFingerprint,
+                   diffAgainstLive: diffAgainstLive, applySelectedChanges: applySelectedChanges };
 })(typeof window !== 'undefined' ? window : globalThis);

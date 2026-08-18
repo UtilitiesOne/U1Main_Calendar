@@ -32,7 +32,10 @@
     var so = (state && state.slotOverrides) || {};
     Object.keys(so).forEach(function (date) {
       var v = so[date];
-      if (!v || !v.note) return;
+      // A skipped slot is removed in app terms even when its note text is still
+      // stored. Counting it as a live post made the gate check phantom content
+      // (caught 2026-08-18 on the skipped Aug 17 Consulting slot).
+      if (!v || v.skipped || !v.note) return;
       out.push({ key: keyFor('sched', date), kind: 'sched', date: date,
                  themeId: v.themeId || '', text: v.note, trustLine: v.trustLine || '',
                  tagline: ('tagline' in v) ? v.tagline : undefined,

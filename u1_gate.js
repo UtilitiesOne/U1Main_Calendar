@@ -250,7 +250,12 @@
         out.push(item('BLOCK', 'Parent tag missing',
           '#UtilitiesOne is always on, no exceptions.', 'Add #UtilitiesOne.'));
       }
-      var banned = tags.filter(function (t) { return inListI(t, BANNED_TAGS); });
+      // People and event posts (Career Arc, U1 Culture: welcomes, promotions,
+      // company and industry events) run on GENERAL tags by policy (Alex
+      // 2026-08-18): #WelcomeToTheTeam, #Hiring, event names, all allowed.
+      // The work-type taxonomy exists for the rebalance surface, and a welcome
+      // post is not rebalance content. Parent tag and the 3-to-5 count still hold.
+      var banned = isHR ? [] : tags.filter(function (t) { return inListI(t, BANNED_TAGS); });
       if (banned.length) {
         out.push(item('BLOCK', 'Banned tag',
           banned.join(', ') + ' ' + (banned.length > 1 ? 'are' : 'is') +
@@ -269,7 +274,7 @@
       }
       // Option: allow the parent-plus-division pattern, e.g. #UtilitiesOneWireless.
       var DIV_BRAND = /^#UtilitiesOne(PowerDelivery|Wireline|Wireless|Water|Renewables?|DataCenters|Fulfillment|Consulting|Group)$/i;
-      var offTax = tags.filter(function (t) {
+      var offTax = isHR ? [] : tags.filter(function (t) {
         if (inListI(t, ALL_TAGS) || inListI(t, BANNED_TAGS)) return false;
         if (root.U1GateOptions && root.U1GateOptions.allowDivisionBrandTags && DIV_BRAND.test(t)) return false;
         return true;

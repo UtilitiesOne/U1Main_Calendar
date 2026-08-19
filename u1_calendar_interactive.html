@@ -2243,8 +2243,17 @@ function renderChip(slot, themeOn) {
   const cls = ['chip', 'chip-' + slot.themeId];
   if (!themeOn) cls.push('dimmed');
   const spotMark = slot.isSpotlight ? '<span class="csp">SPOT</span>' : '';
-  const trigMark = slot.isTriggered ? '<span class="csp" style="background:white; color:#5D3B7A;">EVT</span>' : '';
-  const label = slot.divisionId ? slot.divisionAbbr : (slot.themeScope === 'company' ? 'U1' : 'CROSS');
+  // Events name their kind instead of a generic EVT, and a divisionless event
+  // labels U1, never CROSS: events are company acts, and CROSS stays reserved
+  // for the scheduled cross-portfolio posts where it means something. Before
+  // this a welcome and a cross-divisional post were indistinguishable on the
+  // grid (Alex, 2026-08-19).
+  const kind = slot.subtype === 'newhire' ? 'HIRE'
+    : (slot.subtype === 'company-internal' || slot.subtype === 'company-industry') ? 'EVENT'
+    : 'EVT';
+  const trigMark = slot.isTriggered ? `<span class="csp" style="background:white; color:#5D3B7A;">${kind}</span>` : '';
+  const label = slot.divisionId ? slot.divisionAbbr
+    : (slot.isTriggered || slot.themeScope === 'company') ? 'U1' : 'CROSS';
   return `<div class="${cls.join(' ')}" data-sid="${escapeHtml(slot.id)}" title="${escapeHtml(slot.themeName)} for ${escapeHtml(slot.divisionName)}">
     <span class="cname">${escapeHtml(label)}</span>
     ${spotMark}${trigMark}

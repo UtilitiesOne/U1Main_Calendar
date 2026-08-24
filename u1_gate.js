@@ -153,7 +153,13 @@
        laneId ('parent' default), laneName, laneTag } (lanes added 2026-08-10, calendar v3) */
   function checkPost(post) {
     var out = [];
-    var text = String(post.text || '');
+    // Typographic quotes normalize to ASCII before any check (2026-08-24):
+    // Word, Outlook, and LinkedIn substitute curly quotes on paste, and the
+    // locked lines are locked on their words, caps, and stops, not on which
+    // apostrophe glyph a pasting tool chose. Caught live: a body carrying the
+    // signature with a curly apostrophe was blocked as "signature missing".
+    var text = String(post.text || '')
+      .replace(/[‘’]/g, "'").replace(/[“”]/g, '"');
     var body = text.replace(/#[A-Za-z][A-Za-z0-9_]*/g, ' ');
     var tags = tagsIn(text);
     var isDivisionLane = !!(post.laneId && post.laneId !== 'parent');

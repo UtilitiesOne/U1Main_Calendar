@@ -5,8 +5,9 @@
 (function () {
   'use strict';
 
-  var STATE = { reviews: [], open: false, unsub: null, status: 'starting', error: null };
-  var PANEL_VERSION = "4.0";
+  var STATE = { reviews: [], open: false, unsub: null, status: 'starting', error: null,
+                lastUpdate: 0, retryDelay: 0, retryTimer: null };
+  var PANEL_VERSION = "4.1";
 
   // The app declares `let fb = {...}` at script top level. A top-level `let` is a global
   // LEXICAL binding, not a property of window, so `window.fb` is undefined forever and
@@ -109,7 +110,12 @@
                (g.legacy ? ' (pre-dates the gate)' : '') + '</div>' + fs;
       }).join('');
       return '<div class="u1rp-rev">' + head + groups + '</div>';
-    }).join('');
+    }).join('') +
+      '<p style="font-size:10.5px;color:#8a9099;text-align:center;padding:10px 0 2px;">' +
+      esc(STATE.status) +
+      (STATE.lastUpdate ? ' &middot; last update ' + esc(new Date(STATE.lastUpdate).toLocaleTimeString()) : '') +
+      (STATE.error ? ' &middot; ' + esc(STATE.error) : '') +
+      ' &middot; panel v' + PANEL_VERSION + '</p>';
 
     Array.prototype.forEach.call(body.querySelectorAll('input[type=checkbox]'), function (cb) {
       cb.onchange = function () {
@@ -174,15 +180,38 @@
         var tb = b.at && b.at.seconds ? b.at.seconds : 0;
         return tb - ta;
       });
+      STATE.lastUpdate = Date.now();
+      STATE.retryDelay = 0;
+      STATE.error = null;
       badge();
       if (STATE.open) render();
     }, function (e) {
+      // Self-healing (v4.1): a listener error is a scheduled retry, never a
+      // permanent silent death. Caught 2026-08-24: both live sessions sat on
+      // stale snapshots after their listeners died with nothing on screen.
       STATE.error = e.message;
-      STATE.status = 'listener failed';
+      if (STATE.unsub) { try { STATE.unsub(); } catch (x) {} STATE.unsub = null; }
+      STATE.retryDelay = Math.min((STATE.retryDelay || 2500) * 2, 60000);
+      STATE.status = 'listener failed; retrying in ' + Math.round(STATE.retryDelay / 1000) + 's';
+      if (STATE.retryTimer) clearTimeout(STATE.retryTimer);
+      STATE.retryTimer = setTimeout(listen, STATE.retryDelay);
       if (STATE.open) render();
       console.warn('reviews listener:', e.message);
     });
   }
+
+  // Re-attach whenever the tab wakes or the network returns: the cheapest cure
+  // for a websocket that died while the laptop slept.
+  function relisten() {
+    var F = FB();
+    if (F && F.user) listen();
+  }
+  try {
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible') relisten();
+    });
+    window.addEventListener('online', relisten);
+  } catch (e) {}
 
   function mountButton() {
     if (document.getElementById('u1rp-btn')) return true;

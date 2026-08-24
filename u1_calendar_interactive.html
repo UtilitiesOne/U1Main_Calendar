@@ -4018,10 +4018,30 @@ function renderProposalList() {
     var stale = base < liveV;
     var own = doc.id === fb.user.uid;
     var ready = !!d.submitted || own;
-    var status = ready ? (own ? 'your draft' : 'ready for review') : 'in progress (not submitted)';
+    var status;
+    if (ready) {
+      status = own ? 'your draft' : 'ready for review';
+    } else if (d.l1 === 'blocked') {
+      // The gate refused their submit; count their open findings if the
+      // reviews listener has them, so the owner sees the real state at a glance.
+      var openN = 0;
+      try {
+        (window.U1ReviewPanel.state.reviews || []).forEach(function (r) {
+          if (r.reviewer === 'auto' && r.toUid === doc.id) {
+            (r.items || []).forEach(function (g) {
+              (g.findings || []).forEach(function (f) { if (!f.done) openN++; });
+            });
+          }
+        });
+      } catch (e) {}
+      status = 'gate blocked their submit' + (openN ? ' · ' + openN + ' to fix' : '');
+    } else {
+      status = 'in progress (not submitted)';
+    }
     var row = document.createElement('div');
-    row.style.cssText = 'border:1px solid var(--rule); border-radius:6px; padding:8px; margin-bottom:6px;' + (ready ? '' : ' opacity:0.6;');
-    row.innerHTML = '<div style="font-weight:600;font-size:12px;">' + escapeHtml(d.email || doc.id) + ' <span style="font-weight:400;color:' + (ready ? 'var(--ok,#1f7a4d)' : 'var(--mute)') + ';">&middot; ' + status + '</span></div>' +
+    var blockedRow = (!ready && d.l1 === 'blocked');
+    row.style.cssText = 'border:1px solid var(--rule); border-radius:6px; padding:8px; margin-bottom:6px;' + (ready || blockedRow ? '' : ' opacity:0.6;');
+    row.innerHTML = '<div style="font-weight:600;font-size:12px;">' + escapeHtml(d.email || doc.id) + ' <span style="font-weight:400;color:' + (ready ? 'var(--ok,#1f7a4d)' : blockedRow ? 'var(--warn,#9a5b00)' : 'var(--mute)') + ';">&middot; ' + status + '</span></div>' +
       '<div style="font-size:10px;color:var(--mute);margin-bottom:6px;">updated ' + escapeHtml(when) + ' &middot; based on v' + base +
       (stale ? ' <span style="color:var(--warn);font-weight:600;">(live is v' + liveV + ' &mdash; rebase to publish)</span>' : '') + '</div>';
     var btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex; gap:6px; flex-wrap:wrap;';
@@ -4242,7 +4262,7 @@ initFirebaseSync();
 <script src="u1_gate.js?v=5.1"></script>
 <script src="u1_scope.js?v=5.0"></script>
 <script src="u1_review_ui.js?v=5.1"></script>
-<script src="u1_review_panel.js?v=4.0"></script>
+<script src="u1_review_panel.js?v=4.1"></script>
 
 </body>
 </html>

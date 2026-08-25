@@ -6,8 +6,9 @@
   'use strict';
 
   var STATE = { reviews: [], open: false, unsub: null, status: 'starting', error: null,
-                lastUpdate: 0, retryDelay: 0, retryTimer: null };
-  var PANEL_VERSION = "4.1";
+                lastUpdate: 0, retryDelay: 0, retryTimer: null,
+                proposals: {}, punsub: null };
+  var PANEL_VERSION = "4.2";
 
   // The app declares `let fb = {...}` at script top level. A top-level `let` is a global
   // LEXICAL binding, not a property of window, so `window.fb` is undefined forever and
@@ -42,6 +43,8 @@
     '.u1rp-BLOCK{background:#fdeaea;color:#b3261e}',
     '.u1rp-ADVISE{background:#fff3e0;color:#9a5b00}',
     '.u1rp-WARN{background:#eef2f7;color:#5a6472}',
+    '.u1rp-stale{background:#fff8e6;border:1px solid #f0d79a;color:#7a5a10;border-radius:5px;',
+      'padding:7px 9px;font-size:11.5px;line-height:1.45;margin:2px 0 9px}',
     '.u1rp-empty{color:#8a9099;font-size:13px;padding:24px 0;text-align:center}',
     '.u1rp-x{border:0;background:transparent;font-size:20px;cursor:pointer;color:#8a9099;line-height:1}'
   ].join('');
@@ -70,6 +73,42 @@
     return n;
   }
 
+  /* A review describes the draft AS IT WAS at the last submit. When the editor
+     saves content changes afterwards, the findings can name things they have
+     already fixed, which reads as a broken gate (caught twice on 2026-08-24:
+     a signature added after the check, and a resubmit against the old script).
+     The submit path always writes the review AFTER the proposal, so any gap
+     beyond a couple of seconds is a real post-review edit, never write skew.
+     Pure and exported so the node test can hold it to that contract. */
+  function isStale(reviewAt, proposalUpdatedAt, toleranceSec) {
+    var ra = reviewAt && reviewAt.seconds;
+    var pa = proposalUpdatedAt && proposalUpdatedAt.seconds;
+    if (!ra || !pa) return false;                 // no timestamps, no claim
+    return (pa - ra) > (toleranceSec == null ? 2 : toleranceSec);
+  }
+
+  // Editors may read their own proposal; the owner may read them all. Both
+  // shapes are allowed by the deployed rules, so each side gets the freshness
+  // signal for exactly the drafts it can already see.
+  function listenProposals() {
+    var F = FB();
+    if (typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON || !F || !F.user) return;
+    if (STATE.punsub) { try { STATE.punsub(); } catch (e) {} STATE.punsub = null; }
+    var db = firebase.firestore();
+    var fail = function (e) { console.warn('proposals listener:', e.message); };
+    if (F.isOwner) {
+      STATE.punsub = db.collection('proposals').onSnapshot(function (snap) {
+        snap.docs.forEach(function (d) { STATE.proposals[d.id] = (d.data() || {}).updatedAt || null; });
+        if (STATE.open) render();
+      }, fail);
+    } else {
+      STATE.punsub = db.collection('proposals').doc(F.user.uid).onSnapshot(function (d) {
+        STATE.proposals[F.user.uid] = d.exists ? ((d.data() || {}).updatedAt || null) : null;
+        if (STATE.open) render();
+      }, fail);
+    }
+  }
+
   function render() {
     var body = document.getElementById('u1rp-body');
     if (!body) return;
@@ -90,6 +129,8 @@
         ' &middot; panel v' + PANEL_VERSION + '</span></p>';
       return;
     }
+    var F = FB();
+    var myUid = (F && F.user) ? F.user.uid : null;
     body.innerHTML = STATE.reviews.map(function (r, ri) {
       var who = r.reviewer === 'auto' ? 'Brand gate'
               : r.reviewer === 'claude' ? 'Editorial review'
@@ -98,6 +139,12 @@
         (r.level ? ' &middot; level ' + esc(r.level) : '') +
         (when(r.at) ? ' &middot; ' + esc(when(r.at)) : '') +
         (r.toEmail && window.__u1rpOwner ? ' &middot; ' + esc(r.toEmail) : '') + '</div>';
+      var staleNote = '';
+      if (isStale(r.at, STATE.proposals[r.toUid])) {
+        staleNote = '<div class="u1rp-stale">' + (r.toUid === myUid
+          ? 'You have saved changes since this check ran, so some items below may already be fixed. Submit again for a fresh list.'
+          : 'This editor has saved changes since this check ran, so some items may already be fixed.') + '</div>';
+      }
       var groups = (r.items || []).map(function (g, gi) {
         var fs = (g.findings || []).map(function (f, fi) {
           return '<label class="u1rp-f' + (f.done ? ' done' : '') + '">' +
@@ -109,7 +156,7 @@
         return '<div class="u1rp-post">' + esc(g.date) + ' &middot; ' + esc(g.theme) +
                (g.legacy ? ' (pre-dates the gate)' : '') + '</div>' + fs;
       }).join('');
-      return '<div class="u1rp-rev">' + head + groups + '</div>';
+      return '<div class="u1rp-rev">' + head + staleNote + groups + '</div>';
     }).join('') +
       '<p style="font-size:10.5px;color:#8a9099;text-align:center;padding:10px 0 2px;">' +
       esc(STATE.status) +
@@ -204,7 +251,7 @@
   // for a websocket that died while the laptop slept.
   function relisten() {
     var F = FB();
-    if (F && F.user) listen();
+    if (F && F.user) { listen(); listenProposals(); }
   }
   try {
     document.addEventListener('visibilitychange', function () {
@@ -227,6 +274,14 @@
     return true;
   }
 
+  var ROOT = (typeof window !== 'undefined') ? window : globalThis;
+  ROOT.U1ReviewPanel = { toggle: toggle, render: render, state: STATE, badge: badge,
+    isStale: isStale,
+    load: function (rs) { STATE.reviews = rs; badge(); if (STATE.open) render(); } };
+
+  // Node loads this file for the pure helpers only; everything below needs a DOM.
+  if (typeof document === 'undefined') return;
+
   mountButton();
   // Attach when a user actually appears, however long that takes. The earlier
   // bounded retry expired before sign-in and the onAuthStateChanged hook could not
@@ -240,13 +295,12 @@
     var uid = (F && F.user && F.user.uid) ? F.user.uid : null;
     if (uid !== lastUid) {
       lastUid = uid;
-      if (uid) listen();
+      if (uid) { listen(); listenProposals(); }
       else { if (STATE.unsub) { STATE.unsub(); STATE.unsub = null; }
+             if (STATE.punsub) { try { STATE.punsub(); } catch (e) {} STATE.punsub = null; }
+             STATE.proposals = {};
              STATE.status = 'not listening: waiting for sign-in';
              STATE.reviews = []; badge(); if (STATE.open) render(); }
     }
   }, 700);
-
-  window.U1ReviewPanel = { toggle: toggle, render: render, state: STATE, badge: badge,
-    load: function (rs) { STATE.reviews = rs; badge(); if (STATE.open) render(); } };
 })();

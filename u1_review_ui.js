@@ -336,6 +336,7 @@
                               change: i.change, quote: i.quote || '', done: false };
                    }) };
         }),
+        rulesVersion: (window.U1Gate && window.U1Gate.RULES_VERSION) || '',
         at: firebase.firestore.FieldValue.serverTimestamp(),
         read: false
       }).catch(function (e) {
@@ -422,6 +423,10 @@
         stampVerdict(true);
         original.apply(this, arguments);
         markStages(true);
+        // Write the empty result too. Skipping it left the previous attempt's
+        // findings in place forever, so a post fixed to perfection still showed
+        // its old blocks and the gate looked broken (caught 2026-08-25).
+        writeReview(res);
         return;
       }
 

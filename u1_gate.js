@@ -329,5 +329,12 @@
              warns: items.length - blocks.length, items: items };
   }
 
-  root.U1Gate = { checkPost: checkPost, verdict: verdict, SIGNATURE: SIGNATURE, TAX: TAX, BANNED_TAGS: BANNED_TAGS };
+  // Bump whenever a RULE changes. Findings are stored per editor, so the panel
+  // uses this to tell someone their list came from an older rulebook rather
+  // than leaving them staring at findings the gate no longer produces
+  // (caught 2026-08-25: rules changed under a stored, unrefreshed review).
+  var RULES_VERSION = '2026-08-24';
+
+  root.U1Gate = { checkPost: checkPost, verdict: verdict, RULES_VERSION: RULES_VERSION,
+                  SIGNATURE: SIGNATURE, TAX: TAX, BANNED_TAGS: BANNED_TAGS };
 })(typeof window !== 'undefined' ? window : globalThis);

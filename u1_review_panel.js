@@ -8,7 +8,7 @@
   var STATE = { reviews: [], open: false, unsub: null, status: 'starting', error: null,
                 lastUpdate: 0, retryDelay: 0, retryTimer: null,
                 proposals: {}, punsub: null };
-  var PANEL_VERSION = "4.2";
+  var PANEL_VERSION = "4.3";
 
   // The app declares `let fb = {...}` at script top level. A top-level `let` is a global
   // LEXICAL binding, not a property of window, so `window.fb` is undefined forever and
@@ -43,6 +43,8 @@
     '.u1rp-BLOCK{background:#fdeaea;color:#b3261e}',
     '.u1rp-ADVISE{background:#fff3e0;color:#9a5b00}',
     '.u1rp-WARN{background:#eef2f7;color:#5a6472}',
+    '.u1rp-ok{background:#eef7f1;border:1px solid #cfe6d8;color:#1f6b45;border-radius:5px;',
+      'padding:8px 10px;font-size:12px;line-height:1.45;margin:2px 0 4px}',
     '.u1rp-stale{background:#fff8e6;border:1px solid #f0d79a;color:#7a5a10;border-radius:5px;',
       'padding:7px 9px;font-size:11.5px;line-height:1.45;margin:2px 0 9px}',
     '.u1rp-empty{color:#8a9099;font-size:13px;padding:24px 0;text-align:center}',
@@ -80,6 +82,15 @@
      The submit path always writes the review AFTER the proposal, so any gap
      beyond a couple of seconds is a real post-review edit, never write skew.
      Pure and exported so the node test can hold it to that contract. */
+  // Findings are also obsolete when the RULEBOOK moved on, even if the draft
+  // never changed. Caught 2026-08-25: rules were fixed, the stored findings
+  // stayed, and the panel showed blocks the gate no longer produces.
+  function rulesMoved(reviewRulesVersion) {
+    var cur = '';
+    try { cur = (window.U1Gate || {}).RULES_VERSION || ''; } catch (e) {}
+    return !!(cur && reviewRulesVersion && reviewRulesVersion !== cur);
+  }
+
   function isStale(reviewAt, proposalUpdatedAt, toleranceSec) {
     var ra = reviewAt && reviewAt.seconds;
     var pa = proposalUpdatedAt && proposalUpdatedAt.seconds;
@@ -140,10 +151,19 @@
         (when(r.at) ? ' &middot; ' + esc(when(r.at)) : '') +
         (r.toEmail && window.__u1rpOwner ? ' &middot; ' + esc(r.toEmail) : '') + '</div>';
       var staleNote = '';
+      if (rulesMoved(r.rulesVersion)) {
+        staleNote += '<div class="u1rp-stale">The brand rules changed after this check ran, ' +
+          'so these items may no longer apply. Submit again for a current list.</div>';
+      }
       if (isStale(r.at, STATE.proposals[r.toUid])) {
-        staleNote = '<div class="u1rp-stale">' + (r.toUid === myUid
+        staleNote += '<div class="u1rp-stale">' + (r.toUid === myUid
           ? 'You have saved changes since this check ran, so some items below may already be fixed. Submit again for a fresh list.'
           : 'This editor has saved changes since this check ran, so some items may already be fixed.') + '</div>';
+      }
+      var total = (r.items || []).reduce(function (n, g) { return n + ((g.findings || []).length); }, 0);
+      if (!total) {
+        return '<div class="u1rp-rev">' + head + staleNote +
+          '<div class="u1rp-ok">Nothing to fix. The last check found no issues.</div></div>';
       }
       var groups = (r.items || []).map(function (g, gi) {
         var fs = (g.findings || []).map(function (f, fi) {

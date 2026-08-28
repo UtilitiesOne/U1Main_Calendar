@@ -164,6 +164,20 @@
     var tags = tagsIn(text);
     var isDivisionLane = !!(post.laneId && post.laneId !== 'parent');
 
+    // An empty post is one fault, not several. Before this the blank slot
+    // reported signature missing, no hashtags and visual missing, three true
+    // statements that together hid the only one worth reading. Worse, when the
+    // slot already holds a published post the owner opens that date, sees real
+    // copy with its signature, and concludes the gate is wrong. Caught
+    // 2026-08-28 on a stale draft whose two blank slots would have replaced
+    // live posts. Return immediately: every later check would only restate it.
+    if (!body.replace(/\s/g, '')) {
+      out.push(item('BLOCK', 'Post is empty',
+        'This post has no body text. If this date already carries a published post, submitting this would replace it with a blank one.',
+        'Write the body, or discard this change so the published version stays as it is.'));
+      return out;
+    }
+
     if (isDivisionLane) {
       // Division lane rules. The division speaks on its own page, under the parent
       // promise. Themes, body activation, and the parent-voice check do not apply.
@@ -333,7 +347,7 @@
   // uses this to tell someone their list came from an older rulebook rather
   // than leaving them staring at findings the gate no longer produces
   // (caught 2026-08-25: rules changed under a stored, unrefreshed review).
-  var RULES_VERSION = '2026-08-24';
+  var RULES_VERSION = '2026-08-28';
 
   root.U1Gate = { checkPost: checkPost, verdict: verdict, RULES_VERSION: RULES_VERSION,
                   SIGNATURE: SIGNATURE, TAX: TAX, BANNED_TAGS: BANNED_TAGS };

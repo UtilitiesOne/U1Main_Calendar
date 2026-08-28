@@ -320,11 +320,20 @@
      are derived state, so stale sets from earlier attempts only mislead. The
      override audit trail lives in /overrides and is untouched by this. */
   function writeReview(res) {
+    if (typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON || !fb.user) return;
+    writeReviewFor(fb.user.uid, fb.user.email || '', res);
+  }
+
+  /* The same review doc, addressed to someone else. The owner's publish path
+     judges an editor's changes and stamps l1 on THEIR proposal, so the reasons
+     belong in THEIR panel. Writing to fb.user here would file the owner's
+     verdict about somebody else's work under the owner's own name. */
+  function writeReviewFor(uid, email, res) {
     try {
-      if (typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON || !fb.user) return;
-      firebase.firestore().collection('reviews').doc('auto_' + fb.user.uid).set({
-        toUid: fb.user.uid,
-        toEmail: fb.user.email || '',
+      if (typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON || !uid) return;
+      firebase.firestore().collection('reviews').doc('auto_' + uid).set({
+        toUid: uid,
+        toEmail: email || '',
         reviewer: 'auto',
         level: 1,
         verdict: res.canSubmit ? 'notes' : 'changes-requested',
@@ -344,6 +353,40 @@
         notice('Your feedback list could not be saved to the server (' + e.message + '). The submission itself is not affected, but Review Feedback may show an older list. Tell Alex.');
       });
     } catch (e) { console.warn('review write error', e); }
+  }
+
+  /* Names a held change the way an editor would recognise it. The diff keys
+     are machine shapes (sched|DATE, event|DATE|ID, lane|LANE|ID). */
+  function labelForChange(key) {
+    var p = String(key || '').split('|');
+    if (p[0] === 'lane') return (p[1] || 'division') + ' lane';
+    if (p[0] === 'event') return 'Event';
+    return 'Scheduled post';
+  }
+
+  /* Held work gets its reasons written to the proposer's own panel. Without
+     this the publish path stamped l1:'blocked' and left the editor staring at
+     their previous submit's findings, which could be about other posts on
+     other days. A status with no reasons is worse than no status.
+     Caught 2026-08-28. */
+  function writeHeldReview(uid, email, held) {
+    if (!uid || !held || !held.length) return;
+    var counts = { block: 0, advise: 0, warn: 0 };
+    held.forEach(function (v) {
+      (v.items || []).forEach(function (i) {
+        if (i.level === 'BLOCK') counts.block += 1;
+        else if (i.level === 'ADVISE') counts.advise += 1;
+        else counts.warn += 1;
+      });
+    });
+    writeReviewFor(uid, email, {
+      canSubmit: false,
+      blocks: counts.block, advise: counts.advise, warns: counts.warn,
+      groups: held.map(function (v) {
+        return { date: v.date, theme: labelForChange(v.key), legacy: false,
+                 items: v.items || [] };
+      })
+    });
   }
 
   /* Stamps the review pipeline stage on the proposal.
@@ -472,9 +515,20 @@
         return firebase.firestore().collection('proposals').doc(proposalId).delete()
           .catch(function () {}).then(function () { return result; });
       }
+      // The reasons go to the proposer before the block is stamped, so the
+      // panel is never newer than the status it explains.
+      writeHeldReview(proposalId, proposerEmail, held);
       return firebase.firestore().collection('proposals').doc(proposalId).set({
         baseVersion: window.__liveVersion,
         baseState: fbClone(window.__liveState),
+        // The draft moves with its base. Writing a fresh baseState while
+        // leaving the old draft in place made every post published in the
+        // meantime look deleted: present in the new base, absent from the
+        // stale state. candidateState is new-live plus whatever was held,
+        // which is exactly what this editor should still be looking at.
+        // Caught 2026-08-28, when a draft carried three deletion orders for
+        // posts its owner had never seen.
+        state: fbClone(candidateState),
         submitted: false,
         l1: 'blocked',
         l1At: firebase.firestore.FieldValue.serverTimestamp()

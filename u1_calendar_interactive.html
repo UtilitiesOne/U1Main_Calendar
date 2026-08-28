@@ -3848,7 +3848,7 @@ function exitToLive() {
 function contentFingerprint() {
   var copy = {};
   Object.keys(state || {}).forEach(function (k) { if (!MERGE_VIEW_KEYS[k]) copy[k] = state[k]; });
-  return JSON.stringify(copy);
+  return stableJson(copy);
 }
 
 function pushProposal() {
@@ -3859,6 +3859,39 @@ function pushProposal() {
   if (fb.submitted) { fb.submitted = false; setEditButtons(); }
   clearTimeout(fb.saveTimer);
   fb.saveTimer = setTimeout(pushProposalNow, 800);
+}
+
+/* The editor's intent, recorded rather than re-derived.
+
+   Diffed against fb.baseState, the state THIS editor started from, never
+   against live. That is the whole point: live moves while someone drafts,
+   so a diff against live answers "how does your copy differ from the world
+   now", when the question that matters is "what did you change". A post
+   another editor published after this draft opened is simply absent from
+   this list, so it can never be republished or deleted by accident.
+
+   Written from 2026-08-28. Nothing consumes it yet; the publish path still
+   uses the old diff. It ships first so real change logs accumulate before
+   anything depends on them. */
+function changeLogFromBase() {
+  try {
+    if (!fb.baseState || !window.U1Scope || !window.U1Scope.diffAgainstLive) return null;
+    return window.U1Scope.diffAgainstLive(state, fb.baseState).map(function (c) {
+      var obj = (!c.removed && c.candidate && c.candidate.obj) ? c.candidate.obj : null;
+      return {
+        key: c.key,
+        kind: c.kind || null,
+        laneId: c.laneId || null,
+        date: c.date || null,
+        action: c.removed ? 'delete' : 'upsert',
+        obj: obj
+      };
+    });
+  } catch (e) {
+    // Never let the new bookkeeping break a save that works today.
+    console.warn('change log skipped:', e && e.message);
+    return null;
+  }
 }
 
 function pushProposalNow() {
@@ -3880,7 +3913,9 @@ function pushProposalNow() {
     baseState: fb.baseState || null,
     submitted: !!fb.submitted,
     submittedAt: fb.submitted ? firebase.firestore.FieldValue.serverTimestamp() : null,
-    l1: (typeof fb.l1 === 'string' ? fb.l1 : 'unchecked')
+    l1: (typeof fb.l1 === 'string' ? fb.l1 : 'unchecked'),
+    // Recorded intent (2026-08-28). Read by nothing yet.
+    changes: changeLogFromBase()
   };
   firebase.firestore().collection('proposals').doc(fb.user.uid).set(payload)
     .then(function () { updateModeIndicator(); })
@@ -4165,7 +4200,23 @@ function guardedPublish(stateObj, expectedVersion, source, proposalId, notifyMsg
 var MERGE_VIEW_KEYS = { view: 1, currentMonth: 1, activeLane: 1 };
 
 function isMergeObj(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
-function sameJson(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+/* Order-independent structural compare. Firestore returns map fields in
+   arbitrary order, so the same object can serialise two ways ({h,bytes,w}
+   vs {bytes,w,h}) and JSON.stringify would call them different. Every
+   comparison that answers "did a human change this?" has to ignore key
+   order, or untouched posts read as edits and get republished over
+   whatever is live. That is exactly what happened eight times between
+   v45 and v64 (2026-08-28). */
+function stableJson(v) {
+  if (Array.isArray(v)) return '[' + v.map(stableJson).join(',') + ']';
+  if (v && typeof v === 'object') {
+    return '{' + Object.keys(v).sort().map(function (k) {
+      return JSON.stringify(k) + ':' + stableJson(v[k]);
+    }).join(',') + '}';
+  }
+  return JSON.stringify(v);
+}
+function sameJson(a, b) { return stableJson(a) === stableJson(b); }
 
 function mergeKeyUnion(nodes) {
   var out = {};
@@ -4259,9 +4310,9 @@ initFirebaseSync();
 </script>
 
 <script src="u1_baseline.js?v=4.2"></script>
-<script src="u1_gate.js?v=5.3"></script>
+<script src="u1_gate.js?v=5.4"></script>
 <script src="u1_scope.js?v=5.0"></script>
-<script src="u1_review_ui.js?v=5.2"></script>
+<script src="u1_review_ui.js?v=5.3"></script>
 <script src="u1_review_panel.js?v=4.3"></script>
 
 </body>

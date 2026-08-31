@@ -1,5 +1,12 @@
 // Who may do what, tested against the real firestore.rules file.
 //
+// Named for what it asserts rather than for the file it reads, because a
+// rules_test.mjs already exists in output/2026-08-07_u1_brand_gate and is a
+// different thing entirely: it drives the local emulator through
+// @firebase/rules-unit-testing. This one asks the deployed rules directly and
+// needs no emulator. Two files with one name in two places that are meant to
+// stay byte-identical is how the wrong one gets copied over the right one.
+//
 // This is the only automated check on the access model, and it exists because
 // that model was wrong for months without anyone noticing: isEditor was
 // literally "is signed in", so any Google account that found the URL could
@@ -16,7 +23,7 @@
 // against real data, so that document is mocked with what production holds.
 // Keep the mock in step with the real list or the last two cases go soft.
 //
-// Run: node rules_test.mjs      (needs `firebase login` first)
+// Run: node access_model_test.mjs      (needs `firebase login` first)
 import { readFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';

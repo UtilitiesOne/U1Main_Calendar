@@ -42,12 +42,14 @@ const OWNER_EMAIL = 'wakroz@gmail.com';
 
 // Mirrors config/roles in production. The owner is deliberately absent: he is
 // hardcoded in the rules so a broken or missing list can never lock him out.
+//
+// Pruned 2026-08-31 alongside the real document. Seeding had included everyone
+// who had ever proposed or published, so nobody active was cut off while the
+// allowlist went in; two accounts dormant since June came off once it was safe.
 const EDITORS = [
   'cristina.costin@moldcablecom.onmicrosoft.com',
   'andrewscodreanu@gmail.com',
-  'catamatei7@gmail.com',
-  'catamatthew7@gmail.com',
-  'vlaicumatarin@gmail.com'
+  'catamatei7@gmail.com'
 ];
 
 function token() {
@@ -69,6 +71,8 @@ const who = (email, uid) => ({
 const OWNER = who(OWNER_EMAIL, 'owner1');
 const EDITOR = who(EDITORS[0], 'cris1');
 const STRANGER = who('someone.random@gmail.com', 'strange1');
+// Was an editor until 2026-08-31, dormant since June.
+const REMOVED = who('vlaicumatarin@gmail.com', 'gone1');
 const DRAFT = { submitted: false, state: {}, baseVersion: 65 };
 
 const cases = [
@@ -80,7 +84,10 @@ const cases = [
   ['a stranger cannot add themselves to the editor list', 'DENY', STRANGER, ROLES, 'update', { editors: ['someone.random@gmail.com'] }],
   ['an editor cannot add themselves either', 'DENY', EDITOR, ROLES, 'update', { editors: EDITORS }],
   ['only the owner changes who may edit', 'ALLOW', OWNER, ROLES, 'update', { editors: EDITORS }],
-  ['a signed-in viewer can read the calendar', 'ALLOW', STRANGER, DB + '/calendar/live', 'get', null]
+  ['a signed-in viewer can read the calendar', 'ALLOW', STRANGER, DB + '/calendar/live', 'get', null],
+  // Pruning is only real if a removed address actually loses write access.
+  ['someone pruned off the list can no longer propose', 'DENY', REMOVED, DB + '/proposals/gone1', 'create', DRAFT],
+  ['but can still read, like anyone else', 'ALLOW', REMOVED, DB + '/calendar/live', 'get', null]
 ];
 
 const testCases = cases.map(([, expectation, auth, path, method, data]) => ({

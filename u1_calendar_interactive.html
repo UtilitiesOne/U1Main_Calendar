@@ -1102,9 +1102,41 @@
     main.cal-main { padding: 14px; max-width: none; }
     .day-cell { min-height: 84px; }
   }
+
+/* A reader gets the board, not the controls.
+
+   Leadership opens this calendar signed out, so for months a viewer was handed
+   the whole planning surface: six "Add post" buttons, the spotlight uplift
+   planner, the theme checkboxes, seventeen remove crosses, and Reset all
+   selections. None of it could ever persist. Firestore denies the write and
+   there is no proposal to hold it, so every click was a dead end that discarded
+   silently on the next live refresh, and "Reset all selections" sitting on the
+   CEO's screen reads like a live control over the shared board.
+
+   Controls that only act vanish. Controls that also carry information (which
+   themes are in rotation, which division holds the spotlight) stay legible and
+   stop responding, because a viewer is meant to read that. */
+body.viewer-locked #add-project-btn,
+body.viewer-locked #add-career-btn,
+body.viewer-locked #add-u1way-btn,
+body.viewer-locked #add-culture-btn,
+body.viewer-locked #add-newhire-btn,
+body.viewer-locked #add-companyevent-btn,
+body.viewer-locked #triggered-list button,
+body.viewer-locked #reset-btn,
+body.viewer-locked #import-btn { display: none !important; }
+
+body.viewer-locked #theme-list input,
+body.viewer-locked #spot1-div,
+body.viewer-locked #spot1-uplift,
+body.viewer-locked #spot2-div,
+body.viewer-locked #spot2-uplift { pointer-events: none; opacity: .55; }
 </style>
+
 </head>
-<body>
+<!-- Locked until we know who this is. onAuthChange lifts it for an approved
+     editor; a viewer never sees the controls appear and then vanish. -->
+<body class="viewer-locked">
 
 <header class="top">
   <div class="brand">
@@ -1390,6 +1422,9 @@
   // OWNER_EMAIL can publish a draft to the live calendar. No editor allowlist.
   // Auto-detect: if the apiKey is still a placeholder, stay fully offline.
   const FIREBASE_ON = !!firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf("PASTE") === -1;
+  // A local copy with no Firebase has nobody to authenticate, so it unlocks at
+  // once. The shared app stays locked until onAuthChange says who is here.
+  if (!FIREBASE_ON && document.body) document.body.classList.remove('viewer-locked');
 </script>
 
 <script>
@@ -2625,6 +2660,7 @@ function closeDetailPanel() { detailOverlay.classList.remove('open'); }
 // Full-screen post editor: its own surface, opened from the drawer. Edits a working
 // buffer so Cancel discards and Save commits to the same slotOverrides the drawer uses.
 function openPostEditor(slot) {
+  if (!mayEverEdit()) { setRoleNotice('This calendar is read-only for you. You can read every post, its visual and the posting cadence.'); return; }
   const pe = document.getElementById('post-editor');
   const kind = slot.isTriggered ? 'event' : (slot.isSpotlight ? 'spotlight' : 'scheduled');
   document.getElementById('pe-title').textContent = slot.themeName;
@@ -2772,6 +2808,7 @@ let modalEditId = null;
 let modalState = null;
 
 function openModal({ mode, prefilledDate = null, editEvent = null, origin = null, preserve = null }) {
+  if (!mayEverEdit()) { setRoleNotice('This calendar is read-only for you. You can read every post, its visual and the posting cadence.'); return; }
   ensureEditing();
   modalMode = mode;
   modalOrigin = editEvent ? null : (origin || (mode === 'generic' ? 'plus' : null));
@@ -3759,6 +3796,18 @@ function syncEl(id) { return document.getElementById(id); }
 function fbClone(o) { return JSON.parse(JSON.stringify(o)); }
 function canEdit() { return (typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON) || fb.editing; }
 
+/* May this person edit at all, as opposed to canEdit's "are they editing right
+   now". The two are different questions and the surface needs both: canEdit
+   gates the controls inside a proposal, this gates whether the editing surface
+   is offered in the first place.
+
+   Deliberately keyed on the allowlist and not on edit mode, so nothing changes
+   for an editor who is simply not in a proposal yet. A local copy with Firebase
+   off stays fully editable, which is what offline use is for. */
+function mayEverEdit() {
+  return (typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON) || !!fb.isEditor;
+}
+
 function updateModeIndicator() {
   var el = syncEl('sync-savestate'); if (!el) return;
   if (!fb.user) { el.textContent = ''; return; }
@@ -3775,6 +3824,10 @@ function updateModeIndicator() {
 }
 
 function setEditButtons() {
+  // CSS, not a DOM sweep: the triggered list and theme list re-render
+  // constantly, and a class on body survives that where a per-element pass
+  // would have to be remembered at every future call site.
+  if (document.body) document.body.classList.toggle('viewer-locked', !mayEverEdit());
   var em = syncEl('edit-mode-btn'), vl = syncEl('view-live-btn'), sb = syncEl('submit-approval-btn');
   var on = (typeof FIREBASE_ON !== 'undefined' && FIREBASE_ON) && !!fb.isEditor;
   if (em) em.style.display = (on && !fb.editing && !fb.previewing) ? 'block' : 'none';

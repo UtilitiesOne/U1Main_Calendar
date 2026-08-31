@@ -26,7 +26,14 @@
 // Run: node access_model_test.mjs      (needs `firebase login` first)
 import { readFileSync } from 'fs';
 import { homedir } from 'os';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+// Resolve next to this file, not to the working directory: this suite is run
+// both from the calendar repo and from its mirror in output/, and a bare
+// relative path silently picks up whichever rules file the shell happened to
+// be standing in.
+const RULES = join(dirname(fileURLToPath(import.meta.url)), 'firestore.rules');
 
 const PROJECT = 'u1-calendar';
 const DB = '/databases/(default)/documents';
@@ -86,7 +93,7 @@ const res = await fetch(`https://firebaserules.googleapis.com/v1/projects/${PROJ
   method: 'POST',
   headers: { Authorization: 'Bearer ' + token(), 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    source: { files: [{ name: 'firestore.rules', content: readFileSync('firestore.rules', 'utf8') }] },
+    source: { files: [{ name: 'firestore.rules', content: readFileSync(RULES, 'utf8') }] },
     testSuite: { testCases }
   })
 });

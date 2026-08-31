@@ -1,0 +1,237 @@
+rules_version = '2';
+
+/* u1-calendar Firestore rules.
+
+   The first four blocks are the calendar app rules. The proposals block carries the
+   l2 review-stage protection added with the brand gate (calendar-v3.0, 2026-08-10):
+   an editor can never mark their own post reviewed. The reviews block is the brand
+   gate's review-feedback store, same date. The newsletter_events block is the
+   newsletter analytics addition (July 2026) and is deliberately untouched here.
+   Deploying this file replaces ALL Firestore rules in the project: merge, never
+   overwrite, and keep every block accounted for. */
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* ---- Who may write, 2026-08-31 ----
+       Read access to the board stays open on purpose: leadership glances at it
+       without signing in, and a login wall was rejected as friction. WRITE access
+       was the real hole. Until now isEditor was literally "is signed in", so any
+       Google account that found the URL could create a proposal in this calendar.
+       The owner stays hardcoded so a bad roles document can never lock him out. */
+    function isOwnerEmail() {
+      return request.auth != null
+             && request.auth.token.email == "wakroz@gmail.com";
+    }
+    function isApprovedEditor() {
+      return isOwnerEmail()
+             || (request.auth != null
+                 && exists(/databases/$(database)/documents/config/roles)
+                 && request.auth.token.email in
+                    get(/databases/$(database)/documents/config/roles).data.editors);
+    }
+
+    // ---- The editor allowlist. Owner edits it in the console; no deploy needed. ----
+    match /config/roles {
+      allow read:  if request.auth != null;
+      allow write: if isOwnerEmail();
+    }
+
+    // ---- The one published calendar everyone sees ----
+    match /calendar/live {
+      allow read: if true;                                              // public read
+      allow write: if request.auth != null
+                   && request.auth.token.email == "wakroz@gmail.com";   // only owner publishes
+    }
+
+    // ---- Append-only version history of published calendars (owner-only) ----
+    match /calendar_versions/{id} {
+      allow read:           if request.auth != null
+                            && request.auth.token.email == "wakroz@gmail.com";
+      allow create, delete: if request.auth != null
+                            && request.auth.token.email == "wakroz@gmail.com";
+      // no update: history is append-only
+    }
+
+    // ---- In-app notifications ----
+    // Owner creates approval notices to a proposer; any signed-in editor may
+    // create a notice addressed to the owner role (submitted for approval).
+    match /notifications/{id} {
+      allow read:           if request.auth != null
+                            && (resource.data.toUid == request.auth.uid
+                                || request.auth.token.email == "wakroz@gmail.com");
+      allow create:         if request.auth != null
+                            && (request.auth.token.email == "wakroz@gmail.com"
+                                || request.resource.data.toRole == "owner");
+      allow update, delete: if request.auth != null
+                            && (resource.data.toUid == request.auth.uid
+                                || request.auth.token.email == "wakroz@gmail.com");
+    }
+
+    // ---- Each signed-in user's own working draft (doc id = their Firebase uid) ----
+    // l1 is set by the client gate and is the editor's to write.
+    // l2 is the review stage and is NOT the editor's to write, otherwise an
+    // editor could mark their own post reviewed and skip the judgement pass.
+    // Brand-gate enforcement (2026-08-11): a proposal may not be marked submitted
+    // unless the Level-1 gate passed it (l1 == 'clean'). This is the server-side
+    // half of the gate: it survives devtools, a stale script, and a gate that
+    // failed to load. The owner keeps the override, and every override is logged
+    // to /overrides below.
+    function gatePassed() {
+      return !('submitted' in request.resource.data)
+             || request.resource.data.submitted != true
+             || request.resource.data.l1 == 'clean';
+    }
+
+    match /proposals/{uid} {
+      allow read: if request.auth != null
+                  && (request.auth.uid == uid
+                      || request.auth.token.email == "wakroz@gmail.com");
+
+      allow create: if request.auth != null
+                    && request.auth.uid == uid
+                    && isApprovedEditor()
+                    && gatePassed()
+                    && (!('l2' in request.resource.data)
+                        || request.resource.data.l2 == 'pending');
+
+      allow update: if request.auth != null
+                    && (
+                         request.auth.token.email == "wakroz@gmail.com"
+                         || (request.auth.uid == uid
+                             && isApprovedEditor()
+                             && gatePassed()
+                             && (
+                                  // A write that omits l2 resets the post to
+                                  // unreviewed, which is true the moment content
+                                  // changes. Editors still can never SET a value,
+                                  // so faking "reviewed" stays impossible. The
+                                  // stricter both-absent form deadlocked editors
+                                  // after the runner stamped done (2026-08-18).
+                                  (!('l2' in request.resource.data))
+                                  || (('l2' in request.resource.data) && ('l2' in resource.data)
+                                      && request.resource.data.l2 == resource.data.l2)
+                                  || (!('l2' in resource.data)
+                                      && request.resource.data.l2 == 'pending')
+                                )
+                            )
+                       );
+
+      allow delete: if request.auth != null
+                    && (request.auth.uid == uid
+                        || request.auth.token.email == "wakroz@gmail.com");
+    }
+
+    // ---- Brand-gate review feedback (calendar-v3.0; reshaped 2026-08-18) ----
+    // Three writers, one collection:
+    //   reviewer == "auto"   : the Level-1 gate, running client-side as the editor,
+    //                          writes its own findings about the editor's own submission.
+    //                          One document per editor (id "auto_<uid>"), REPLACED on
+    //                          every submit, so stale findings from earlier attempts
+    //                          never accumulate. The editor rewriting their own auto
+    //                          review is by design: the findings are derived state the
+    //                          gate regenerates, and the tamper-proof record of what
+    //                          was pushed through anyway lives in /overrides.
+    //   reviewer == "alex"   : the owner adds Level-2 judgement notes.
+    //   reviewer == "claude" : written by the Admin SDK service account, which
+    //                          bypasses these rules entirely. Listed for documentation.
+    // An editor may never touch a review that is not their own auto review, may not
+    // re-address one, and may not change who it claims to be from.
+    match /reviews/{id} {
+      allow read:   if request.auth != null
+                    && (resource.data.toUid == request.auth.uid
+                        || request.auth.token.email == "wakroz@gmail.com");
+
+      allow create: if request.auth != null
+                    && (
+                         request.auth.token.email == "wakroz@gmail.com"
+                         || (request.resource.data.reviewer == "auto"
+                             && request.resource.data.toUid == request.auth.uid)
+                       );
+
+      // Editor: full rewrite of their own auto review only (the gate replacing its
+      // own findings, or ticking items done). Owner may update anything.
+      allow update: if request.auth != null
+                    && (
+                         request.auth.token.email == "wakroz@gmail.com"
+                         || (resource.data.toUid == request.auth.uid
+                             && resource.data.reviewer == "auto"
+                             && request.resource.data.reviewer == "auto"
+                             && request.resource.data.toUid == request.auth.uid)
+                       );
+
+      allow delete: if request.auth != null
+                    && request.auth.token.email == "wakroz@gmail.com";
+    }
+
+    // ---- Brand-gate override audit (2026-08-11) ----
+    // Written when someone pushes a blocked post through anyway. Immutable by
+    // design: an override is a decision on the record, not a draft.
+    match /overrides/{id} {
+      allow read:   if request.auth != null
+                    && request.auth.token.email == "wakroz@gmail.com";
+      allow create: if request.auth != null
+                    && request.resource.data.by == request.auth.token.email;
+      allow update, delete: if false;
+    }
+
+    // ---- Newsletter engagement events (ADDED for July 2026 analytics) ----
+    // Append-only. Readers write one small document per page or section view.
+    // No personal data is accepted: the schema is closed to exactly these eight
+    // fields, so an email address cannot be smuggled in even by a modified client.
+    // Reads are open because the collection holds counts and anonymous UUIDs only.
+    match /newsletter_events/{id} {
+      allow read: if true;
+
+      allow create: if request.resource.data.keys().hasOnly(
+                         ['issue','type','section','visitor','device','ref','ts','ext_host'])
+                    && request.resource.data.issue is string
+                    && request.resource.data.issue.size() <= 16
+                    && request.resource.data.type in ['issue_view','section_view']
+                    && request.resource.data.section is string
+                    && request.resource.data.section.size() <= 40
+                    && request.resource.data.visitor is string
+                    && request.resource.data.visitor.size() <= 64
+                    && request.resource.data.device in ['mobile','desktop']
+                    && request.resource.data.ref in
+                         ['direct','internal','outlook','external','unknown']
+                    && request.resource.data.ts is timestamp
+                    // ext_host is optional: only present on an 'external' referrer,
+                    // and only ever a bare hostname, never a full URL.
+                    && (!('ext_host' in request.resource.data)
+                        || (request.resource.data.ext_host is string
+                            && request.resource.data.ext_host.size() <= 60));
+
+      // History is immutable: no edits, no deletes.
+      allow update, delete: if false;
+    }
+
+    // ---- Website-direction voting (RESTORED 2026-08-25) ----
+    // This block existed ONLY in the deployed ruleset, not in this file, so the
+    // 2026-08-25 restore had to merge it back in by hand. Any rules deploy on
+    // this project must carry EVERY block in this file: on 2026-08-25 an older
+    // rules file was deployed and silently wiped reviews, overrides, and the
+    // proposals gate floor for about an hour. Verify with verify_rules.py.
+    match /direction_votes/{voter} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasOnly(
+                                 ['voter','choice','name','note','device','ts'])
+                            && request.resource.data.voter == voter
+                            && request.resource.data.voter.size() <= 64
+                            && request.resource.data.choice in [
+                                 'beneath_v1','beneath_v2',
+                                 'overdeliver_v1','overdeliver_v2',
+                                 'command_v1','command_v2',
+                                 'showcase_v1','showcase_v2',
+                                 'hive_v1','hive_v2',
+                                 'road_v1','road_v2']
+                            && request.resource.data.name is string
+                            && request.resource.data.name.size() <= 60
+                            && request.resource.data.note is string
+                            && request.resource.data.note.size() <= 280
+                            && request.resource.data.device in ['mobile','desktop']
+                            && request.resource.data.ts is timestamp;
+      allow delete: if false;
+    }
+  }
+}

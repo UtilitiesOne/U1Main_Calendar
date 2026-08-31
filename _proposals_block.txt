@@ -1,0 +1,35 @@
+
+      allow read: if request.auth != null
+                  && (request.auth.uid == uid
+                      || request.auth.token.email == "wakroz@gmail.com");
+
+      allow create: if request.auth != null
+                    && request.auth.uid == uid
+                    && gatePassed()
+                    && (!('l2' in request.resource.data)
+                        || request.resource.data.l2 == 'pending');
+
+      allow update: if request.auth != null
+                    && (
+                         request.auth.token.email == "wakroz@gmail.com"
+                         || (request.auth.uid == uid
+                             && gatePassed()
+                             && (
+                                  // A write that omits l2 resets the post to
+                                  // unreviewed, which is true the moment content
+                                  // changes. Editors still can never SET a value,
+                                  // so faking "reviewed" stays impossible. The
+                                  // stricter both-absent form deadlocked editors
+                                  // after the runner stamped done (2026-08-18).
+                                  (!('l2' in request.resource.data))
+                                  || (('l2' in request.resource.data) && ('l2' in resource.data)
+                                      && request.resource.data.l2 == resource.data.l2)
+                                  || (!('l2' in resource.data)
+                                      && request.resource.data.l2 == 'pending')
+                                )
+                            )
+                       );
+
+      allow delete: if request.auth != null
+                    && (request.auth.uid == uid
+                        || request.auth.token.email == "wakroz@gmail.com");

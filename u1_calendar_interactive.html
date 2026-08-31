@@ -2,6 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+  <!-- Not for search engines. The board is deliberately reachable without a
+       login so leadership can glance at it, so the one thing worth doing is
+       keeping it out of results. This does NOT protect the data itself: the
+       Firestore endpoint is a separate host that no robots directive here can
+       reach. Read access is open by decision, 2026-08-31. -->
+  <meta name="robots" content="noindex, nofollow, noarchive" />
 <title>U1 Posting Calendar · 6-month operational planner</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3770,7 +3776,7 @@ function updateModeIndicator() {
 
 function setEditButtons() {
   var em = syncEl('edit-mode-btn'), vl = syncEl('view-live-btn'), sb = syncEl('submit-approval-btn');
-  var on = (typeof FIREBASE_ON !== 'undefined' && FIREBASE_ON) && !!fb.user;
+  var on = (typeof FIREBASE_ON !== 'undefined' && FIREBASE_ON) && !!fb.isEditor;
   if (em) em.style.display = (on && !fb.editing && !fb.previewing) ? 'block' : 'none';
   if (vl) vl.style.display = (on && (fb.editing || fb.previewing)) ? 'block' : 'none';
   if (sb) { sb.style.display = (on && fb.editing) ? 'block' : 'none'; sb.textContent = fb.submitted ? 'Submitted for approval' : 'Submit for approval'; sb.disabled = !!fb.submitted; }
@@ -3786,6 +3792,7 @@ function applyLiveToView() {
 
 function enterEditMode() {
   if (!(typeof FIREBASE_ON !== 'undefined' && FIREBASE_ON) || !fb.user) return;
+  if (!fb.isEditor) { setRoleNotice('You are signed in as a viewer, so this calendar is read-only for you.'); return; }
   fb.previewing = false;
   // Draft resume (2026-08-10, caught live by Alex): re-entering edit mode used to
   // reseed from live unconditionally and immediately overwrite the server draft,
@@ -4007,15 +4014,53 @@ function initFirebaseSync() {
   firebase.auth().onAuthStateChanged(onAuthChange);
 }
 
+/* Resolves whether this account may propose changes. Until 2026-08-31 isEditor
+   was literally "is signed in", so any Google account that found the URL could
+   write a proposal into this calendar. The list lives in Firestore so the owner
+   can add somebody in the console without a deploy. The owner is hardcoded and
+   never depends on the document, so a bad or missing list cannot lock him out.
+   Viewing is deliberately NOT gated: leadership reads the board without an
+   account, and that decision is on record. */
+function resolveEditorRole(user) {
+  if (!user) { fb.isEditor = false; setEditButtons(); return; }
+  if (fb.isOwner) { fb.isEditor = true; setEditButtons(); return; }
+  firebase.firestore().collection('config').doc('roles').get()
+    .then(function (doc) {
+      var list = (doc.exists && doc.data() && doc.data().editors) || [];
+      fb.isEditor = list.indexOf(user.email) !== -1;
+      setEditButtons();
+      setRoleNotice();
+    })
+    .catch(function (e) {
+      // Fail closed on write, and say so. A silent false here would look
+      // identical to "you are not an editor", which is the F-04 pattern.
+      fb.isEditor = false;
+      setEditButtons();
+      setRoleNotice('Could not check your editing access (' + e.message + '). You can read the calendar. Tell Alex if you should be able to edit.');
+    });
+}
+
+/* One line under the account name explaining why there are no edit buttons.
+   A viewer who sees nothing and is told nothing assumes the app is broken. */
+function setRoleNotice(msg) {
+  var el = syncEl('sync-savestate');
+  if (!el) return;
+  if (msg) { el.textContent = msg; return; }
+  if (fb.user && !fb.isEditor) {
+    el.textContent = 'Signed in as a viewer. You can read the calendar; proposing changes is limited to the marketing editors.';
+  }
+}
+
 function onAuthChange(user) {
   fb.user = user;
   fb.isOwner = !!(user && user.email === OWNER_EMAIL);
-  fb.isEditor = !!user;
+  fb.isEditor = false;
   fb.editing = false; fb.previewing = false;
+  resolveEditorRole(user);
   if (user) {
     syncEl('signin-btn').style.display = 'none';
     syncEl('signout-btn').style.display = 'block';
-    syncEl('sync-who').textContent = user.email + (fb.isOwner ? ' (owner)' : ' (editor)');
+    syncEl('sync-who').textContent = user.email + (fb.isOwner ? ' (owner)' : '');
     subscribeNotifications();
     if (fb.isOwner) { var rb = syncEl('view-review-btn'); if (rb) rb.style.display = ''; subscribeProposals(); subscribeVersions(); }
   } else {

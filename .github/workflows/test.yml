@@ -67,6 +67,9 @@ jobs:
       # still catches the regression that matters most here: someone removing the
       # allowlist check, or quietly closing the public read that leadership relies
       # on.
+      - name: Failures a person can see
+        run: node silent_failure_test.mjs
+
       - name: Access model, structural tier
         run: node access_model_test.mjs
 

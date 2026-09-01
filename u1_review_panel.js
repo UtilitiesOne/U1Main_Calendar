@@ -87,7 +87,11 @@
   // stayed, and the panel showed blocks the gate no longer produces.
   function rulesMoved(reviewRulesVersion) {
     var cur = '';
-    try { cur = (window.U1Gate || {}).RULES_VERSION || ''; } catch (e) {}
+        try { cur = (window.U1Gate || {}).RULES_VERSION || ''; }
+        // Behaviour deliberately unchanged: treating "cannot tell" as "rules
+        // moved" would flag every review stale on a transient hiccup, which is
+        // its own kind of wrong. But it should be diagnosable when it happens.
+        catch (e) { console.error('rules version unreadable, staleness check degraded:', e && e.message); }
     return !!(cur && reviewRulesVersion && reviewRulesVersion !== cur);
   }
 
@@ -185,19 +189,42 @@
       ' &middot; panel v' + PANEL_VERSION + '</p>';
 
     Array.prototype.forEach.call(body.querySelectorAll('input[type=checkbox]'), function (cb) {
-      cb.onchange = function () {
-        var r = +cb.getAttribute('data-r'), g = +cb.getAttribute('data-g'), f = +cb.getAttribute('data-f');
-        var rev = STATE.reviews[r];
-        rev.items[g].findings[f].done = cb.checked;
-        var row = cb.parentNode;
-        if (row && row.classList) row.classList.toggle('done', cb.checked);
-        badge();
-        try {
-          firebase.firestore().collection('reviews').doc(rev.id)
-            .update({ items: rev.items })
-            .catch(function (e) { console.warn('tick not saved:', e.message); });
-        } catch (e) {}
-      };
+        cb.onchange = function () {
+          var r = +cb.getAttribute('data-r'), g = +cb.getAttribute('data-g'), f = +cb.getAttribute('data-f');
+          var rev = STATE.reviews[r];
+          var row = cb.parentNode;
+          // Captured now, not read back inside the failure handler. Clicking twice
+          // before the first write settles would otherwise revert to whatever the
+          // box happened to show by then, rather than to what this click changed.
+          var was = !cb.checked;
+          var wanted = cb.checked;
+
+          rev.items[g].findings[f].done = wanted;
+          if (row && row.classList) row.classList.toggle('done', wanted);
+          badge();
+
+          // A tick that does not persist is worse than one that fails loudly: the
+          // reviewer sees it checked, moves on, and the finding is still open for
+          // whoever reads the review next. It used to console.warn into a log
+          // nobody has open, inside an outer catch that swallowed the rest.
+          var revert = function (why) {
+            rev.items[g].findings[f].done = was;
+            cb.checked = was;
+            if (row && row.classList) row.classList.toggle('done', was);
+            badge();
+            STATE.status = 'a tick could not be saved (' + why + '), so nothing was recorded';
+            if (STATE.open) render();
+            if (typeof window.U1Notice === 'function') {
+              window.U1Notice('That tick was not saved (' + why + '), so the finding is still open. Try again, or tell Alex.');
+            }
+          };
+
+          try {
+            firebase.firestore().collection('reviews').doc(rev.id)
+              .update({ items: rev.items })
+              .catch(function (e) { revert(e && e.message ? e.message : 'write rejected'); });
+          } catch (e) { revert(e && e.message ? e.message : 'write threw'); }
+        };
     });
   }
 

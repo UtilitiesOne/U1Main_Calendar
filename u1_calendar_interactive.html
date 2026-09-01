@@ -1615,8 +1615,36 @@ function loadState() {
   }
 }
 function saveState() {
-  try { localStorage.setItem(BRAND_CONFIG.storageKey, JSON.stringify(state)); }
-  catch (e) {}
+      try { localStorage.setItem(BRAND_CONFIG.storageKey, JSON.stringify(state)); }
+      catch (e) {
+        // Swallowing this meant a full or blocked localStorage lost the local copy
+        // with no signal at all. A signed-in editor still has their server draft,
+        // so this warns rather than stops; offline or private-window use has
+        // nothing else, and there the loss is total.
+        //
+        // Reported once. saveState runs on virtually every interaction, and a
+        // message that returns on every keystroke gets dismissed as noise.
+        //
+        // Delivery is deferred on purpose. The first failure lands during page
+        // load, and u1_review_ui.js does not define U1Notice until the bottom of
+        // the document, so the original version of this fell through to alert()
+        // and the warning was gone before anyone could read it. Found by breaking
+        // localStorage in a browser; reading the code would not have shown it.
+        if (!window.__localSaveWarned) {
+          window.__localSaveWarned = true;
+          console.error('local save failed:', e && e.message);
+          var m = 'This browser is not storing your local copy (' + (e && e.message ? e.message : 'storage unavailable') + '). '
+                + ((typeof fb !== 'undefined' && fb && fb.user)
+                    ? 'Your server draft is still saving.'
+                    : 'Nothing is being saved on this device. Sign in, or copy your work out before closing the tab.');
+          var tries = 0;
+          (function deliver() {
+            if (typeof window.U1Notice === 'function') { window.U1Notice(m); return; }
+            if (++tries > 20) { alert(m); return; }   // ~5s, then fall back
+            setTimeout(deliver, 250);
+          })();
+        }
+      }
   // When signed in as an editor, also push to this user's proposal draft (debounced).
   // No-op in offline mode (pushProposal is defined by the Firebase sync layer below).
   if (typeof pushProposal === 'function') pushProposal();

@@ -15,7 +15,12 @@
         m[t.id] = { name: t.name, tagline: t.tagline || '',
                     act: !!t.bodyActivationRequired };
       });
-    } catch (e) {}
+    } catch (e) {
+      // An empty map is not harmless: the gate reads theme names and the
+      // body-activation flag out of it, so swallowing this downgrades the checks
+      // without telling anyone the checks were downgraded.
+      console.error('theme map could not be built, gate checks are degraded:', e && e.message);
+    }
     return m;
   }
   function inferTheme(text, declared, TH) {
@@ -314,6 +319,17 @@
       document.getElementById('u1g-notice-text').textContent = msg;
     } catch (e) { console.warn(msg); }
   }
+
+  // One place to say "this failed", reachable from the inline app too. The app
+  // had no such channel of its own: its failures went to console.warn or nowhere,
+  // and sync-savestate has ten writers that overwrite each other within a second.
+  // A warning nobody can see is the same as no warning.
+  //
+  // Assigned here, beside the function, not inside a publish path. The first
+  // version of this line landed inside guardedPublish, where U1Notice would only
+  // have existed after somebody published, which is exactly when you no longer
+  // need it. Caught because the load was actually executed rather than eyeballed.
+  window.U1Notice = notice;
 
   /* Writes the findings so the editor keeps them after the modal closes.
      One document per editor, replaced on every run (2026-08-18): the findings

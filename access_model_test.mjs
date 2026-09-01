@@ -145,7 +145,20 @@ const res = await fetch(`https://firebaserules.googleapis.com/v1/projects/${PROJ
   })
 });
 const out = await res.json();
-if (out.error) { console.error('API error:', out.error.message); process.exit(1); }
+if (out.error) {
+  // An expired login is the same situation as no login: this machine cannot ask
+  // Google to evaluate the rules. Failing red for that reads like a rules problem
+  // and sends you looking in the wrong place. A real API fault still fails.
+  if (/authentication|credential|UNAUTHENTICATED|invalid_grant/i.test(out.error.message || '')) {
+    console.log('');
+    console.log('SKIP  behavioural tier: the Firebase login has expired. Run `firebase login` to include it.');
+    console.log('');
+    console.log(pass + ' passed, ' + fail + ' failed, behavioural tier skipped');
+    process.exit(fail ? 1 : 0);
+  }
+  console.error('API error:', out.error.message);
+  process.exit(1);
+}
 (out.issues || []).forEach((i) => console.log('RULES ISSUE  ' + i.description));
 
 (out.testResults || []).forEach((r, i) => {

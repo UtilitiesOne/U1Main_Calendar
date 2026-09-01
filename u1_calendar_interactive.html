@@ -4217,6 +4217,40 @@ function renderProposalList() {
     // judges every changed post on its own: clean ones go live and create a
     // new version, held ones stay exactly as drafted in their proposal. One
     // bad post can no longer freeze everything else in the same batch.
+    /* Collisions, spelled out before anything is published.
+
+       mergeOntoLive is base-relative and takes the editor's version of anything
+       they changed, without asking whether live moved away from their base while
+       they worked. Two people on the same post therefore ends with the second
+       publish overwriting the first, silently.
+
+       Found live on 2026-09-01, in the owner's own draft: it held a DELETION of a
+       wireless lane post that somebody had edited since, and deletions are
+       stamped pass in evaluatePerChange, so the gate would never have held it.
+
+       This changes nothing about the merge. It puts the collision in front of the
+       person about to publish and makes them say yes. */
+    var conflictWarning = function (d) {
+      if (!window.U1Scope || !window.U1Scope.conflictsAgainstLive) return '';
+      var cs;
+      try { cs = window.U1Scope.conflictsAgainstLive(window.__liveState, d.baseState, d.state); }
+      catch (e) { console.error('conflict check failed:', e && e.message); return ''; }
+      if (!cs || !cs.length) return '';
+      var detail = cs.map(function (c) {
+        var what = c.kind === 'lane' ? (c.laneId + ' lane post')
+                 : c.kind === 'event' ? ('event on ' + (c.date || '?'))
+                 : ('post on ' + (c.date || '?'));
+        if (c.editorRemoved) return '  - ' + what + ': THIS DRAFT DELETES IT, and someone edited it after this draft started.';
+        if (c.liveRemoved) return '  - ' + what + ': someone DELETED it live, and this draft still edits it.';
+        return '  - ' + what + ': edited here AND edited live since this draft started.';
+      }).join('\n');
+      return 'CONFLICT: ' + cs.length + ' item' + (cs.length === 1 ? '' : 's')
+             + ' changed in BOTH this draft and the live calendar since this draft started.\n\n'
+             + detail
+             + '\n\nPublishing keeps this draft and discards the live version of those items.'
+             + '\nPreview first if you are not sure.\n\n';
+    };
+
     var pushIt = function (forced) {
       var merged = mergeOntoLive(window.__liveState, d.baseState, d.state);
       window.U1GateUI.publishPerPost(
@@ -4243,7 +4277,7 @@ function renderProposalList() {
       publish.style.cssText = 'border-color:var(--accent);color:var(--accent);';
       publish.textContent = stale ? 'Rebase & publish' : 'Publish';
       publish.onclick = function () {
-        if (confirm((stale ? 'Rebase ' + who + "'s proposal onto the current live calendar and publish? Their day-level changes win on any same-day conflict."
+        if (confirm(conflictWarning(d) + (stale ? 'Rebase ' + who + "'s proposal onto the current live calendar and publish? Their day-level changes win on any same-day conflict."
                            : 'Publish ' + who + "'s proposal to the LIVE calendar everyone sees?") +
                     '\n\nEach change is judged on its own: whatever is clean goes live now, and anything with an issue stays in their draft for them to fix, without holding back the rest.')) pushIt(false);
       };
@@ -4257,7 +4291,7 @@ function renderProposalList() {
       force.style.cssText = 'border-color:var(--warn);color:var(--warn);';
       force.textContent = 'Publish anyway';
       force.onclick = function () {
-        if (confirm(who + ' has NOT submitted this for approval.\n\nEach of their changes is judged on its own: whatever is clean goes live, whatever has an issue stays in their draft untouched. They will be notified of exactly what published. Continue?')) pushIt(true);
+        if (confirm(conflictWarning(d) + who + ' has NOT submitted this for approval.\n\nEach of their changes is judged on its own: whatever is clean goes live, whatever has an issue stays in their draft untouched. They will be notified of exactly what published. Continue?')) pushIt(true);
       };
       btnRow.appendChild(force);
     }

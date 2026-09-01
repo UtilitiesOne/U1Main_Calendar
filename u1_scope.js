@@ -180,6 +180,60 @@
     return changes;
   }
 
+  /* Two editors, one post. The merge cannot answer this on its own.
+
+     mergeOntoLive is base-relative, which is right: it applies what an editor
+     actually changed and leaves everything else at the live value, so a draft
+     fifty versions behind publishes nothing. But at the leaf the rule is 'the
+     editor changed it, so take the editor's version', and it never asks whether
+     live moved away from that editor's base in the meantime.
+
+     So when two people edit the SAME post from the same starting point, the
+     second publish silently overwrites the first. Reproduced against the
+     shipping merge 2026-09-01: Cristina publishes her rewrite, Andrei publishes
+     his while still holding the original base, and hers is gone with nothing
+     said to anyone. Reverse the order and it happens to him instead.
+
+     This reports those collisions and deliberately does not change the merge,
+     which merge_test covers and which is correct for every other case. What to
+     do about a collision is a person's call, not a rule's.
+
+     Three conditions, all required:
+       the editor changed this unit away from their base,
+       live also moved away from that same base,
+       and the two did not land on the same answer.
+     The third matters. Two people fixing the same typo identically is not a
+     conflict, and reporting it as one teaches people to click straight through. */
+  function conflictsAgainstLive(liveState, baseState, editedState) {
+    var L = allKeyedUnits(liveState || {});
+    var B = allKeyedUnits(baseState || {});
+    var E = allKeyedUnits(editedState || {});
+    var keys = {};
+    [L, B, E].forEach(function (m) { Object.keys(m).forEach(function (k) { keys[k] = 1; }); });
+    var out = [];
+    Object.keys(keys).forEach(function (k) {
+      var fpL = unitFingerprint(L[k]);
+      var fpB = unitFingerprint(B[k]);
+      var fpE = unitFingerprint(E[k]);
+      if (fpE === fpB) return;   // the editor did not touch this
+      if (fpL === fpB) return;   // live has not moved under them
+      if (fpE === fpL) return;   // both arrived at the same place
+      var u = E[k] || L[k] || B[k];
+      out.push({
+        key: k,
+        kind: u && u.kind,
+        date: u && u.date,
+        laneId: u && u.laneId,
+        base: B[k] || null,
+        live: L[k] || null,
+        edited: E[k] || null,
+        editorRemoved: !E[k] || !E[k].obj,
+        liveRemoved: !L[k] || !L[k].obj
+      });
+    });
+    return out;
+  }
+
   /* Rebuilds a state that starts from `live` and applies ONLY the changes
      whose key is in `passKeys` (a Set or plain object of keys). Removals pass
      through unconditionally: taking something down is never a brand risk. */
@@ -214,5 +268,6 @@
   root.U1Scope = { resolve: resolve, buildBaseline: buildBaseline, applyScope: applyScope,
                    canSubmit: canSubmit, postsFrom: postsFrom, fingerprint: fingerprint,
                    laneKey: laneKey, laneFingerprint: laneFingerprint,
-                   diffAgainstLive: diffAgainstLive, applySelectedChanges: applySelectedChanges };
+                   diffAgainstLive: diffAgainstLive, applySelectedChanges: applySelectedChanges,
+                   conflictsAgainstLive: conflictsAgainstLive };
 })(typeof window !== 'undefined' ? window : globalThis);

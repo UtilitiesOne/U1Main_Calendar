@@ -1,0 +1,99 @@
+# Runs the suites on every push and pull request.
+#
+# This repo is served straight to production by GitHub Pages. There is no build,
+# no staging and no review step, so whatever lands on main is what the team is
+# using minutes later. Until now the only thing standing between a bad commit and
+# the live calendar was whether someone remembered to run node by hand.
+#
+# August is the argument for this file. Eight posts were silently reverted over
+# ten days because a map comparison was key-order sensitive; a stale draft carried
+# three deletion orders for posts its author had never seen; and the editor
+# allowlist did not exist while the code carried a comment claiming it did. Every
+# one of those is now covered by a suite here, and every one of them shipped
+# because nothing ran automatically.
+#
+# No dependencies on purpose. The suites use Node built-ins only, so there is no
+# install step to break and no lockfile to drift.
+
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Named individually rather than globbed, so a suite that stops being
+      # collected fails the build instead of quietly dropping out of the run.
+      # A glob would have let a renamed file disappear without a word, which is
+      # the same silent-failure shape the suites exist to catch.
+      - name: Gate rules, including lane posts
+        run: node gate_lane_test.mjs
+
+      - name: Empty-post handling
+        run: node empty_post_test.mjs
+
+      - name: Key-order comparison, the silent-revert regression
+        run: node key_order_test.mjs
+
+      - name: Three-way merge
+        run: node merge_test.mjs
+
+      - name: Per-post publish
+        run: node per_post_publish_test.mjs
+
+      - name: Recorded change log
+        run: node changelog_test.mjs
+
+      - name: Review-panel staleness
+        run: node panel_stale_test.mjs
+
+      - name: L2 review predicate
+        run: node rules_l2_test.mjs
+
+      # Structural tier only on CI. The behavioural tier asks Google to evaluate
+      # the deployed rules against simulated identities, which needs a login this
+      # runner does not have, so it skips itself and says so. The structural half
+      # still catches the regression that matters most here: someone removing the
+      # allowlist check, or quietly closing the public read that leadership relies
+      # on.
+      - name: Access model, structural tier
+        run: node access_model_test.mjs
+
+      # The HTML is one 4,000-line file with the whole app inline, so a stray
+      # bracket takes the calendar down for everyone with no other warning.
+      - name: Inline scripts parse
+        run: |
+          node -e '
+            const fs = require("fs");
+            const src = fs.readFileSync("u1_calendar_interactive.html", "utf8");
+            const blocks = [...src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)];
+            if (!blocks.length) { console.error("no inline scripts found; did the file move?"); process.exit(1); }
+            blocks.forEach((m, i) => {
+              try { new (require("vm").Script)(m[1]); }
+              catch (e) { console.error("inline script " + i + " failed to parse: " + e.message); process.exit(1); }
+            });
+            console.log(blocks.length + " inline script block(s) parse");
+          '
+
+      # Cheap, and it would have caught the one that shipped: the pages carry a
+      # noindex because the board is open to read by decision, and losing it
+      # should be deliberate.
+      - name: Pages still carry noindex
+        run: |
+          for f in u1_calendar_interactive.html u1_utility_guidance.html \
+                   u1_voice_conservative_one.html u1_voice_flamboyant_one.html \
+                   u1_voice_marketing_one.html; do
+            grep -q 'name="robots"' "$f" || { echo "$f lost its noindex"; exit 1; }
+          done
+          echo "all five pages carry noindex"

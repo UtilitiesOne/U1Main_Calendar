@@ -53,11 +53,41 @@ const EDITORS = [
 ];
 
 function token() {
-  const p = join(homedir(), '.config', 'configstore', 'firebase-tools.json');
-  const t = JSON.parse(readFileSync(p, 'utf8'))?.tokens?.access_token;
-  if (!t) throw new Error('no firebase credentials found; run `firebase login`');
-  return t;
+  try {
+    const p = join(homedir(), '.config', 'configstore', 'firebase-tools.json');
+    return JSON.parse(readFileSync(p, 'utf8'))?.tokens?.access_token || null;
+  } catch { return null; }
 }
+
+// Two tiers, because CI has no Firebase credentials and an access test that
+// simply refuses to run in CI protects nothing.
+//
+// The structural tier reads firestore.rules as text and needs no auth, so it
+// runs everywhere including CI. It cannot prove the rules BEHAVE correctly, only
+// that the guards are still written down: enough to catch someone deleting the
+// allowlist check, which is the regression that actually worries me.
+//
+// The behavioural tier asks Google to evaluate the rules against simulated
+// identities. It needs a login and is skipped, loudly, when there is none.
+const RULES_SRC = readFileSync(RULES, 'utf8');
+let pass = 0, fail = 0;
+function t(name, cond) {
+  if (cond) { pass++; console.log('PASS  ' + name); } else { fail++; console.log('FAIL  ' + name); }
+}
+
+t('structural: an approved-editor helper exists at all',
+  /function isApprovedEditor\(\)/.test(RULES_SRC));
+t('structural: the owner is hardcoded, so a broken list cannot lock him out',
+  /function isOwnerEmail\(\)[\s\S]{0,200}wakroz@gmail\.com/.test(RULES_SRC));
+t('structural: proposals still gate create on the allowlist',
+  /allow create:[\s\S]{0,400}?isApprovedEditor\(\)/.test(RULES_SRC));
+t('structural: the roles document is not world-writable',
+  /match \/config\/roles[\s\S]{0,300}?allow write: if isOwnerEmail\(\)/.test(RULES_SRC));
+// Asserted as a decision, not an oversight: leadership opens this board without
+// signing in and a login wall was rejected as friction. If someone closes this,
+// it should be because they meant to, and this line should fail loudly first.
+t('structural: reading the calendar is still open, which is the decision',
+  /match \/calendar\/live[\s\S]{0,200}?allow read: if true/.test(RULES_SRC));
 
 const mocks = [
   { function: 'get', args: [{ exactValue: ROLES }], result: { value: { data: { editors: EDITORS } } } },
@@ -96,9 +126,19 @@ const testCases = cases.map(([, expectation, auth, path, method, data]) => ({
   functionMocks: mocks
 }));
 
+const TOKEN = token();
+if (!TOKEN) {
+  console.log('');
+  console.log('SKIP  behavioural tier: no Firebase login on this machine.');
+  console.log('      The structural checks above ran; run `firebase login` for the full set.');
+  console.log('');
+  console.log(pass + ' passed, ' + fail + ' failed, behavioural tier skipped');
+  process.exit(fail ? 1 : 0);
+}
+
 const res = await fetch(`https://firebaserules.googleapis.com/v1/projects/${PROJECT}:test`, {
   method: 'POST',
-  headers: { Authorization: 'Bearer ' + token(), 'Content-Type': 'application/json' },
+  headers: { Authorization: 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },
   body: JSON.stringify({
     source: { files: [{ name: 'firestore.rules', content: readFileSync(RULES, 'utf8') }] },
     testSuite: { testCases }
@@ -108,7 +148,6 @@ const out = await res.json();
 if (out.error) { console.error('API error:', out.error.message); process.exit(1); }
 (out.issues || []).forEach((i) => console.log('RULES ISSUE  ' + i.description));
 
-let pass = 0, fail = 0;
 (out.testResults || []).forEach((r, i) => {
   const ok = r.state === 'SUCCESS';
   ok ? pass++ : fail++;

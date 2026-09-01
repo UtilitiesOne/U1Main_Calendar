@@ -3982,6 +3982,73 @@ function changeLogFromBase() {
   }
 }
 
+/* One document per post, written alongside the existing save (step 2 of the
+   per-post migration, 2026-09-01).
+
+   The save above rewrites this editor's whole calendar copy with set(): 140 KB
+   measured on a real draft, every 800ms of typing. Two editors on two different
+   posts still write the same document, so nothing collides only because the
+   merge is careful about it.
+
+   These units are the same thing expressed one post at a time, keyed the way
+   U1Scope.allKeyedUnits keys them so the publish path can consume them later
+   without a second scheme to reconcile. Only the changed units are written, so
+   a save costs about 1 KB rather than 63 KB of unchanged calendar.
+
+   NOTHING READS THESE YET, deliberately. The whole-state save above is still
+   the source of truth and is untouched. This accumulates real data first, and
+   it rolls back by deleting this function's call site.
+
+   Failures here must never break a save that works today: the main write has
+   already resolved by the time this runs, and every path swallows into a
+   console line rather than surfacing an error for a feature nobody is using. */
+function writeUnits(changes) {
+  if (!(typeof FIREBASE_ON !== 'undefined' && FIREBASE_ON) || !fb.user) return;
+  if (!Array.isArray(changes)) return;   // null means the log could not be built
+  try {
+    var db = firebase.firestore();
+    var col = db.collection('proposals').doc(fb.user.uid).collection('units');
+    var batch = db.batch();
+    var live = {};
+
+    changes.forEach(function (c) {
+      if (!c || !c.key) return;
+      live[c.key] = 1;
+      batch.set(col.doc(encodeUnitKey(c.key)), {
+        key: c.key,
+        kind: c.kind || null,
+        date: c.date || null,
+        laneId: c.laneId || null,
+        action: c.action,
+        obj: c.obj,
+        at: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+
+    // An editor who undoes a change leaves a unit behind otherwise, and a stale
+    // unit is worse than a missing one: it describes an intent that no longer
+    // exists. Tracked in memory rather than read back, because a read per save
+    // costs more than the write it is guarding.
+    (fb.lastUnitKeys || []).forEach(function (k) {
+      if (!live[k]) batch.delete(col.doc(encodeUnitKey(k)));
+    });
+    fb.lastUnitKeys = Object.keys(live);
+
+    batch.commit().catch(function (e) {
+      console.warn('unit write skipped:', e && e.message);
+    });
+  } catch (e) {
+    console.warn('unit write skipped:', e && e.message);
+  }
+}
+
+/* Unit keys carry '|' and dates, which Firestore document ids allow, but a lane
+   post id is user-generated and a '/' in one would silently create a nested
+   path instead of a document. Encoded rather than trusted. */
+function encodeUnitKey(key) {
+  return String(key).replace(/\//g, '%2F');
+}
+
 function pushProposalNow() {
   if (!(typeof FIREBASE_ON !== 'undefined' && FIREBASE_ON) || !fb.user || fb.previewing || !fb.editing) return;
   // l1 rides on every write (2026-08-11). l2 does NOT (2026-08-18 night): the
@@ -4006,7 +4073,7 @@ function pushProposalNow() {
     changes: changeLogFromBase()
   };
   firebase.firestore().collection('proposals').doc(fb.user.uid).set(payload)
-    .then(function () { updateModeIndicator(); })
+    .then(function () { updateModeIndicator(); writeUnits(payload.changes); })
     .catch(function (e) { var el = syncEl('sync-savestate'); if (el) el.textContent = 'Save error: ' + e.message; });
 }
 

@@ -120,6 +120,34 @@ service cloud.firestore {
       allow delete: if request.auth != null
                     && (request.auth.uid == uid
                         || request.auth.token.email == "wakroz@gmail.com");
+
+      // ---- One document per post (step 1 of the per-post migration) ----
+      //
+      // Today a save rewrites this editor's entire calendar copy: 140 KB measured
+      // on a real draft, every 800ms of typing. Two editors working on two
+      // different posts still write the same document, so safety comes from the
+      // merge being careful rather than from the writes never colliding.
+      //
+      // A unit is one scheduled post, one lane post, or one event, keyed the way
+      // U1Scope.allKeyedUnits keys them. Two people on different posts then write
+      // different documents and cannot clobber each other at all, and a save
+      // drops from 140 KB to about 1 KB.
+      //
+      // Nothing reads these yet. The shape ships before any client writes it, and
+      // it rolls back by simply not writing them. Access is exactly the parent's:
+      // the editor who owns the proposal, and the owner. An editor removed from
+      // the allowlist loses these writes at the same moment they lose the parent.
+      match /units/{unitKey} {
+        allow read: if request.auth != null
+                    && (request.auth.uid == uid
+                        || request.auth.token.email == "wakroz@gmail.com");
+
+        allow write: if request.auth != null
+                     && (
+                          request.auth.token.email == "wakroz@gmail.com"
+                          || (request.auth.uid == uid && isApprovedEditor())
+                        );
+      }
     }
 
     // ---- Brand-gate review feedback (calendar-v3.0; reshaped 2026-08-18) ----

@@ -104,6 +104,10 @@ const STRANGER = who('someone.random@gmail.com', 'strange1');
 // Was an editor until 2026-08-31, dormant since June.
 const REMOVED = who('vlaicumatarin@gmail.com', 'gone1');
 const DRAFT = { submitted: false, state: {}, baseVersion: 65 };
+const UNIT_CRIS    = DB + '/proposals/cris1/units/sched|2026-09-10';
+const UNIT_STRANGE = DB + '/proposals/strange1/units/sched|2026-09-10';
+const UNIT_GONE    = DB + '/proposals/gone1/units/sched|2026-09-10';
+const UNITDOC = { key: 'sched|2026-09-10', kind: 'sched', action: 'upsert', obj: { note: 'x' } };
 
 const cases = [
   ['a stranger who found the URL cannot create a proposal', 'DENY', STRANGER, DB + '/proposals/strange1', 'create', DRAFT],
@@ -117,7 +121,22 @@ const cases = [
   ['a signed-in viewer can read the calendar', 'ALLOW', STRANGER, DB + '/calendar/live', 'get', null],
   // Pruning is only real if a removed address actually loses write access.
   ['someone pruned off the list can no longer propose', 'DENY', REMOVED, DB + '/proposals/gone1', 'create', DRAFT],
-  ['but can still read, like anyone else', 'ALLOW', REMOVED, DB + '/calendar/live', 'get', null]
+  ['but can still read, like anyone else', 'ALLOW', REMOVED, DB + '/calendar/live', 'get', null],
+  // --- per-post units, step 1 of the migration ------------------------------
+  // The subcollection ships before any client writes it, so the shape is legal
+  // first and rolls back by simply not writing. Access must be exactly the
+  // parent's: an editor taken off the allowlist has to lose these writes at the
+  // same moment they lose the parent document, or the allowlist has a back door.
+  ['an approved editor writes their own units', 'ALLOW', EDITOR, UNIT_CRIS, 'create', UNITDOC],
+  ['the owner writes any unit, which publishing will need', 'ALLOW', OWNER, UNIT_CRIS, 'create', UNITDOC],
+  ['the owner reads them', 'ALLOW', OWNER, UNIT_CRIS, 'get', null],
+  ['a stranger cannot write into an editor unit', 'DENY', STRANGER, UNIT_CRIS, 'create', UNITDOC],
+  ['a stranger cannot read an editor unit', 'DENY', STRANGER, UNIT_CRIS, 'get', null],
+  ['a stranger cannot write units under their own uid either, being off the list',
+   'DENY', STRANGER, UNIT_STRANGE, 'create', UNITDOC],
+  ['someone pruned off the list loses unit writes with the parent',
+   'DENY', REMOVED, UNIT_GONE, 'create', UNITDOC],
+  ['an editor cannot delete another editor unit', 'DENY', EDITOR, UNIT_GONE, 'delete', null]
 ];
 
 const testCases = cases.map(([, expectation, auth, path, method, data]) => ({

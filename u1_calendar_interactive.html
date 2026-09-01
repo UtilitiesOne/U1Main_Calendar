@@ -4251,6 +4251,49 @@ function renderProposalList() {
              + '\nPreview first if you are not sure.\n\n';
     };
 
+    /* Deletions, counted and named before the fact.
+
+       The gate never holds a removal. evaluatePerChange stamps removals pass on
+       purpose, because taking something down is not a brand risk, and that is a
+       fair rule for one deliberate deletion. It is a bad rule for a draft that
+       has quietly accumulated several.
+
+       Measured on the owner's own draft, 2026-09-01: it would have published
+       eight changes, six of them deletions, one lane post in each of Renewable,
+       Consulting, Wireless, Data Centers, Fulfillment and Power Delivery. Only
+       the Wireless one collided with a live edit, so the conflict warning would
+       have named one of the six and said nothing about the other five.
+
+       This does not block anything. It refuses to let "publish 8 changes" hide
+       "and delete six division posts". */
+    var deletionWarning = function (d) {
+      if (!window.U1Scope || !window.U1Scope.diffAgainstLive) return '';
+      var dels;
+      try {
+        var merged = mergeOntoLive(window.__liveState, d.baseState, d.state);
+        dels = window.U1Scope.diffAgainstLive(merged, window.__liveState)
+                 .filter(function (c) { return c.removed; });
+      } catch (e) {
+        console.error('deletion check failed:', e && e.message);
+        return '';
+      }
+      if (!dels.length) return '';
+      var named = dels.map(function (c) {
+        return '  - ' + (c.kind === 'lane' ? (c.laneId + ' lane post')
+                       : c.kind === 'event' ? ('event on ' + (c.date || '?'))
+                       : ('post on ' + (c.date || '?')));
+      }).join('\n');
+      return 'REMOVES ' + dels.length + ' item' + (dels.length === 1 ? '' : 's')
+           + ' from the live calendar:\n\n' + named
+           + '\n\nThe brand gate does not check removals, so nothing else will stop these.\n\n';
+    };
+
+    /* One preamble, so neither warning can be added to one publish route and
+       forgotten on the other. */
+    var publishPreamble = function (d) {
+      return conflictWarning(d) + deletionWarning(d);
+    };
+
     var pushIt = function (forced) {
       var merged = mergeOntoLive(window.__liveState, d.baseState, d.state);
       window.U1GateUI.publishPerPost(
@@ -4277,7 +4320,7 @@ function renderProposalList() {
       publish.style.cssText = 'border-color:var(--accent);color:var(--accent);';
       publish.textContent = stale ? 'Rebase & publish' : 'Publish';
       publish.onclick = function () {
-        if (confirm(conflictWarning(d) + (stale ? 'Rebase ' + who + "'s proposal onto the current live calendar and publish? Their day-level changes win on any same-day conflict."
+        if (confirm(publishPreamble(d) + (stale ? 'Rebase ' + who + "'s proposal onto the current live calendar and publish? Their day-level changes win on any same-day conflict."
                            : 'Publish ' + who + "'s proposal to the LIVE calendar everyone sees?") +
                     '\n\nEach change is judged on its own: whatever is clean goes live now, and anything with an issue stays in their draft for them to fix, without holding back the rest.')) pushIt(false);
       };
@@ -4291,7 +4334,7 @@ function renderProposalList() {
       force.style.cssText = 'border-color:var(--warn);color:var(--warn);';
       force.textContent = 'Publish anyway';
       force.onclick = function () {
-        if (confirm(conflictWarning(d) + who + ' has NOT submitted this for approval.\n\nEach of their changes is judged on its own: whatever is clean goes live, whatever has an issue stays in their draft untouched. They will be notified of exactly what published. Continue?')) pushIt(true);
+        if (confirm(publishPreamble(d) + who + ' has NOT submitted this for approval.\n\nEach of their changes is judged on its own: whatever is clean goes live, whatever has an issue stays in their draft untouched. They will be notified of exactly what published. Continue?')) pushIt(true);
       };
       btnRow.appendChild(force);
     }

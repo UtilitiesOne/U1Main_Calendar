@@ -128,12 +128,59 @@ t('a missing U1Scope degrades to no warning rather than a broken publish',
   noScope.conflictWarning({ baseState: base, state: andrei }) === '');
 
 // --- both publish routes are wired, including the escape hatch --------------
-t('the normal publish route shows it',
-  /if \(confirm\(conflictWarning\(d\) \+ \(stale \?/.test(appSrc));
-t('"publish anyway" cannot be the quiet way past it',
-  /if \(confirm\(conflictWarning\(d\) \+ who \+ ' has NOT submitted/.test(appSrc));
+t('the conflict text reaches the normal publish route, via the preamble',
+  /return conflictWarning\(d\) \+ deletionWarning\(d\);/.test(appSrc)
+  && /if \(confirm\(publishPreamble\(d\) \+ \(stale \?/.test(appSrc));
+t('"publish anyway" cannot be the quiet way past either warning',
+  /if \(confirm\(publishPreamble\(d\) \+ who \+ ' has NOT submitted/.test(appSrc));
 t('U1Scope exports the detector for the app to reach',
   /conflictsAgainstLive: conflictsAgainstLive/.test(readFileSync(join(here, 'u1_scope.js'), 'utf8')));
+
+
+// --- deletions, which the gate never holds ----------------------------------
+// evaluatePerChange stamps removals pass on purpose: taking something down is
+// not a brand risk, and that is fair for one deliberate deletion. It is a bad
+// rule for a draft that has quietly accumulated several. The owner's own draft
+// held six on 2026-09-01, one lane post per division, and only the Wireless one
+// collided with a live edit, so the conflict warning named one of the six and
+// said nothing at all about the other five.
+const dwStart = appSrc.indexOf('var deletionWarning = function (d) {');
+const dwEnd = appSrc.indexOf('\n    };', dwStart) + '\n    };'.length;
+const DW = {};
+new Function('exports', 'window', 'mergeOntoLive',
+  appSrc.slice(dwStart, dwEnd) + '\nexports.deletionWarning = deletionWarning;')(DW, w, M.mergeOntoLive);
+
+const baseThree = st({ '2026-09-10': post('Original.'), '2026-09-11': post('Untouched.'),
+                       '2026-09-12': post('Third.') });
+const dropTwo = st({ '2026-09-11': post('Untouched.') });
+w.__liveState = baseThree;
+
+const dmsg = DW.deletionWarning({ baseState: baseThree, state: dropTwo });
+t('deletions are reported even when nothing collides', dmsg.length > 0);
+t('the count is right', /REMOVES 2 items/.test(dmsg));
+t('each one is named', /2026-09-10/.test(dmsg) && /2026-09-12/.test(dmsg));
+t('it says the gate will not stop them', /does not check removals/.test(dmsg));
+t('and no conflict is claimed, because there is none',
+  conflictsAgainstLive(baseThree, baseThree, dropTwo).length === 0);
+t('a draft that deletes nothing gets no deletion text',
+  DW.deletionWarning({ baseState: baseThree, state: baseThree }) === '');
+t('singular reads correctly', /REMOVES 1 item from/.test(DW.deletionWarning({
+  baseState: baseThree,
+  state: st({ '2026-09-10': post('Original.'), '2026-09-11': post('Untouched.') }) })));
+
+// One preamble, so a warning cannot be wired to one publish button and
+// forgotten on the other.
+t('the preamble combines conflicts and deletions',
+  /return conflictWarning\(d\) \+ deletionWarning\(d\);/.test(appSrc));
+t('the normal publish route uses it', /if \(confirm\(publishPreamble\(d\) \+ \(stale \?/.test(appSrc));
+t('"publish anyway" uses it too',
+  /if \(confirm\(publishPreamble\(d\) \+ who \+ ' has NOT submitted/.test(appSrc));
+t('a missing U1Scope degrades to silence rather than a broken publish', (function () {
+  const bare = {};
+  new Function('exports', 'window', 'mergeOntoLive',
+    appSrc.slice(dwStart, dwEnd) + '\nexports.deletionWarning = deletionWarning;')(bare, {}, M.mergeOntoLive);
+  return bare.deletionWarning({ baseState: baseThree, state: dropTwo }) === '';
+})());
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

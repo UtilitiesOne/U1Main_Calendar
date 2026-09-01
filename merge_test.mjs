@@ -3,8 +3,19 @@
 // every key added to the schema after it was written (lanes, the spotlight
 // uplifts) was silently dropped when an editor's proposal was rebased onto live.
 import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-const appPath = process.env.U1_APP_PATH || 'C:/tmp/u1cal_check/u1_calendar_interactive.html';
+// The app next to this file, which is the one that ships.
+//
+// This pointed at C:/tmp/u1cal_check, a temp checkout last touched 2026-08-25.
+// That copy predates the key-order fix: it has no stableJson at all, so it still
+// carries the order-sensitive comparison that silently reverted eight posts over
+// ten days. This suite covers the three-way merge, the exact logic that failed,
+// and it was passing against the broken version the whole time. It proved
+// nothing. Found 2026-09-01 when CI ran it on Linux and the Windows path did not
+// exist, which is the only reason anyone noticed.
+const appPath = process.env.U1_APP_PATH || join(dirname(fileURLToPath(import.meta.url)), 'u1_calendar_interactive.html');
 const html = readFileSync(appPath, 'utf8');
 const from = html.indexOf('var MERGE_VIEW_KEYS');
 const to = html.indexOf('function subscribeVersions');

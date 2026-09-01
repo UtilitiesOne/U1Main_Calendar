@@ -92,6 +92,10 @@ jobs:
             console.log(blocks.length + " inline script block(s) parse");
           '
 
+      # A changed script that keeps its old ?v= reaches the repo and nobody's screen.
+      - name: Scripts are cache-busted
+        run: node cache_bust_test.mjs
+
       # Cheap, and it would have caught the one that shipped: the pages carry a
       # noindex because the board is open to read by decision, and losing it
       # should be deliberate.

@@ -46,18 +46,59 @@ const OWNER_EMAIL = 'wakroz@gmail.com';
 // Pruned 2026-08-31 alongside the real document. Seeding had included everyone
 // who had ever proposed or published, so nobody active was cut off while the
 // allowlist went in; two accounts dormant since June came off once it was safe.
-const EDITORS = [
-  'cristina.costin@moldcablecom.onmicrosoft.com',
-  'andrewscodreanu@gmail.com',
-  'catamatei7@gmail.com'
-];
-
 function token() {
   try {
     const p = join(homedir(), '.config', 'configstore', 'firebase-tools.json');
     return JSON.parse(readFileSync(p, 'utf8'))?.tokens?.access_token || null;
   } catch { return null; }
 }
+
+const TOKEN = token();
+
+// Placeholders, deliberately. This repository is public, and until 2026-09-02 it
+// carried five colleagues' personal email addresses in this file for no benefit:
+// with a login the block below reads the real allowlist from config/roles, and
+// without one the behavioural tier exits before these are ever used. They bought
+// nothing and published people's addresses.
+//
+// The owner's address stays, in this file and in firestore.rules, because the
+// rule hardcodes it and a test that mocks it would be testing a different rule.
+//
+// Anyone reading this: the live list is in Firestore at config/roles, not here.
+const EDITORS = [
+  'editor.one@example.com',
+  'editor.two@example.com'
+];
+
+// The mock above is a written-down guess at what production holds, and a guess
+// drifts. It did within a day: an editor added in the console on 2026-09-02 left
+// the suite testing a list that no longer existed, so the last two cases were
+// quietly asserting something about the wrong set of people.
+//
+// When this tier runs it already has a login, so it can just read the real
+// document. The list above stays as the fallback and as documentation of who is
+// expected, and any difference is printed rather than silently accepted.
+let REAL_EDITORS = EDITORS;
+if (TOKEN) {
+  try {
+    const r = await fetch('https://firestore.googleapis.com/v1/projects/' + PROJECT +
+      '/databases/(default)/documents/config/roles', { headers: { Authorization: 'Bearer ' + TOKEN } });
+    const j = await r.json();
+    const live = (j?.fields?.editors?.arrayValue?.values || []).map((v) => v.stringValue);
+    if (live.length) {
+      // The written list is placeholders now, so a difference is expected and is
+      // not worth a warning. What IS worth printing is how many real editors the
+      // cases below are actually running against, since that number changing is
+      // the only visible sign that somebody was added or removed.
+      console.log('Using the live allowlist from config/roles: ' + live.length + ' editor(s).');
+      console.log('');
+      REAL_EDITORS = live;
+    }
+  } catch (e) {
+    console.log('NOTE  could not read config/roles (' + (e && e.message) + '), using the written list.');
+  }
+}
+
 
 // Two tiers, because CI has no Firebase credentials and an access test that
 // simply refuses to run in CI protects nothing.
@@ -90,7 +131,7 @@ t('structural: reading the calendar is still open, which is the decision',
   /match \/calendar\/live[\s\S]{0,200}?allow read: if true/.test(RULES_SRC));
 
 const mocks = [
-  { function: 'get', args: [{ exactValue: ROLES }], result: { value: { data: { editors: EDITORS } } } },
+  { function: 'get', args: [{ exactValue: ROLES }], result: { value: { data: { editors: REAL_EDITORS } } } },
   { function: 'exists', args: [{ exactValue: ROLES }], result: { value: true } }
 ];
 
@@ -99,10 +140,13 @@ const who = (email, uid) => ({
   token: { email, email_verified: true, sub: uid, aud: PROJECT, firebase: { sign_in_provider: 'google.com' } }
 });
 const OWNER = who(OWNER_EMAIL, 'owner1');
-const EDITOR = who(EDITORS[0], 'cris1');
+const EDITOR = who(REAL_EDITORS[0], 'cris1');
 const STRANGER = who('someone.random@gmail.com', 'strange1');
-// Was an editor until 2026-08-31, dormant since June.
-const REMOVED = who('vlaicumatarin@gmail.com', 'gone1');
+// Guaranteed not on the live list, which is the property under test. Using a
+// real ex-editor's address here only published it.
+const REMOVED = who('removed.editor@example.com', 'gone1');
+// Whoever sits last on the live list, so this follows production rather than a name.
+const NEWEST = who(REAL_EDITORS[REAL_EDITORS.length - 1], 'new1');
 const DRAFT = { submitted: false, state: {}, baseVersion: 65 };
 const UNIT_CRIS    = DB + '/proposals/cris1/units/sched|2026-09-10';
 const UNIT_STRANGE = DB + '/proposals/strange1/units/sched|2026-09-10';
@@ -116,8 +160,8 @@ const cases = [
   ["a stranger cannot write into an editor's proposal", 'DENY', STRANGER, DB + '/proposals/cris1', 'update', DRAFT],
   ['a stranger cannot publish over live', 'DENY', STRANGER, DB + '/calendar/live', 'update', { v: 66 }],
   ['a stranger cannot add themselves to the editor list', 'DENY', STRANGER, ROLES, 'update', { editors: ['someone.random@gmail.com'] }],
-  ['an editor cannot add themselves either', 'DENY', EDITOR, ROLES, 'update', { editors: EDITORS }],
-  ['only the owner changes who may edit', 'ALLOW', OWNER, ROLES, 'update', { editors: EDITORS }],
+  ['an editor cannot add themselves either', 'DENY', EDITOR, ROLES, 'update', { editors: REAL_EDITORS }],
+  ['only the owner changes who may edit', 'ALLOW', OWNER, ROLES, 'update', { editors: REAL_EDITORS }],
   ['a signed-in viewer can read the calendar', 'ALLOW', STRANGER, DB + '/calendar/live', 'get', null],
   // Pruning is only real if a removed address actually loses write access.
   ['someone pruned off the list can no longer propose', 'DENY', REMOVED, DB + '/proposals/gone1', 'create', DRAFT],
@@ -136,7 +180,10 @@ const cases = [
    'DENY', STRANGER, UNIT_STRANGE, 'create', UNITDOC],
   ['someone pruned off the list loses unit writes with the parent',
    'DENY', REMOVED, UNIT_GONE, 'create', UNITDOC],
-  ['an editor cannot delete another editor unit', 'DENY', EDITOR, UNIT_GONE, 'delete', null]
+  ['an editor cannot delete another editor unit', 'DENY', EDITOR, UNIT_GONE, 'delete', null],
+  // The newest editor. A name on the list means nothing until a write is allowed.
+  ['the most recently added editor can actually propose', 'ALLOW', NEWEST, DB + '/proposals/new1', 'create', DRAFT],
+  ['and write their own units', 'ALLOW', NEWEST, DB + '/proposals/new1/units/sched|2026-09-10', 'create', UNITDOC]
 ];
 
 const testCases = cases.map(([, expectation, auth, path, method, data]) => ({
@@ -145,7 +192,6 @@ const testCases = cases.map(([, expectation, auth, path, method, data]) => ({
   functionMocks: mocks
 }));
 
-const TOKEN = token();
 if (!TOKEN) {
   console.log('');
   console.log('SKIP  behavioural tier: no Firebase login on this machine.');

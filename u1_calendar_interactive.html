@@ -3515,12 +3515,51 @@ function findLaneDuplicate(laneId, postId, body) {
   }
   for (const d in (state.slotOverrides || {})) {
     const v = state.slotOverrides[d];
-    if (v && v.note && normBody(v.note) === n) return { lane: laneById('parent'), post: { date: d } };
+    if (v && v.note && normBody(v.note) === n) {
+      return { lane: laneById('parent'), post: { date: d }, kind: 'sched' };
+    }
   }
   for (const e of (state.triggeredEvents || [])) {
-    if (e && e.note && normBody(e.note) === n) return { lane: laneById('parent'), post: { date: e.date } };
+    if (e && e.note && normBody(e.note) === n) {
+      return { lane: laneById('parent'), post: { date: e.date }, kind: 'event', id: e.id };
+    }
   }
   return null;
+}
+
+/* What the editor is colliding with, in words they can act on.
+
+   The old message read "This body already runs on the U1 Main lane (<date>)"
+   for all three cases, because findLaneDuplicate flattened a scheduled post, a
+   triggered event and another lane's post into one shape. On 2026-09-02 an
+   editor was told to look at a date on U1 Main when the blocker was a triggered
+   EVENT she had created herself and still had sitting in her own draft. She
+   could not find it, because she was not looking for an event.
+
+   It also says whether the thing is published or only in this draft. "You made
+   this" and "this is already live" call for different actions, and the editor
+   cannot tell them apart from the calendar alone. */
+function laneDuplicateMessage(dup) {
+  const live = window.__liveState || {};
+  let what, why, published;
+  if (dup.kind === 'event') {
+    what = 'an event in your draft on ' + (dup.post.date || 'an unknown date');
+    why = 'Events run on U1 Main, so the same body cannot also run on a division lane.';
+    published = (live.triggeredEvents || []).some(function (e) { return e && e.id === dup.id; });
+  } else if (dup.kind === 'sched') {
+    what = 'the U1 Main post on ' + (dup.post.date || 'an unknown date');
+    why = 'A post that fits more than one division belongs on U1 Main, and never on both.';
+    published = !!((live.slotOverrides || {})[dup.post.date]);
+  } else {
+    what = 'a post on the ' + dup.lane.name + ' lane (' + (dup.post.date || 'no date') + ')';
+    why = 'The same body cannot run on two division pages.';
+    published = true;
+  }
+  return 'This body is already used by ' + what + '.\n\n' + why + '\n\n'
+    + (published
+        ? 'That one is already published, so changing this body is the way forward. Ask Alex if the published one should come down instead.'
+        : 'That one is only in your draft and nothing has been published, so you can delete it and then save this.')
+    + '\n\nNothing was saved just now.';
 }
 
 const LANE_CATEGORIES = [
@@ -3678,7 +3717,7 @@ function openLanePostEditor(laneId, postId) {
     if (!String(buf.note || '').trim()) { alert('The post body is empty.'); return; }
     const dup = findLaneDuplicate(lane.id, buf.id, buf.note);
     if (dup) {
-      alert('This body already runs on the ' + dup.lane.name + ' lane (' + dup.post.date + '). The same post never runs on two pages: a post that fits more than one division belongs on U1 Main.');
+      alert(laneDuplicateMessage(dup));
       return;
     }
     const i = laneStore.posts.findIndex(p => p.id === buf.id);
@@ -4003,8 +4042,10 @@ function changeLogFromBase() {
    already resolved by the time this runs, and every path swallows into a
    console line rather than surfacing an error for a feature nobody is using. */
 function writeUnits(changes) {
-  if (!(typeof FIREBASE_ON !== 'undefined' && FIREBASE_ON) || !fb.user) return;
-  if (!Array.isArray(changes)) return;   // null means the log could not be built
+  // Returns the promise so a caller can know when units landed, and so tests can
+  // wait for the reconcile rather than racing it.
+  if (!(typeof FIREBASE_ON !== 'undefined' && FIREBASE_ON) || !fb.user) return Promise.resolve();
+  if (!Array.isArray(changes)) return Promise.resolve();   // null means the log could not be built
   try {
     var db = firebase.firestore();
     var col = db.collection('proposals').doc(fb.user.uid).collection('units');
@@ -4027,18 +4068,43 @@ function writeUnits(changes) {
 
     // An editor who undoes a change leaves a unit behind otherwise, and a stale
     // unit is worse than a missing one: it describes an intent that no longer
-    // exists. Tracked in memory rather than read back, because a read per save
-    // costs more than the write it is guarding.
-    (fb.lastUnitKeys || []).forEach(function (k) {
-      if (!live[k]) batch.delete(col.doc(encodeUnitKey(k)));
-    });
-    fb.lastUnitKeys = Object.keys(live);
+    // exists.
+    //
+    // This was tracked purely in memory, which was wrong and showed up the next
+    // day in production: an editor's post was discarded, she reloaded, and the
+    // unit for it stayed behind because the in-memory key list had reset. Memory
+    // does not survive a reload, and the whole point of a unit is that it
+    // outlives the session.
+    //
+    // So the first write of a session reconciles against what is actually
+    // there. One read per session rather than per save, and it heals units
+    // orphaned before this fix rather than leaving them for the publish path to
+    // trip over later.
+    if (fb.unitKeysKnown) {
+      (fb.lastUnitKeys || []).forEach(function (k) {
+        if (!live[k]) batch.delete(col.doc(encodeUnitKey(k)));
+      });
+      fb.lastUnitKeys = Object.keys(live);
+      return batch.commit().catch(function (e) { console.warn('unit write skipped:', e && e.message); });
+    }
 
-    batch.commit().catch(function (e) {
-      console.warn('unit write skipped:', e && e.message);
+    return col.get().then(function (snap) {
+      snap.forEach(function (doc) {
+        var k = (doc.data() || {}).key || doc.id;
+        if (!live[k]) batch.delete(doc.ref);
+      });
+      fb.unitKeysKnown = true;
+      fb.lastUnitKeys = Object.keys(live);
+      return batch.commit();
+    }).catch(function (e) {
+      // A failed reconcile must not lose the writes it was guarding, and must
+      // not mark the session as knowing keys it never read.
+      console.warn('unit reconcile skipped:', e && e.message);
+      return batch.commit().catch(function (e2) { console.warn('unit write skipped:', e2 && e2.message); });
     });
   } catch (e) {
     console.warn('unit write skipped:', e && e.message);
+    return Promise.resolve();
   }
 }
 
@@ -4406,7 +4472,34 @@ function renderProposalList() {
       btnRow.appendChild(force);
     }
     var discard = document.createElement('button'); discard.className = 'reset'; discard.textContent = 'Discard';
-    discard.onclick = function () { if (confirm('Delete this proposal? The editor keeps their local copy.')) firebase.firestore().collection('proposals').doc(doc.id).delete(); };
+    /* Discarding deletes the server draft and leaves the editor's tab holding the
+       old one. That is deliberate, and the confirm below says so, but until now
+       nobody told the editor.
+
+       Cost of that, 2026-09-02: a discarded post stayed in its author's open tab,
+       she kept working against it, and the duplicate check blocked her from
+       rebuilding it in a division lane because her own discarded copy was still
+       sitting in her draft. She spent the afternoon fighting a post that no longer
+       existed on the server, with nothing anywhere telling her so. */
+    discard.onclick = function () {
+      if (!confirm('Delete this proposal?\n\nThe editor keeps their local copy, so their open tab will still show it until they reload. They will be told it was discarded.')) return;
+      var who = d.email || doc.id;
+      firebase.firestore().collection('proposals').doc(doc.id).delete()
+        .then(function () {
+          return firebase.firestore().collection('notifications').add({
+            toUid: doc.id,
+            message: 'The owner discarded your draft. Your browser may still show it until you reload; reload to start from the published calendar.',
+            fromUid: fb.user.uid,
+            at: firebase.firestore.FieldValue.serverTimestamp(),
+            read: false
+          });
+        })
+        .catch(function (e) {
+          console.error('discard or its notice failed:', e && e.message);
+          var el = syncEl('sync-savestate');
+          if (el) el.textContent = 'Discarding ' + who + "'s proposal did not complete (" + (e && e.message) + '). Nothing may have changed.';
+        });
+    };
     btnRow.appendChild(discard);
     row.appendChild(btnRow); list.appendChild(row);
   });

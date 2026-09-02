@@ -32,7 +32,7 @@ let pass = 0, fail = 0;
 const t = (n, c) => { c ? (pass++, console.log('PASS  ' + n)) : (fail++, console.log('FAIL  ' + n)); };
 
 // --- a Firestore stub that records what it was asked to do -----------------
-function makeEnv(commitFails) {
+function makeEnv(commitFails, server = [], serverFails = false) {
   const log = { set: [], delete: [], committed: 0, warned: [] };
   const doc = (id) => ({ __id: id });
   const batch = {
@@ -40,10 +40,22 @@ function makeEnv(commitFails) {
     delete: (d) => log.delete.push(d.__id),
     commit: () => commitFails ? Promise.reject(new Error('permission denied')) : (log.committed++, Promise.resolve())
   };
+  // The collection has to answer get(), because the first write of a session
+  // reconciles against what is actually stored rather than trusting memory.
+  // `server` stands for what Firestore already holds, which is how a unit
+  // orphaned by an earlier session gets simulated.
+  const col = {
+    doc,
+    get: () => serverFails
+      ? Promise.reject(new Error('read denied'))
+      : Promise.resolve({
+          forEach: (f) => server.forEach((k) => f({ data: () => ({ key: k }), ref: doc(k), id: k }))
+        })
+  };
   const firebase = {
     firestore: Object.assign(() => ({
       batch: () => batch,
-      collection: () => ({ doc: () => ({ collection: () => ({ doc }) }) })
+      collection: () => ({ doc: () => ({ collection: () => col }) })
     }), { FieldValue: { serverTimestamp: () => '__ts__' } })
   };
   const fb = { user: { uid: 'u1' } };
@@ -63,7 +75,7 @@ const CH = [
 
 // --- what a normal save writes ---------------------------------------------
 let e = makeEnv(false);
-e.run(CH);
+await e.run(CH);
 t('one document per changed unit, not the whole calendar', e.log.set.length === 3);
 t('a scheduled post is keyed the way U1Scope keys it',
   e.log.set.some(([id]) => id === 'sched|2026-09-10'));
@@ -80,14 +92,14 @@ t('nothing is deleted on a first write', e.log.delete.length === 0);
 // --- an editor who undoes a change -----------------------------------------
 // The unit left behind would describe an intent that no longer exists, which is
 // worse than a missing one.
-e.run([CH[0]]);
+await e.run([CH[0]]);
 t('undoing a change deletes the units that no longer apply', e.log.delete.length === 2);
 t('and leaves the one still changed alone', !e.log.delete.includes('sched|2026-09-10'));
 t('the tracked key set shrinks to match', e.fb.lastUnitKeys.length === 1);
 
 // --- a lane id with a slash would create a nested path, not a document ------
 e = makeEnv(false);
-e.run([{ key: 'lane|wireless|a/b', kind: 'lane', laneId: 'wireless', action: 'upsert', obj: {} }]);
+await e.run([{ key: 'lane|wireless|a/b', kind: 'lane', laneId: 'wireless', action: 'upsert', obj: {} }]);
 t('a slash in a generated id is encoded, not left to split the path',
   e.log.set[0][0] === 'lane|wireless|a%2Fb');
 t('but the key field keeps the real value', e.log.set[0][1].key === 'lane|wireless|a/b');
@@ -95,11 +107,12 @@ t('but the key field keeps the real value', e.log.set[0][1].key === 'lane|wirele
 // --- it must never break a save that works ---------------------------------
 e = makeEnv(true);
 let threw = false;
-try { e.run(CH); } catch (x) { threw = true; }
+try { await e.run(CH); } catch (x) { threw = true; }
 t('a failed unit write does not throw into the save path', !threw);
 
 e = makeEnv(false);
-t('a null change log is ignored rather than crashing', (() => { try { e.run(null); return true; } catch { return false; } })());
+t('a null change log is ignored rather than crashing',
+  await (async () => { try { await e.run(null); return true; } catch { return false; } })());
 t('and writes nothing', e.log.set.length === 0);
 
 // --- the existing save is untouched ----------------------------------------
@@ -114,6 +127,38 @@ t('the units collection is mentioned exactly once in the app', unitMentions === 
 t('and that one mention is the write, so nothing consumes units yet',
   /var col = firebase\.firestore\(\)[\s\S]{0,0}/.test(src) === false
   && /\.collection\('units'\);/.test(src));
+
+
+// --- units orphaned by an earlier session -----------------------------------
+// The delete pass used to trust an in-memory key list, which does not survive a
+// reload. Found in production 2026-09-02: an editor's post was discarded, she
+// reloaded, and the unit for it stayed behind because the tracking had reset.
+// The whole point of a unit is that it outlives the session, so the first write
+// of a session now reconciles against what is really stored.
+e = makeEnv(false, ['event|2026-09-02|orphan', 'sched|2026-09-10']);
+await e.run([CH[0]]);   // only sched|2026-09-10 is still a real change
+t('an orphan from a previous session is found and deleted',
+  e.log.delete.includes('event|2026-09-02|orphan'));
+t('a unit that is still a real change is left alone',
+  !e.log.delete.includes('sched|2026-09-10'));
+t('the session now knows its keys', e.fb.unitKeysKnown === true);
+t('and tracks only what is currently changed', e.fb.lastUnitKeys.length === 1);
+
+// The reconcile is once per session, not once per save.
+const before = e.log.delete.length;
+await e.run([CH[0], CH[1]]);
+t('a later write does not re-read the collection', e.log.delete.length === before);
+
+// --- when the reconcile itself fails ----------------------------------------
+// The writes it was guarding still matter, and the session must not claim to
+// know keys it never read, or the next save would delete from a guess.
+e = makeEnv(false, ['event|2026-09-02|orphan'], true);
+await e.run(CH);
+t('a failed reconcile still commits the unit writes', e.log.committed === 1);
+t('and says so rather than failing silently',
+  e.log.warned.some((w) => /unit reconcile skipped/.test(w)));
+t('and does not mark the keys as known, so it retries next time',
+  !e.fb.unitKeysKnown);
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

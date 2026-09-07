@@ -355,7 +355,7 @@ function syncImageControls(id, cur) {
   const frozen = !!cur && cur !== 'drafting';
   rm.disabled = frozen;
   rm.title = frozen
-    ? 'Frozen. Once a post leaves drafting its visual cannot be removed, so an approval always covers the image it was given with.'
+    ? 'Frozen. Once a post leaves drafting its visual cannot be removed. Uploading a replacement is still possible, so this is not a guarantee that the image never changed.'
     : 'Removes the visual and deletes the file. Only works while the post is drafting.';
 }
 
@@ -428,6 +428,19 @@ function showImage(id, url) {
    nothing can change underneath an approval. If the delete is refused the field
    still clears, because the editor asked to stop using that image and that part
    is always theirs; the message says the file was kept and why. */
+/* The post id lives in the storage path, promo-images/<personId>_<weekOf>/<file>,
+   and that is the id the storage rule reads when it decides the delete. Rebuilding
+   it from the week field on screen looked equivalent and is not: an editor who
+   rolls the week forward after attaching an image would have a different document
+   read back, and be told to press Save when saving would not help. Download URLs
+   percent-encode the slashes, so decode before matching. */
+function postIdFromUrl(url) {
+  try {
+    const m = decodeURIComponent(String(url)).match(/promo-images\/([^/?]+)\//);
+    return m ? m[1] : '';
+  } catch (e) { return ''; }
+}
+
 function clearImage(id) {
   const url = el('img-' + id).value;
   el('img-' + id).value = '';
@@ -447,12 +460,12 @@ function clearImage(id) {
          The old text blamed the freeze every time, which sent people looking for
          an approval that had never happened when the real cause was a post that
          had not been saved yet. */
-      const week = (el('week-' + id).value || '').trim();
-      if (!week || !db) {
-        stat.textContent = 'Removed from the post. The file was kept: no week is set, so there is no post for it to belong to.';
+      const postId = postIdFromUrl(url);
+      if (!postId || !db) {
+        stat.textContent = 'Removed from the post. The file was kept, and its post could not be identified from the file itself.';
         return;
       }
-      db.collection('promo_posts').doc(id + '_' + week).get()
+      db.collection('promo_posts').doc(postId).get()
         .then(doc => {
           if (!doc.exists) {
             stat.textContent = 'Removed from the post. The file was kept because this post has not been saved yet. Press Save, then Remove again.';

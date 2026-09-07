@@ -166,6 +166,24 @@ t('it is wired into the one place that knows the current state',
 
 // The refusal message has to name the cause. Blaming the freeze every time sent
 // people hunting for an approval that had never happened.
+// The post id comes from the file being deleted, never from the week field on
+// screen. An editor who rolls the week forward after attaching an image would
+// otherwise have a different document read back, and be told to press Save when
+// saving would not help.
+// savePost legitimately builds the id from the fields on screen; that is where the
+// post is being created. Only the diagnostic must read it from the file instead.
+const CLEAR = (PAGE.match(/function clearImage[\s\S]*?\n}/) || [''])[0];
+t('the diagnostic identifies the post from the file, not from the week field',
+  /function postIdFromUrl/.test(PAGE)
+  && /doc\(postId\)/.test(CLEAR)
+  && !/week/.test(CLEAR));
+
+// storage.rules freezes DELETION past drafting. It puts no status condition on
+// write, and firestore.rules gives the owner an unconditional update, so a visual
+// CAN still be replaced after approval. The tooltip must not promise otherwise.
+t('the frozen tooltip does not claim an approval covers the image forever',
+  !/approval always covers the image/.test(PAGE));
+
 t('a refusal distinguishes an unsaved post from a frozen one',
   /has not been saved yet/.test(PAGE) && /has left drafting and its visual is frozen/.test(PAGE));
 t('and says plainly when a drafting post was refused, which means a broken config',

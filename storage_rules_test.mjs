@@ -170,4 +170,16 @@ if (out.error) {
 (out.testResults || []).forEach((r, i) => t(cases[i][0], r.state === 'SUCCESS'));
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
+
+/* Printed, not left as a comment at the top of the file. On 2026-09-07 this suite
+   reported 27 of 27 while the rule refused every delete in production, and a note
+   nobody sees is a note that does not work. */
+if (!fail) {
+  console.log('');
+  console.log('CAVEAT  The delete cases above mock the Firestore read, so they prove the rule is');
+  console.log('        WRITTEN correctly and say nothing about whether it RUNS. Cross-service rules');
+  console.log('        need roles/firebaserules.firestoreServiceAgent on the storage service agent.');
+  console.log('        Check production: upload to a throwaway path, then expect REFUSED with no');
+  console.log('        post document, ALLOWED with it drafting, REFUSED once past drafting.');
+}
 process.exit(fail ? 1 : 0);

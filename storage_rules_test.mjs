@@ -114,7 +114,22 @@ const cases = [
 
 /* The delete rule reads promo_posts via firestore.get(), which the test API does
    not resolve against real data, so each case mocks the status it is testing. A
-   status of null mocks the document as missing. */
+   status of null mocks the document as missing.
+
+   READ THIS BEFORE TRUSTING A GREEN RUN. Mocking the Firestore read is exactly
+   what this suite cannot check, and on 2026-09-07 every case below passed while
+   the rule refused every single delete in production. Cross-service rules, which
+   is what a Storage rule reading Firestore is, only run once the Firebase Storage
+   service agent holds roles/firebaserules.firestoreServiceAgent. Firebase grants
+   it when you are prompted on your first such deploy; ours went out through the
+   CLI non-interactively, so nothing granted it, the read failed, and the whole
+   condition evaluated false.
+
+   So a green run here means the rule is WRITTEN correctly. It does not mean the
+   rule RUNS. The only check for that is deleting a real file on the real bucket,
+   which is how the fault was eventually found: upload to a throwaway path, then
+   confirm REFUSED with no post document, ALLOWED with the post drafting, and
+   REFUSED once it has left drafting. */
 const POSTDOC = '/databases/(default)/documents/promo_posts/stoica_2026-09-08';
 const testCases = cases.map(([, expectation, a, path, method, data, status]) => ({
   expectation,

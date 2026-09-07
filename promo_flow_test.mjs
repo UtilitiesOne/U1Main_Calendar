@@ -150,5 +150,26 @@ if (out.error) {
 (out.issues || []).forEach((i) => console.log('RULES ISSUE  ' + i.description));
 (out.testResults || []).forEach((r, i) => t(cases[i][0], r.state === 'SUCCESS'));
 
+
+// The page must not offer a Remove button that the storage rule will refuse.
+// storage.rules allows a delete only while a post is drafting and makes no owner
+// exception, so once a post leaves drafting nobody can remove its visual. An
+// enabled button that always fails is worse than no button.
+//
+// This is a MATCH, never the enforcement. The rule holds; this only keeps the UI
+// honest about what the rule will do. The same suite above proves the server side.
+const PAGE = readFileSync(join(here, 'u1_promotion_programme.html'), 'utf8');
+t('the page turns Remove off once a post leaves drafting',
+  /function syncImageControls[\s\S]{0,600}?cur !== 'drafting'[\s\S]{0,200}?rm\.disabled = frozen/.test(PAGE));
+t('it is wired into the one place that knows the current state',
+  /syncImageControls\(id, sel\.value\)/.test(PAGE));
+
+// The refusal message has to name the cause. Blaming the freeze every time sent
+// people hunting for an approval that had never happened.
+t('a refusal distinguishes an unsaved post from a frozen one',
+  /has not been saved yet/.test(PAGE) && /has left drafting and its visual is frozen/.test(PAGE));
+t('and says plainly when a drafting post was refused, which means a broken config',
+  /configuration problem rather than anything you did/.test(PAGE));
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

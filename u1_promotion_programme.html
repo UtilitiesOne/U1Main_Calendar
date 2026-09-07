@@ -324,6 +324,8 @@ function fillStates(id, current) {
     .join('');
   sel.value = allowed.indexOf(cur) !== -1 ? cur : allowed[0];
 
+  syncImageControls(id, sel.value);
+
   const hint = el('statehint-' + id);
   if (!hint) return;
   if (isOwner) {
@@ -335,6 +337,26 @@ function fillStates(id, current) {
   } else {
     hint.textContent = 'This has left drafting, so it is Alex’s from here and the text is locked. Ask him to send it back if it needs changing.';
   }
+}
+
+/* The Remove button follows the storage rule rather than guessing.
+
+   storage.rules allows a delete only while the post is drafting, and it makes no
+   exception for the owner, so once a post has left drafting nobody can remove its
+   visual. An enabled button that always fails is worse than no button, so this
+   turns it off at exactly the moment the rule does.
+
+   This is a match, never the enforcement itself. The calendar established in
+   August that a client-side gate is decoration: an editor's own submission never
+   met it and devtools walked straight around it. The rule is what holds. */
+function syncImageControls(id, cur) {
+  const rm = el('imgclear-' + id);
+  if (!rm) return;
+  const frozen = !!cur && cur !== 'drafting';
+  rm.disabled = frozen;
+  rm.title = frozen
+    ? 'Frozen. Once a post leaves drafting its visual cannot be removed, so an approval always covers the image it was given with.'
+    : 'Removes the visual and deletes the file. Only works while the post is drafting.';
 }
 
 function refreshStates() {
@@ -416,9 +438,31 @@ function clearImage(id) {
   firebase.storage().refFromURL(url).delete()
     .then(() => { stat.textContent = 'Visual removed and the file deleted. Save to apply.'; })
     .catch(e => {
-      stat.textContent = e.code === 'storage/unauthorized'
-        ? 'Removed from the post. The file was kept, because this post has left drafting and its visual is frozen.'
-        : 'Removed from the post. The file could not be deleted (' + (e.code || e.message) + ').';
+      if (e.code !== 'storage/unauthorized') {
+        stat.textContent = 'Removed from the post. The file could not be deleted (' + (e.code || e.message) + ').';
+        return;
+      }
+      /* A refusal has three different causes and they need three different
+         answers, so read the post the storage rule reads instead of guessing.
+         The old text blamed the freeze every time, which sent people looking for
+         an approval that had never happened when the real cause was a post that
+         had not been saved yet. */
+      const week = (el('week-' + id).value || '').trim();
+      if (!week || !db) {
+        stat.textContent = 'Removed from the post. The file was kept: no week is set, so there is no post for it to belong to.';
+        return;
+      }
+      db.collection('promo_posts').doc(id + '_' + week).get()
+        .then(doc => {
+          if (!doc.exists) {
+            stat.textContent = 'Removed from the post. The file was kept because this post has not been saved yet. Press Save, then Remove again.';
+          } else if ((doc.data().status || 'drafting') !== 'drafting') {
+            stat.textContent = 'Removed from the post. The file was kept because this post has left drafting and its visual is frozen.';
+          } else {
+            stat.textContent = 'Removed from the post. The file was kept and it should not have been, because this post is still drafting. That is a configuration problem rather than anything you did. Flag it to Alex.';
+          }
+        })
+        .catch(() => { stat.textContent = 'Removed from the post. The file was kept and the reason could not be read.'; });
     });
 }
 

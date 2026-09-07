@@ -199,15 +199,38 @@ const PEOPLE = [
 /* The status flow is the consent model made visible. A post cannot skip from
    drafted to posted without passing through his hands, because that is the
    whole promise the programme makes. */
+/* The approval flow. The team drafts, Alex approves it for sending, it goes to
+   Denis, Denis coordinates with his people and comes back with one verdict, then
+   we post.
+
+   Denis Mezheretskov is Senior Director of Construction Field Services and the
+   roster reports through him, so his verdict covers them and the coordination
+   behind it is his. He never touches this app: his answer reaches Alex by
+   message and Alex enters it. The labels say "Alex recorded" rather than "Denis
+   approved" for that reason. Anyone reading this later should be able to tell
+   who actually pressed the button.
+
+   The same states are enforced in firestore.rules. What follows only decides
+   what to OFFER; the server decides what is allowed. The calendar learned in
+   August that a client-side gate on its own is decoration. */
 const STATES = [
-  { v: 'drafted',  label: 'Drafted, not sent',  cls: '' },
-  { v: 'with_him', label: 'With him',           cls: 'wait' },
-  { v: 'approved', label: 'He approved it',     cls: 'on' },
-  { v: 'posted',   label: 'Posted',             cls: 'on' },
-  { v: 'declined', label: 'He said no',         cls: 'hold' }
+  { v: 'drafting',   label: 'Drafting',                     cls: '' },
+  { v: 'with_alex',  label: 'Sent to Alex',                 cls: 'wait' },
+  { v: 'with_denis', label: 'With Denis',                   cls: 'wait' },
+  { v: 'posted',     label: 'Posted',                       cls: 'on' },
+  { v: 'declined',   label: 'Denis said no',                cls: 'hold' }
 ];
 
-let db = null, user = null, isEditor = false;
+/* Which moves this person may make from where they are. Editors hand work up and
+   nothing more. Everything past that is the owner's, because he is the one who
+   speaks to Denis and records what came back. */
+function allowedNext(from, owner) {
+  if (owner) return STATES.map(s => s.v);
+  if (from === 'drafting' || !from) return ['drafting', 'with_alex'];
+  return [from];
+}
+
+let db = null, user = null, isEditor = false, isOwner = false;
 const el = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -243,9 +266,8 @@ function render() {
             <div class="row">
               <div class="col">
                 <label>Where it stands</label>
-                <select id="state-${p.id}">
-                  ${STATES.map(s => `<option value="${s.v}">${s.label}</option>`).join('')}
-                </select>
+                <select id="state-${p.id}"></select>
+                <div class="hint" id="statehint-${p.id}"></div>
               </div>
               <div class="col">
                 <label>Week of</label>
@@ -282,6 +304,41 @@ function render() {
 function togglePerson(id) {
   const b = el('body-' + id);
   if (b) b.classList.toggle('open');
+}
+
+/* Build one person's status dropdown from where the post currently is and who is
+   looking at it. An editor sees only the moves they can actually make, so the
+   page never offers an action the server will refuse.
+
+   The offering is a courtesy. firestore.rules is what enforces this, and the
+   hint below says so plainly, because an editor who sees a short list should
+   know why rather than assume the page is broken. */
+function fillStates(id, current) {
+  const sel = el('state-' + id);
+  if (!sel) return;
+  const cur = current || sel.value || 'drafting';
+  const allowed = allowedNext(cur, isOwner);
+  sel.innerHTML = STATES
+    .filter(s => allowed.indexOf(s.v) !== -1)
+    .map(s => '<option value="' + s.v + '">' + s.label + '</option>')
+    .join('');
+  sel.value = allowed.indexOf(cur) !== -1 ? cur : allowed[0];
+
+  const hint = el('statehint-' + id);
+  if (!hint) return;
+  if (isOwner) {
+    hint.textContent = cur === 'with_denis'
+      ? 'Denis answers to you and you enter it here. The record will say you recorded his verdict, not that he used this page.'
+      : 'You can move this anywhere, including back to drafting.';
+  } else if (cur === 'drafting') {
+    hint.textContent = 'You can keep working on it or send it to Alex. He takes it to Denis from there.';
+  } else {
+    hint.textContent = 'This has left drafting, so it is Alex’s from here and the text is locked. Ask him to send it back if it needs changing.';
+  }
+}
+
+function refreshStates() {
+  PEOPLE.forEach(p => fillStates(p.id, (el('state-' + p.id) || {}).value));
 }
 
 /* Image upload, following the calendar's proven pattern but writing to
@@ -365,7 +422,9 @@ function loadPosts() {
       if (i && !i.value) { i.value = x.visual || ''; if (x.visual) showImage(p.id, x.visual); }
       const w = el('week-' + p.id);  if (w && !w.value) w.value = x.weekOf || '';
       const n = el('note-' + p.id);  if (n && !n.value) n.value = x.notes || '';
-      const st = el('state-' + p.id); if (st) st.value = x.status || 'drafted';
+      const cur = x.status || 'drafting';
+      fillStates(p.id, cur);
+      const st = el('state-' + p.id); if (st) st.value = cur;
     });
   }, e => setStatus('Could not read posts: ' + e.message));
 }
@@ -393,12 +452,14 @@ function savePost(id) {
    one list to maintain. The owner is hardcoded in the rules and cannot be locked
    out by a broken list. */
 function resolveRole(u) {
-  if (!u) { isEditor = false; setStatus('Signed out.'); return; }
-  if (u.email === OWNER) { isEditor = true; setStatus('Signed in as owner.'); loadPosts(); return; }
+  if (!u) { isEditor = false; isOwner = false; refreshStates(); setStatus('Signed out.'); return; }
+  if (u.email === OWNER) { isEditor = true; isOwner = true; setStatus('Signed in as owner. You are the only one who can move a post past Alex.'); refreshStates(); loadPosts(); return; }
   db.collection('config').doc('roles').get()
     .then(doc => {
       const list = (doc.exists && doc.data() && doc.data().editors) || [];
       isEditor = list.indexOf(u.email) !== -1;
+      isOwner = false;
+      refreshStates();
       setStatus(isEditor
         ? 'Signed in as ' + u.email
         : 'Signed in as ' + u.email + ', but you are not on the editor list. Tell Alex.');
@@ -409,6 +470,7 @@ function resolveRole(u) {
 
 render();
 wireUploads();
+refreshStates();
 firebase.initializeApp(firebaseConfig);
 db = firebase.firestore();
 el('signin').onclick = () =>

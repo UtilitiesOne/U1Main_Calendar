@@ -114,6 +114,15 @@ jobs:
           done
           echo "all six pages carry noindex"
 
+      # The approval flow: team drafts, Alex approves for sending, Denis
+      # coordinates and returns one verdict, then we post. The cases that must
+      # FAIL are the point: an editor approving their own draft, editing a body
+      # after Alex approved it, or jumping straight to posted. Each is a route to
+      # a man's personal profile carrying an approval that does not belong to the
+      # words in the post.
+      - name: Promotion programme approval flow
+        run: node promo_flow_test.mjs
+
       # Storage rules were console-only until 2026-09-07, so nothing reviewed or
       # tested them, and the only copy lived in a web UI. The calendar depends on
       # the post-images block for every image it shows, so the suite asserts that

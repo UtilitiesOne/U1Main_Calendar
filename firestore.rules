@@ -283,10 +283,50 @@ service cloud.firestore {
       allow write: if isOwnerEmail();
     }
 
+    // The approval flow, enforced here rather than only in the page.
+    //
+    // The team drafts, Alex approves it for sending, it goes to Denis, Denis
+    // coordinates with his people and comes back with one verdict, then we post.
+    // Denis Mezheretskov is Senior Director of Construction Field Services and
+    // the men in the roster report through him, so his verdict covers the
+    // roster and the coordination behind it is his.
+    //
+    // Putting this in the UI alone would make it decoration. The calendar
+    // learned that in August: the gate lived client-side and an editor's own
+    // submission never met it, so the server rule is what actually holds.
+    //
+    // Four states plus a terminal branch:
+    //   drafting    the team is writing it. Editors may edit freely here.
+    //   with_alex   sent up for approval. Only Alex moves it on.
+    //   with_denis  sent to Denis. Only Alex records what came back.
+    //   posted      it went up.
+    //   declined    Denis said no, from either stage. No reason required.
+    function promoState(d) {
+      return ('status' in d) ? d.status : 'drafting';
+    }
+    function promoEditableStates() {
+      return ['drafting'];
+    }
+
     match /promo_posts/{postId} {
-      allow read:   if isApprovedEditor();
-      allow create: if isApprovedEditor();
-      allow update: if isApprovedEditor();
+      allow read: if isApprovedEditor();
+
+      // A new post always starts in drafting. Nobody creates one already approved.
+      allow create: if isApprovedEditor()
+                    && promoState(request.resource.data) == 'drafting';
+
+      allow update: if isOwnerEmail()
+                    || (
+                         isApprovedEditor()
+                         // An editor works only while it is still theirs to work on.
+                         // Once Alex has it, or Denis has it, the body is frozen so
+                         // an approval cannot be quietly attached to different words.
+                         && promoState(resource.data) in promoEditableStates()
+                         // An editor may hand it up, and nothing further. They cannot
+                         // approve their own draft, send it to Denis, or mark it posted.
+                         && promoState(request.resource.data) in ['drafting', 'with_alex']
+                       );
+
       allow delete: if isOwnerEmail();
     }
   }

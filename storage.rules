@@ -1,0 +1,38 @@
+rules_version = '2';
+
+// Brought into the repo 2026-09-07. These rules were console-only until now, so
+// nothing reviewed them, nothing tested them, and the only copy lived in a web UI.
+//
+// The post-images block below is reproduced from the live ruleset
+// 346cd647-8175-431f-8076-0623bbfc818a (created 2026-06-23), character for
+// character including its comment and spacing. Deploying this file must not
+// change the calendar's uploads at all. If that block ever needs editing, diff it
+// against that ruleset first.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /post-images/{allPaths=**} {
+      allow read: if true;                                   // public calendar => public images
+      allow write: if request.auth != null
+                   && request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    // U1 LinkedIn Promotion Programme visuals.
+    //
+    // Read requires auth here, unlike post-images, and that difference is the
+    // whole reason this path exists. These are visuals prepared for a named
+    // person's personal post before he has seen it. The Firestore side already
+    // restricts that draft copy to signed-in editors, so leaving the matching
+    // image world-readable would undo the decision by the back door.
+    //
+    // The image becomes public the moment he posts it, which is the point of the
+    // programme. Until then it is a draft addressed to one man.
+    match /promo-images/{allPaths=**} {
+      allow read:  if request.auth != null;
+      allow write: if request.auth != null
+                   && request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

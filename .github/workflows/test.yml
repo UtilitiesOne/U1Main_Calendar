@@ -114,6 +114,14 @@ jobs:
           done
           echo "all six pages carry noindex"
 
+      # Storage rules were console-only until 2026-09-07, so nothing reviewed or
+      # tested them, and the only copy lived in a web UI. The calendar depends on
+      # the post-images block for every image it shows, so the suite asserts that
+      # block is intact as well as covering the new one. The structural tier runs
+      # here without credentials; the behavioural tier needs a login and skips.
+      - name: Storage rules
+        run: node storage_rules_test.mjs
+
       # The promotion programme publishes to people's PERSONAL profiles, so the
       # U1 brand gate must never govern it. Six of the gate's rules would fire
       # wrongly there, demanding the U1 signature and U1 hashtags on a man's own

@@ -143,6 +143,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 
 <script>
 /* Same Firebase project and the same editor allowlist as the calendar, so there
@@ -231,7 +232,13 @@ function render() {
               rules; on his page they are his.</div>
 
             <label>Visual</label>
-            <input type="text" id="img-${p.id}" placeholder="Link to the image prepared for this post" />
+            <div id="imgwrap-${p.id}"></div>
+            <input type="file" id="imgfile-${p.id}" accept="image/*" />
+            <button type="button" id="imgclear-${p.id}" onclick="clearImage('${p.id}')">Remove</button>
+            <div class="hint" id="imgstat-${p.id}">PNG or JPG up to 10MB. Uploads to promo-images,
+              which only signed-in editors can read, so a draft visual is not public before he
+              has seen it.</div>
+            <input type="hidden" id="img-${p.id}" />
 
             <div class="row">
               <div class="col">
@@ -277,6 +284,62 @@ function togglePerson(id) {
   if (b) b.classList.toggle('open');
 }
 
+/* Image upload, following the calendar's proven pattern but writing to
+   promo-images rather than post-images.
+
+   The path matters. post-images is world-readable, because the calendar itself
+   is public to read. These visuals are prepared for a named person's post before
+   he has seen it, and the Firestore side already restricts that draft copy to
+   signed-in editors, so putting the image at a public URL would undo the
+   decision by the back door. promo-images requires auth to read.
+
+   Every failure says what happened. An upload that fails silently leaves the
+   editor believing a visual is attached when none is, which they only discover
+   when the post goes out without it. */
+function wireUploads() {
+  PEOPLE.forEach(p => {
+    const f = el('imgfile-' + p.id);
+    if (!f || f.dataset.wired) return;
+    f.dataset.wired = '1';
+    f.addEventListener('change', () => {
+      const file = f.files && f.files[0];
+      if (!file) return;
+      const stat = el('imgstat-' + p.id);
+      if (!user || !isEditor) { stat.textContent = 'Sign in as an editor before uploading.'; return; }
+      if (file.size > 10 * 1024 * 1024) {
+        stat.textContent = 'That file is ' + (file.size / 1048576).toFixed(1) + 'MB, over the 10MB limit.';
+        return;
+      }
+      stat.textContent = 'Uploading ' + file.name + '...';
+      const safe = file.name.replace(/[^A-Za-z0-9._-]/g, '_');
+      const path = 'promo-images/' + p.id + '/' + Date.now() + '_' + safe;
+      firebase.storage().ref().child(path).put(file)
+        .then(snap => snap.ref.getDownloadURL())
+        .then(url => {
+          el('img-' + p.id).value = url;
+          showImage(p.id, url);
+          stat.textContent = 'Uploaded. Save to attach it to this post.';
+        })
+        .catch(e => { stat.textContent = 'Upload failed: ' + e.message; });
+    });
+  });
+}
+
+function showImage(id, url) {
+  const w = el('imgwrap-' + id);
+  if (!w) return;
+  w.innerHTML = url
+    ? '<img src="' + esc(url) + '" alt="" style="max-width:240px;border:1px solid var(--rule);'
+      + 'border-radius:4px;display:block;margin-bottom:8px;" />'
+    : '';
+}
+
+function clearImage(id) {
+  el('img-' + id).value = '';
+  showImage(id, '');
+  el('imgstat-' + id).textContent = 'Visual removed. Save to apply.';
+}
+
 function chipFor(state) {
   return STATES.find(s => s.v === state) || { label: state, cls: '' };
 }
@@ -298,7 +361,8 @@ function loadPosts() {
       const s = chipFor(x.status);
       if (chip) { chip.textContent = s.label; chip.className = 'chip ' + s.cls; }
       const t = el('text-' + p.id);  if (t && !t.value) t.value = x.body || '';
-      const i = el('img-' + p.id);   if (i && !i.value) i.value = x.visual || '';
+      const i = el('img-' + p.id);
+      if (i && !i.value) { i.value = x.visual || ''; if (x.visual) showImage(p.id, x.visual); }
       const w = el('week-' + p.id);  if (w && !w.value) w.value = x.weekOf || '';
       const n = el('note-' + p.id);  if (n && !n.value) n.value = x.notes || '';
       const st = el('state-' + p.id); if (st) st.value = x.status || 'drafted';
@@ -344,6 +408,7 @@ function resolveRole(u) {
 }
 
 render();
+wireUploads();
 firebase.initializeApp(firebaseConfig);
 db = firebase.firestore();
 el('signin').onclick = () =>

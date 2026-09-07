@@ -109,7 +109,21 @@ jobs:
         run: |
           for f in u1_calendar_interactive.html u1_utility_guidance.html \
                    u1_voice_conservative_one.html u1_voice_flamboyant_one.html \
-                   u1_voice_marketing_one.html; do
+                   u1_voice_marketing_one.html u1_promotion_programme.html; do
             grep -q 'name="robots"' "$f" || { echo "$f lost its noindex"; exit 1; }
           done
-          echo "all five pages carry noindex"
+          echo "all six pages carry noindex"
+
+      # The promotion programme publishes to people's PERSONAL profiles, so the
+      # U1 brand gate must never govern it. Six of the gate's rules would fire
+      # wrongly there, demanding the U1 signature and U1 hashtags on a man's own
+      # page. A future edit that pulls the gate in would look harmless in review.
+      - name: The promotion programme stays gate-free
+        run: |
+          if grep -q '<script[^>]*src="u1_gate' u1_promotion_programme.html; then
+            echo "u1_promotion_programme.html now loads the brand gate; it must not"; exit 1
+          fi
+          if grep -qE 'U1Gate\.|checkPost\(|evaluateState\(' u1_promotion_programme.html; then
+            echo "u1_promotion_programme.html now calls the brand gate; it must not"; exit 1
+          fi
+          echo "promotion programme neither loads nor calls the brand gate"

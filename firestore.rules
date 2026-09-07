@@ -261,5 +261,33 @@ service cloud.firestore {
                             && request.resource.data.ts is timestamp;
       allow delete: if false;
     }
+
+    // ---- U1 LinkedIn Promotion Programme (2026-09-07) ----
+    //
+    // A deliberately separate surface. These posts publish to named individuals'
+    // PERSONAL LinkedIn profiles, not to U1 pages, so the brand gate does not
+    // apply to them and the programme page never loads u1_gate.js.
+    //
+    // The locked ruling behind that, from project-u1-foremen-linkedin-program:
+    // "These are personal pages, so the U1 Main voice recipe, the B2B end-user
+    // prohibition and the brand-line rules do NOT apply wholesale." Applying the
+    // U1 gate here would demand the U1 signature and U1 hashtags on a man's own
+    // page, and would flag one editor's own habitual phrasing as an AI-tell.
+    //
+    // Read is closed, unlike the calendar. The calendar is open to read by
+    // decision because leadership needs it without signing in; this holds draft
+    // copy written for named people before they have seen it, which is nobody
+    // else's business.
+    match /promo_people/{personId} {
+      allow read:  if isApprovedEditor();
+      allow write: if isOwnerEmail();
+    }
+
+    match /promo_posts/{postId} {
+      allow read:   if isApprovedEditor();
+      allow create: if isApprovedEditor();
+      allow update: if isApprovedEditor();
+      allow delete: if isOwnerEmail();
+    }
   }
 }

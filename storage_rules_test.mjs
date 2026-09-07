@@ -44,13 +44,22 @@ const t = (n, c) => { c ? (pass++, console.log('PASS  ' + n)) : (fail++, console
 t('structural: the calendar path still exists', /match \/post-images\/\{allPaths=\*\*\}/.test(SRC));
 t('structural: the calendar path is still world-readable, which it must be',
   /match \/post-images[\s\S]{0,120}?allow read: if true/.test(SRC));
-t('structural: the programme path exists', /match \/promo-images\/\{allPaths=\*\*\}/.test(SRC));
+// The path carries the post id, personId_weekOf, because the delete rule has to
+// find that exact post to read its status.
+t('structural: the programme path exists and is keyed by post',
+  /match \/promo-images\/\{postId\}\/\{file\}/.test(SRC));
 t('structural: the programme path is NOT world-readable',
   !/match \/promo-images[\s\S]{0,140}?allow read:\s*if true/.test(SRC));
 t('structural: both paths keep the 10MB ceiling',
   (SRC.match(/request\.resource\.size < 10 \* 1024 \* 1024/g) || []).length === 2);
 t('structural: both paths keep the image-only content type',
   (SRC.match(/contentType\.matches\('image\/\.\*'\)/g) || []).length === 2);
+t('structural: programme images are deletable while drafting',
+  /allow delete:[\s\S]{0,320}?status == 'drafting'/.test(SRC));
+t('structural: the delete rule requires the post to exist',
+  /firestore\.exists\(\/databases\/\(default\)\/documents\/promo_posts/.test(SRC));
+t('structural: the calendar path has no delete rule, so nothing there changed',
+  !/match \/post-images[\s\S]{0,400}?allow delete/.test(SRC));
 
 const TOKEN = token();
 if (!TOKEN) {
@@ -82,16 +91,46 @@ const cases = [
   ['non-images are refused there too', 'DENY', auth, O + '/promo-images/u1/x.pdf', 'create', pdf],
 
   // Nothing else is writable, which is how it was before.
-  ['an unlisted path is still closed', 'DENY', auth, O + '/anything-else/x.png', 'create', img]
+  ['an unlisted path is still closed', 'DENY', auth, O + '/anything-else/x.png', 'create', img],
+
+  // The freeze. An image can be removed while the post is still being drafted,
+  // and not once Alex has approved it for sending, so the visual cannot change
+  // underneath an approval. Same moment the body freezes in firestore.rules.
+  ['a visual is deletable while the post is drafting', 'ALLOW', auth,
+   O + '/promo-images/stoica_2026-09-08/x.png', 'delete', null, 'drafting'],
+  ['it is frozen once Alex has it', 'DENY', auth,
+   O + '/promo-images/stoica_2026-09-08/x.png', 'delete', null, 'with_alex'],
+  ['frozen while Denis has it', 'DENY', auth,
+   O + '/promo-images/stoica_2026-09-08/x.png', 'delete', null, 'with_denis'],
+  ['frozen once posted', 'DENY', auth,
+   O + '/promo-images/stoica_2026-09-08/x.png', 'delete', null, 'posted'],
+  ['frozen on a declined post too, so the record survives', 'DENY', auth,
+   O + '/promo-images/stoica_2026-09-08/x.png', 'delete', null, 'declined'],
+  ['a signed-out visitor cannot delete even a draft visual', 'DENY', null,
+   O + '/promo-images/stoica_2026-09-08/x.png', 'delete', null, 'drafting'],
+  ['an image whose post is missing is refused, leaving a visible orphan', 'DENY', auth,
+   O + '/promo-images/stoica_2026-09-08/x.png', 'delete', null, null]
 ];
 
-const testCases = cases.map(([, expectation, a, path, method, data]) => ({
+/* The delete rule reads promo_posts via firestore.get(), which the test API does
+   not resolve against real data, so each case mocks the status it is testing. A
+   status of null mocks the document as missing. */
+const POSTDOC = '/databases/(default)/documents/promo_posts/stoica_2026-09-08';
+const testCases = cases.map(([, expectation, a, path, method, data, status]) => ({
   expectation,
   request: {
     ...(a ? { auth: a } : {}),
     path, method,
     ...(data ? { resource: data } : {})
-  }
+  },
+  ...(status !== undefined ? {
+    functionMocks: [
+      { function: 'firestore.exists', args: [{ exactValue: POSTDOC }],
+        result: { value: status !== null } },
+      { function: 'firestore.get', args: [{ exactValue: POSTDOC }],
+        result: status === null ? { undefined: {} } : { value: { data: { status } } } }
+    ]
+  } : {})
 }));
 
 const res = await fetch(`https://firebaserules.googleapis.com/v1/projects/${PROJECT}:test`, {

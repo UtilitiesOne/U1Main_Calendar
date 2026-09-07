@@ -367,9 +367,16 @@ function wireUploads() {
         stat.textContent = 'That file is ' + (file.size / 1048576).toFixed(1) + 'MB, over the 10MB limit.';
         return;
       }
+      // The week has to be set before uploading, because the path carries the
+      // post id and the storage rule reads that post to decide whether the image
+      // may later be deleted. Without it the image lands somewhere the rule
+      // cannot resolve, and it could never be removed.
+      const week = (el('week-' + p.id).value || '').trim();
+      if (!week) { stat.textContent = 'Set the week first. The visual is filed against a specific post.'; f.value = ''; return; }
+
       stat.textContent = 'Uploading ' + file.name + '...';
       const safe = file.name.replace(/[^A-Za-z0-9._-]/g, '_');
-      const path = 'promo-images/' + p.id + '/' + Date.now() + '_' + safe;
+      const path = 'promo-images/' + p.id + '_' + week + '/' + Date.now() + '_' + safe;
       firebase.storage().ref().child(path).put(file)
         .then(snap => snap.ref.getDownloadURL())
         .then(url => {
@@ -391,10 +398,28 @@ function showImage(id, url) {
     : '';
 }
 
+/* Remove clears the field AND deletes the file, so replacing a visual three
+   times does not leave three files in the bucket forever.
+
+   The storage rule allows that only while the post is still drafting. Once Alex
+   has approved it for sending, the visual is frozen the same way the body is, so
+   nothing can change underneath an approval. If the delete is refused the field
+   still clears, because the editor asked to stop using that image and that part
+   is always theirs; the message says the file was kept and why. */
 function clearImage(id) {
+  const url = el('img-' + id).value;
   el('img-' + id).value = '';
   showImage(id, '');
-  el('imgstat-' + id).textContent = 'Visual removed. Save to apply.';
+  const stat = el('imgstat-' + id);
+  if (!url) { stat.textContent = 'No visual attached.'; return; }
+  stat.textContent = 'Removed from the post. Deleting the file...';
+  firebase.storage().refFromURL(url).delete()
+    .then(() => { stat.textContent = 'Visual removed and the file deleted. Save to apply.'; })
+    .catch(e => {
+      stat.textContent = e.code === 'storage/unauthorized'
+        ? 'Removed from the post. The file was kept, because this post has left drafting and its visual is frozen.'
+        : 'Removed from the post. The file could not be deleted (' + (e.code || e.message) + ').';
+    });
 }
 
 function chipFor(state) {

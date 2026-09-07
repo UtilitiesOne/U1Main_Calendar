@@ -28,11 +28,31 @@ service firebase.storage {
     //
     // The image becomes public the moment he posts it, which is the point of the
     // programme. Until then it is a draft addressed to one man.
-    match /promo-images/{allPaths=**} {
+    // The path carries the post id, personId_weekOf, because the delete rule
+    // below has to find that exact post to read its status. Keying on the person
+    // alone would let an image from an approved post be deleted whenever a newer
+    // draft existed for the same man, which is the freeze this rule exists to
+    // provide.
+    match /promo-images/{postId}/{file} {
       allow read:  if request.auth != null;
       allow write: if request.auth != null
                    && request.resource.size < 10 * 1024 * 1024
                    && request.resource.contentType.matches('image/.*');
+
+      // Deletable while the post is still being drafted, frozen once it has left
+      // drafting. This mirrors the body, which firestore.rules already freezes at
+      // the same moment: once Alex has approved a post for sending, neither the
+      // words nor the visual can change underneath that approval.
+      //
+      // Storage rules can read Firestore, which I did not expect and checked
+      // before relying on. The cost is one document read per delete and a hard
+      // dependency: if the post document is missing, the delete is refused. That
+      // is deliberate. An image whose post cannot be found is not obviously safe
+      // to remove, and refusing leaves a visible orphan rather than silently
+      // destroying something.
+      allow delete: if request.auth != null
+                    && firestore.exists(/databases/(default)/documents/promo_posts/$(postId))
+                    && firestore.get(/databases/(default)/documents/promo_posts/$(postId)).data.status == 'drafting';
     }
   }
 }

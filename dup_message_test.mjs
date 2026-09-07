@@ -40,7 +40,11 @@ function build(state, live) {
     + '\nexports.findLaneDuplicate = findLaneDuplicate;'
     + '\nexports.laneDuplicateMessage = laneDuplicateMessage;')
     (state,
-     { __liveState: live },
+     // The app reaches the shared baseline through window.liveOrDefault(),
+     // which returns __liveState when a live document exists. Cases here pass
+     // the live state in directly; the missing-document fallback to
+     // DEFAULT_STATE has its own case in per_post_publish_test.mjs.
+     { __liveState: live, liveOrDefault: () => live },
      LANES,
      (id) => id === 'parent' ? { id: 'parent', name: 'U1 Main' } : LANES.find((l) => l.id === id),
      ex);

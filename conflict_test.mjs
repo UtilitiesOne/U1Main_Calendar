@@ -18,6 +18,11 @@ import { dirname, join } from 'path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const w = {};
+// The app reaches the shared baseline through window.liveOrDefault(), which
+// returns __liveState whenever a live document exists. Every case below sets
+// __liveState, so that is the branch under test here; the missing-document
+// fallback to DEFAULT_STATE has its own case in per_post_publish_test.mjs.
+w.liveOrDefault = function () { return w.__liveState; };
 new Function('window', readFileSync(join(here, 'u1_scope.js'), 'utf8'))(w);
 const { conflictsAgainstLive } = w.U1Scope;
 

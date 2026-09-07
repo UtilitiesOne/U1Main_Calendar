@@ -1579,6 +1579,32 @@ const DEFAULT_STATE = {
   lanes: emptyLanes(),
 };
 
+/* What "live" means before anything has ever been published.
+
+   window.__liveState is only ever assigned inside the calendar/live snapshot
+   handler, and only when that document exists. Before the first publish it is
+   undefined, and the publish path fell back to {} in several places. That is
+   wrong in a way that deletes the calendar: mergeOntoLive starting from {}
+   copies only the keys the editor actually changed, so every post they did not
+   touch is dropped, and diffAgainstLive against {} re-judges every existing post
+   as brand new, so the whole board goes back through the gate and whatever fails
+   is held.
+
+   Both happened on the E5 calendar on 2026-09-07, which runs this same code. Its
+   v1 published with no themes key at all, crashing the render at
+   state.themes[s.themeId], and the rotation went from 1/2/2/2/2 to 1/1/0/0/0
+   because seven untouched posts were re-gated and held. U1 has a live document
+   so it never hit this, but the page-load window before the first snapshot lands
+   is the same undefined state.
+
+   DEFAULT_STATE is the right answer because it is exactly what a visitor renders
+   while calendar/live is missing. Merging onto it is merging onto what people
+   are actually looking at. */
+function liveOrDefault() {
+  return window.__liveState ? window.__liveState : structuredClone(DEFAULT_STATE);
+}
+window.liveOrDefault = liveOrDefault;
+
 let state = loadState();
 
 function loadState() {
@@ -3540,7 +3566,7 @@ function findLaneDuplicate(laneId, postId, body) {
    this" and "this is already live" call for different actions, and the editor
    cannot tell them apart from the calendar alone. */
 function laneDuplicateMessage(dup) {
-  const live = window.__liveState || {};
+  const live = window.liveOrDefault();
   let what, why, published;
   if (dup.kind === 'event') {
     what = 'an event in your draft on ' + (dup.post.date || 'an unknown date');
@@ -3944,7 +3970,11 @@ function enterEditMode() {
     pushProposalNow();
   };
   var liveB = window.__liveVersion || 0;
-  var liveS = fbClone(window.__liveState || state);
+  // Falling back to the editor's own `state` here seeded their base from their
+  // localStorage draft, so their local edits were recorded as the shared
+  // baseline and a later merge saw them as unchanged. Base is what everyone
+  // sees, never what one person has open.
+  var liveS = fbClone(window.liveOrDefault());
   firebase.firestore().collection('proposals').doc(fb.user.uid).get().then(function (doc) {
     var d = doc.exists ? doc.data() : null;
     if (d && d.state) {
@@ -4366,7 +4396,7 @@ function renderProposalList() {
     var conflictWarning = function (d) {
       if (!window.U1Scope || !window.U1Scope.conflictsAgainstLive) return '';
       var cs;
-      try { cs = window.U1Scope.conflictsAgainstLive(window.__liveState, d.baseState, d.state); }
+      try { cs = window.U1Scope.conflictsAgainstLive(window.liveOrDefault(), d.baseState, d.state); }
       catch (e) { console.error('conflict check failed:', e && e.message); return ''; }
       if (!cs || !cs.length) return '';
       var detail = cs.map(function (c) {
@@ -4403,8 +4433,8 @@ function renderProposalList() {
       if (!window.U1Scope || !window.U1Scope.diffAgainstLive) return '';
       var dels;
       try {
-        var merged = mergeOntoLive(window.__liveState, d.baseState, d.state);
-        dels = window.U1Scope.diffAgainstLive(merged, window.__liveState)
+        var merged = mergeOntoLive(window.liveOrDefault(), d.baseState, d.state);
+        dels = window.U1Scope.diffAgainstLive(merged, window.liveOrDefault())
                  .filter(function (c) { return c.removed; });
       } catch (e) {
         console.error('deletion check failed:', e && e.message);
@@ -4428,7 +4458,7 @@ function renderProposalList() {
     };
 
     var pushIt = function (forced) {
-      var merged = mergeOntoLive(window.__liveState, d.baseState, d.state);
+      var merged = mergeOntoLive(window.liveOrDefault(), d.baseState, d.state);
       window.U1GateUI.publishPerPost(
         merged,
         'published from proposal by ' + who + (forced ? ' (author had not submitted it)' : ''),
@@ -4540,7 +4570,12 @@ function guardedPublish(stateObj, expectedVersion, source, proposalId, notifyMsg
     return newV;
   }).catch(function (e) {
     var msg = String((e && e.message) || e);
-    if (msg.indexOf('STALE:') === 0) { alert('Live already advanced to v' + msg.split(':')[1] + ' since this was drafted. Use "Rebase & publish" to apply it on top of the current live calendar.'); }
+    // The old wording here sent people looking for a "Rebase & publish" control.
+    // That is a label the SAME button wears when the panel knows live has moved,
+    // not a second button, so the instruction pointed at nothing on screen. What
+    // actually resolves this is pressing publish again: pushIt always re-merges
+    // the draft onto whatever __liveState holds at click time.
+    if (msg.indexOf('STALE:') === 0) { var sv = msg.split(':')[1]; alert('The live calendar moved to v' + sv + ' while this panel was open, so nothing was published. Press publish again and the draft will be merged onto v' + sv + '.'); }
     else { alert('Publish error: ' + msg); }
     throw e;
   });
@@ -4675,7 +4710,7 @@ initFirebaseSync();
 <script src="u1_baseline.js?v=4.2"></script>
 <script src="u1_gate.js?v=5.4"></script>
 <script src="u1_scope.js?v=5.1"></script>
-<script src="u1_review_ui.js?v=5.4"></script>
+<script src="u1_review_ui.js?v=5.5"></script>
 <script src="u1_review_panel.js?v=4.4"></script>
 
 </body>

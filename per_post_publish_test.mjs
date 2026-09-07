@@ -91,5 +91,62 @@ const abPublish = Scope.applySelectedChanges(live, abChanges, abPass);
 t('nothing is published when everything is held (state unchanged)',
   JSON.stringify(abPublish) === JSON.stringify(live));
 
+// The first-publish deadlock, found on the E5 calendar 2026-09-07 and present
+// here in identical form.
+//
+// guardedPublish compares the server's version to the caller's expected version
+// with a strict !==. window.__liveVersion is only ever assigned inside the
+// calendar/live snapshot handler, and only when that document exists. Before the
+// first publish, and in the window between page load and the first snapshot, it
+// is undefined, so 0 !== undefined and every publish throws STALE. The alert
+// then told the owner to use "Rebase & publish", a label the same button wears
+// rather than a control they can find, so the app asked for something that was
+// not on screen and publishing was impossible.
+//
+// Every read of the global in the HTML already wrote `|| 0`. The per-post
+// publish path added afterwards in u1_review_ui.js dropped it at both of its
+// call sites, which is the whole bug. This asserts the convention holds
+// everywhere, because the next person to add a call site will not know the story.
+const VERSION_FILES = ['u1_review_ui.js', 'u1_calendar_interactive.html'];
+for (const f of VERSION_FILES) {
+  const text = readFileSync(join(here, f), 'utf8');
+  // Reads only. An assignment (`window.__liveVersion = ...`) is how it gets set.
+  const reads = [...text.matchAll(/window\.__liveVersion(?!\s*=[^=])(.{0,12})/g)];
+  const bare = reads.filter((m) => !/^\s*\|\|\s*0/.test(m[1]));
+  t(f + ': every read of __liveVersion defends against undefined',
+    reads.length > 0 && bare.length === 0);
+  bare.forEach((m) => console.log('        bare read: window.__liveVersion' + m[1]));
+}
+
+// The alert must not send anyone hunting for a control that does not exist.
+t('the stale alert no longer names a button that is not on screen',
+  !/Use "Rebase & publish"/.test(readFileSync(join(here, 'u1_calendar_interactive.html'), 'utf8')));
+
+
+// The sibling defect, same root, found the moment the version fix let a publish
+// through (E5, 2026-09-07). window.__liveState is undefined for exactly the same
+// reason, and falling back to {} is not harmless: mergeOntoLive starting from {}
+// copies only the keys the editor changed, so untouched posts are dropped, and
+// diffAgainstLive against {} re-judges the whole board as new so the gate holds
+// whatever fails. E5's v1 published with no themes key and crashed the render.
+//
+// liveOrDefault() returns DEFAULT_STATE when nothing has been published, which is
+// exactly what a visitor renders while calendar/live is missing.
+for (const f of VERSION_FILES) {
+  const text = readFileSync(join(here, f), 'utf8');
+  const reads = [...text.matchAll(/window\.__liveState(?!\s*=[^=])(.{0,24})/g)];
+  // A bare existence test (`&& window.__liveState`) is fine; it guards, it does
+  // not substitute. A `|| {}` or a raw pass into a merge is the bug.
+  const bad = reads.filter((m) => /^\s*\|\|\s*(\{\}|state)/.test(m[1])
+                              || /^\s*,/.test(m[1]));
+  t(f + ': no read of __liveState falls back to an empty or personal state',
+    bad.length === 0);
+  bad.forEach((m) => console.log('        bad fallback: window.__liveState' + m[1]));
+}
+
+t('liveOrDefault exists and returns the shared default, not {}',
+  /function liveOrDefault\(\)\s*{[^}]*DEFAULT_STATE/.test(
+    readFileSync(join(here, 'u1_calendar_interactive.html'), 'utf8')));
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

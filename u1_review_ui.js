@@ -512,7 +512,9 @@
      drafted in the editor's own proposal, held for them to fix, never lost and
      never blocking anyone else's clean work. */
   function publishPerPost(candidateState, source, proposalId, proposerEmail, notifyOwner) {
-    var live = window.__liveState || {};
+    // {} here re-judged every existing post as new, sending the whole board
+    // back through the gate. See liveOrDefault in the HTML.
+    var live = window.liveOrDefault();
     var changes = window.U1Scope.diffAgainstLive(candidateState, live);
     var verdicts = evaluatePerChange(changes);
     var passKeys = {};
@@ -535,8 +537,8 @@
       // panel is never newer than the status it explains.
       writeHeldReview(proposalId, proposerEmail, held);
       return firebase.firestore().collection('proposals').doc(proposalId).set({
-        baseVersion: window.__liveVersion,
-        baseState: fbClone(window.__liveState),
+        baseVersion: window.__liveVersion || 0,
+        baseState: fbClone(window.liveOrDefault()),
         // The draft moves with its base. Writing a fresh baseState while
         // leaving the old draft in place made every post published in the
         // meantime look deleted: present in the new base, absent from the
@@ -561,7 +563,7 @@
          held.length + ' still need work, and are sitting in your draft, unchanged.')
       : (notifyOwner || 'Your proposal was approved and published as v{V}.');
 
-    return guardedPublish(toPublish, window.__liveVersion, source, proposalId, msg, true)
+    return guardedPublish(toPublish, window.__liveVersion || 0, source, proposalId, msg, true)
       .then(afterPublish);
   }
 

@@ -249,6 +249,13 @@ function render() {
       <div class="pbody" id="body-${p.id}">
         <div class="row">
           <div class="col">
+            <label>His About section</label>
+            <textarea id="about-${p.id}" placeholder="Two to three lines in his register. Sourced from his own posts and profile."></textarea>
+            <div class="hint">Written once, not weekly. It sits on his page permanently and
+              speaks in the first person, so it is more personal than any post. Same approval
+              path: you draft, Alex approves, Denis takes it to him. Drafts and sourcing are in
+              <code>02_about_drafts.md</code>.</div>
+
             <label>The post Marketing supplies</label>
             <textarea id="text-${p.id}" placeholder="Written in his voice, from ${esc(p.voice)}."></textarea>
             <div class="hint">His words, his punctuation. Keep habits that break our brand-copy
@@ -500,6 +507,8 @@ function loadPosts() {
       const s = chipFor(x.status);
       if (chip) { chip.textContent = s.label; chip.className = 'chip ' + s.cls; }
       const t = el('text-' + p.id);  if (t && !t.value) t.value = x.body || '';
+      const a = el('about-' + p.id);
+      if (a && !a.value) a.value = x.about || '';
       const i = el('img-' + p.id);
       if (i && !i.value) { i.value = x.visual || ''; if (x.visual) showImage(p.id, x.visual); }
       const w = el('week-' + p.id);  if (w && !w.value) w.value = x.weekOf || '';
@@ -519,6 +528,7 @@ function savePost(id) {
     personId: id,
     weekOf: week,
     body: el('text-' + id).value,
+    about: el('about-' + id).value,
     visual: el('img-' + id).value.trim(),
     status: el('state-' + id).value,
     notes: el('note-' + id).value,

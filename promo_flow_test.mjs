@@ -55,6 +55,22 @@ t('structural: an editor can only ever hand it up, never further',
 t('structural: an editor can only edit while it is still in drafting',
   /promoState\(resource\.data\) in promoEditableStates\(\)/.test(SRC));
 
+const PAGE = readFileSync(join(here, 'u1_promotion_programme.html'), 'utf8');
+t('the page turns Remove off once a post leaves drafting',
+  /function syncImageControls[\s\S]{0,600}?cur !== 'drafting'[\s\S]{0,200}?rm\.disabled = frozen/.test(PAGE));
+t('it is wired into the one place that knows the current state',
+  /syncImageControls\(id, sel\.value\)/.test(PAGE));
+
+// The About is a different artifact from a post, written once rather than weekly, and it
+// lives in the same document so it travels the same approval path. If it ever moves out of
+// the page, the approval trail splits in two and the trail is what proves a man said yes.
+t('the page has an About field per person',
+  /id="about-\$\{p\.id\}"/.test(PAGE));
+t('it is saved with the post',
+  /about: el\('about-' \+ id\)\.value/.test(PAGE));
+t('and loaded back the way the body and visual are',
+  /a\.value = x\.about/.test(PAGE));
+
 const TOKEN = token();
 if (!TOKEN) {
   console.log('');
@@ -104,6 +120,11 @@ const cases = [
   ['an editor cannot jump a draft straight to posted', 'DENY', EDITOR, 'update', post('posted'), post('with_alex')],
   ['an editor cannot edit the body once Alex has it', 'DENY', EDITOR, 'update', post('with_alex', { body: 'changed after approval' }), post('with_alex')],
   ['an editor cannot edit the body once Denis has it', 'DENY', EDITOR, 'update', post('with_denis', { body: 'changed under him' }), post('with_denis')],
+  // The About goes in the same document, so promoEditableStates already covers it.
+  // Proven rather than assumed: an untested field is a field nobody knows is covered.
+  ['an editor can write his About while drafting', 'ALLOW', EDITOR, 'update', post('drafting', { about: 'two lines in his register' }), post('drafting')],
+  ['an editor cannot change his About once Alex has it', 'DENY', EDITOR, 'update', post('with_alex', { about: 'rewritten after approval' }), post('with_alex')],
+  ['an editor cannot change his About once Denis has it', 'DENY', EDITOR, 'update', post('with_denis', { about: 'rewritten under him' }), post('with_denis')],
   ['an editor cannot pull it back from Denis', 'DENY', EDITOR, 'update', post('drafting'), post('with_denis')],
   ['an editor cannot record a verdict', 'DENY', EDITOR, 'update', post('declined'), post('with_denis')],
   ['nobody creates a post that is already approved', 'DENY', EDITOR, 'create', post('with_denis'), null],
@@ -158,11 +179,6 @@ if (out.error) {
 //
 // This is a MATCH, never the enforcement. The rule holds; this only keeps the UI
 // honest about what the rule will do. The same suite above proves the server side.
-const PAGE = readFileSync(join(here, 'u1_promotion_programme.html'), 'utf8');
-t('the page turns Remove off once a post leaves drafting',
-  /function syncImageControls[\s\S]{0,600}?cur !== 'drafting'[\s\S]{0,200}?rm\.disabled = frozen/.test(PAGE));
-t('it is wired into the one place that knows the current state',
-  /syncImageControls\(id, sel\.value\)/.test(PAGE));
 
 // The refusal message has to name the cause. Blaming the freeze every time sent
 // people hunting for an approval that had never happened.

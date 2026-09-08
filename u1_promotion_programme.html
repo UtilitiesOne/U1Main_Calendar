@@ -251,10 +251,16 @@ function render() {
           <div class="col">
             <label>His About section</label>
             <textarea id="about-${p.id}" placeholder="Two to three lines in his register. Sourced from his own posts and profile."></textarea>
-            <div class="hint">Written once, not weekly. It sits on his page permanently and
-              speaks in the first person, so it is more personal than any post. Same approval
-              path: you draft, Alex approves, Denis takes it to him. Drafts and sourcing are in
+            <div class="hint">Written once, not weekly, so it lives in its own record with its
+              own approval state. It sits on his page permanently and speaks in the first
+              person, which makes it more personal than any post. Same path: you draft, Alex
+              approves, Denis takes it to him. Drafts and sourcing are in
               <code>02_about_drafts.md</code>.</div>
+            <div class="btnrow">
+              <select id="aboutstate-${p.id}"></select>
+              <button onclick="saveAbout('${p.id}')">Save About</button>
+              <span class="hint" id="aboutstat-${p.id}"></span>
+            </div>
 
             <label>The post Marketing supplies</label>
             <textarea id="text-${p.id}" placeholder="Written in his voice, from ${esc(p.voice)}."></textarea>
@@ -366,8 +372,25 @@ function syncImageControls(id, cur) {
     : 'Removes the visual and deletes the file. Only works while the post is drafting.';
 }
 
+/* The About's state dropdown, driven by the same rules as the post's. An editor can
+   hand it up and no further; the owner can move it anywhere. */
+function fillAboutStates(id, current) {
+  const sel = el('aboutstate-' + id);
+  if (!sel) return;
+  const cur = current || sel.value || 'drafting';
+  const allowed = allowedNext(cur, isOwner);
+  sel.innerHTML = STATES
+    .filter(x => allowed.indexOf(x.v) !== -1)
+    .map(x => '<option value="' + x.v + '">' + x.label + '</option>')
+    .join('');
+  sel.value = allowed.indexOf(cur) !== -1 ? cur : allowed[0];
+}
+
 function refreshStates() {
-  PEOPLE.forEach(p => fillStates(p.id, (el('state-' + p.id) || {}).value));
+  PEOPLE.forEach(p => {
+    fillStates(p.id, (el('state-' + p.id) || {}).value);
+    fillAboutStates(p.id, (el('aboutstate-' + p.id) || {}).value);
+  });
 }
 
 /* Image upload, following the calendar's proven pattern but writing to
@@ -493,12 +516,21 @@ function chipFor(state) {
 function loadPosts() {
   if (!db || !isEditor) return;
   db.collection('promo_posts').onSnapshot(snap => {
-    const latest = {};
+    const latest = {}, abouts = {};
     snap.forEach(d => {
       const x = d.data() || {};
       if (!x.personId) return;
+      if (x.kind === 'about') { abouts[x.personId] = x; return; }
       const prev = latest[x.personId];
       if (!prev || String(x.weekOf || '') > String(prev.weekOf || '')) latest[x.personId] = x;
+    });
+
+    // The About is filled from its own record, independent of any week.
+    PEOPLE.forEach(p => {
+      const ab = abouts[p.id];
+      const a = el('about-' + p.id);
+      if (a && !a.value) a.value = (ab && ab.about) || '';
+      fillAboutStates(p.id, (ab && ab.status) || 'drafting');
     });
     PEOPLE.forEach(p => {
       const x = latest[p.id];
@@ -507,8 +539,6 @@ function loadPosts() {
       const s = chipFor(x.status);
       if (chip) { chip.textContent = s.label; chip.className = 'chip ' + s.cls; }
       const t = el('text-' + p.id);  if (t && !t.value) t.value = x.body || '';
-      const a = el('about-' + p.id);
-      if (a && !a.value) a.value = x.about || '';
       const i = el('img-' + p.id);
       if (i && !i.value) { i.value = x.visual || ''; if (x.visual) showImage(p.id, x.visual); }
       const w = el('week-' + p.id);  if (w && !w.value) w.value = x.weekOf || '';
@@ -528,7 +558,6 @@ function savePost(id) {
     personId: id,
     weekOf: week,
     body: el('text-' + id).value,
-    about: el('about-' + id).value,
     visual: el('img-' + id).value.trim(),
     status: el('state-' + id).value,
     notes: el('note-' + id).value,
@@ -538,6 +567,29 @@ function savePost(id) {
   db.collection('promo_posts').doc(id + '_' + week).set(payload, { merge: true })
     .then(() => setStatus('Saved ' + id + ' for week of ' + week))
     .catch(e => setStatus('Save failed: ' + e.message));
+}
+
+/* An About is written once, not weekly, so it gets its own document keyed by person
+   alone. The first version of this rode along on the week's post document, which
+   looked equivalent and was not: loadPosts fills each card from that person's LATEST
+   weekOf, so the About would have silently vanished from the card the moment a second
+   week existed. Found by trying to load the seven approved drafts into it.
+
+   Its own document also means its own approval state, which is correct. A man's About
+   and this week's post are two different things to say yes to. */
+function saveAbout(id) {
+  if (!db || !isEditor) { setStatus('Sign in as an editor first.'); return; }
+  const stat = el('aboutstat-' + id);
+  db.collection('promo_posts').doc(id + '_about').set({
+    personId: id,
+    kind: 'about',
+    about: el('about-' + id).value,
+    status: el('aboutstate-' + id).value,
+    updatedBy: user.email,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  }, { merge: true })
+    .then(() => { if (stat) stat.textContent = 'About saved.'; })
+    .catch(e => { if (stat) stat.textContent = 'About save failed: ' + e.message; });
 }
 
 /* Editor access is the calendar's allowlist, read from config/roles, so there is

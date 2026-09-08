@@ -66,10 +66,22 @@ t('it is wired into the one place that knows the current state',
 // the page, the approval trail splits in two and the trail is what proves a man said yes.
 t('the page has an About field per person',
   /id="about-\$\{p\.id\}"/.test(PAGE));
-t('it is saved with the post',
-  /about: el\('about-' \+ id\)\.value/.test(PAGE));
-t('and loaded back the way the body and visual are',
-  /a\.value = x\.about/.test(PAGE));
+// An About is written once, not weekly. The first version stored it on the week's post
+// document, and loadPosts fills each card from that person's LATEST weekOf, so the About
+// would have vanished from the card the moment a second week existed. It has its own
+// document now, keyed by person alone, with its own approval state.
+t('the About has its own document, keyed by person and not by week',
+  /doc\(id \+ '_about'\)/.test(PAGE));
+t('it is marked so it can never be read as a week',
+  /kind: 'about'/.test(PAGE));
+t('and savePost does NOT write it, so a week can never carry it',
+  !/about/.test((PAGE.match(/function savePost[\s\S]*?\n}/) || [''])[0]));
+t('loadPosts separates the two kinds',
+  /x\.kind === 'about'/.test(PAGE));
+t('and fills the About from its own record, not from the latest post',
+  /a\.value = \(ab && ab\.about\)/.test(PAGE));
+t('the About carries its own approval state',
+  /function fillAboutStates/.test(PAGE) && /aboutstate-/.test(PAGE));
 
 const TOKEN = token();
 if (!TOKEN) {

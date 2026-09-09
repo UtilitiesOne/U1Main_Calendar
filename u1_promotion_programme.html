@@ -119,6 +119,7 @@
     <h1>U1 LinkedIn Promotion Programme</h1>
     <div class="sub">Personal profiles &middot; no brand gate &middot; every post needs his yes</div>
   </div>
+  <a href="u1_calendar_interactive.html" style="font-size:12px;">&larr; Posting calendar</a>
   <button id="signin">Sign in with Google</button>
   <div id="status"></div>
 </header>
@@ -595,8 +596,66 @@ function saveAbout(id) {
 /* Editor access is the calendar's allowlist, read from config/roles, so there is
    one list to maintain. The owner is hardcoded in the rules and cannot be locked
    out by a broken list. */
+/* The public view, decided 2026-09-09.
+
+   The calendar reads open with no sign-in wall, on the ruling that a CEO will not
+   sign in to look at a board. This page was closed to everyone but editors, because
+   it carries draft copy written for named men before they have seen it. Both rulings
+   stand, so the read splits by state.
+
+   Only 'posted' opens, and only because those words are already on that man's public
+   profile. So this view answers the questions a reader outside the team would
+   actually have, who is in the programme and what has gone out, and it cannot show a
+   draft even if the code asked it to, because firestore.rules refuses.
+
+   The query is deliberately where('status','==','posted'). A collection read that
+   COULD return a denied document is refused outright, so a plain .get() here would
+   fail for a signed-out reader and the page would look broken rather than empty. */
+function loadPublic() {
+  if (!db) return;
+  PEOPLE.forEach(p => {
+    const chip = el('chip-' + p.id);
+    if (chip) { chip.textContent = 'checking...'; chip.className = 'chip'; }
+  });
+  db.collection('promo_posts').where('status', '==', 'posted').get()
+    .then(snap => {
+      const live = {};
+      snap.forEach(d => {
+        const x = d.data() || {};
+        if (!x.personId) return;
+        (live[x.personId] = live[x.personId] || []).push(x);
+      });
+      PEOPLE.forEach(p => {
+        const chip = el('chip-' + p.id);
+        const n = (live[p.id] || []).length;
+        if (chip) {
+          chip.textContent = n ? (n === 1 ? '1 post live' : n + ' posts live') : 'nothing published yet';
+          chip.className = 'chip' + (n ? ' on' : '');
+        }
+        const body = el('body-' + p.id);
+        if (body) body.innerHTML = publicPanel(p, live[p.id] || []);
+      });
+      setStatus('Showing what is already live on these profiles. Drafts are not shown here.');
+    })
+    .catch(e => setStatus('Could not load: ' + e.message));
+}
+
+/* What a reader outside the team sees per man. No drafts, no controls, and the reason
+   said plainly rather than left as an empty panel that looks broken. */
+function publicPanel(p, posts) {
+  const link = '<a href="' + esc(p.url) + '" target="_blank" rel="noopener">His profile</a>';
+  if (!posts.length) {
+    return '<div class="hint">Nothing published yet for ' + esc(p.name) + '. ' +
+      'Drafts are not shown here: they are written for him and he has not seen them. ' + link + '</div>';
+  }
+  return posts.map(x =>
+    '<div class="voice" style="margin-bottom:10px;"><b>Week of ' + esc(x.weekOf || '') + '</b><br />' +
+    esc(x.body || '').replace(/\n/g, '<br />') + '</div>').join('') +
+    '<div class="hint">Live on his profile. ' + link + '</div>';
+}
+
 function resolveRole(u) {
-  if (!u) { isEditor = false; isOwner = false; refreshStates(); setStatus('Signed out.'); return; }
+  if (!u) { isEditor = false; isOwner = false; refreshStates(); setStatus('Signed out.'); loadPublic(); return; }
   if (u.email === OWNER) { isEditor = true; isOwner = true; setStatus('Signed in as owner. You are the only one who can move a post past Alex.'); refreshStates(); loadPosts(); return; }
   db.collection('config').doc('roles').get()
     .then(doc => {
@@ -607,7 +666,7 @@ function resolveRole(u) {
       setStatus(isEditor
         ? 'Signed in as ' + u.email
         : 'Signed in as ' + u.email + ', but you are not on the editor list. Tell Alex.');
-      if (isEditor) loadPosts();
+      if (isEditor) loadPosts(); else loadPublic();
     })
     .catch(e => { isEditor = false; setStatus('Could not check your access: ' + e.message); });
 }

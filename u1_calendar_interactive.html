@@ -1159,6 +1159,15 @@ body.viewer-locked #spot2-uplift { pointer-events: none; opacity: .55; }
       <button id="view-theme-btn" data-view="theme">Theme view</button>
       <button id="view-review-btn" data-view="review" style="display:none;">Review</button>
     </div>
+    <!-- A link off this page, not a fourth view, so it is styled as one.
+
+         Public on purpose. The programme page splits its read by state: only posts
+         already live on a man's own profile are visible without an editor account,
+         and firestore.rules refuses the rest. So a visitor who follows this sees who
+         is in the programme and what has gone out, and cannot see a draft written
+         about a man before he has read it. Decided 2026-09-09. -->
+    <a id="promo-link" href="u1_promotion_programme.html"
+       style="font-size:12px; color:var(--accent); text-decoration:none; white-space:nowrap;">LinkedIn promotion programme &rarr;</a>
   </div>
 </header>
 

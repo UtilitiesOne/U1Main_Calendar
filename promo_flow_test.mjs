@@ -61,6 +61,24 @@ t('the page turns Remove off once a post leaves drafting',
 t('it is wired into the one place that knows the current state',
   /syncImageControls\(id, sel\.value\)/.test(PAGE));
 
+// The two pages have to point at each other, and the public path has to use the
+// query the rules permit. A plain .get() on promo_posts is refused for a signed-out
+// reader, because a collection read that COULD return a denied document is refused
+// outright. Get that wrong and the page looks broken instead of empty.
+const CAL = readFileSync(join(here, 'u1_calendar_interactive.html'), 'utf8');
+t('the calendar links to the programme',
+  /href="u1_promotion_programme\.html"/.test(CAL));
+t('the programme links back to the calendar',
+  /href="u1_calendar_interactive\.html"/.test(PAGE));
+t('the public path queries only what the rules allow',
+  /where\('status', '==', 'posted'\)/.test(PAGE));
+t('a signed-out visitor gets the public view rather than a dead page',
+  /loadPublic\(\)/.test(PAGE) && /Signed out\.'\); loadPublic/.test(PAGE));
+t('a signed-in non-editor gets it too',
+  /if \(isEditor\) loadPosts\(\); else loadPublic/.test(PAGE));
+t('the public panel says why a draft is not shown',
+  /he has not seen them/.test(PAGE));
+
 // The About is a different artifact from a post, written once rather than weekly, and it
 // lives in the same document so it travels the same approval path. If it ever moves out of
 // the page, the approval trail splits in two and the trail is what proves a man said yes.
@@ -142,9 +160,19 @@ const cases = [
   ['nobody creates a post that is already approved', 'DENY', EDITOR, 'create', post('with_denis'), null],
   ['nobody creates one already posted', 'DENY', EDITOR, 'create', post('posted'), null],
 
+  // The split read, decided 2026-09-09. 'posted' is the only state that opens, because
+  // those words are already on the man's public profile. Everything else stays shut,
+  // including with_denis, where the drafts are in flight and nobody has answered yet.
+  ['anyone may read a post that is already live on his profile', 'ALLOW', null, 'get', null, post('posted')],
+  ['a draft stays shut to the public', 'DENY', null, 'get', null, post('drafting')],
+  ['one Alex has approved stays shut, he has not sent it yet', 'DENY', null, 'get', null, post('with_alex')],
+  ['one in flight to the men stays shut, nobody has answered', 'DENY', null, 'get', null, post('with_denis')],
+  ['a declined one stays shut, his no is his own business', 'DENY', null, 'get', null, post('declined')],
+  ['an editor still reads every state', 'ALLOW', EDITOR, 'get', null, post('drafting')],
+
   // Outsiders.
   ['a stranger cannot create one', 'DENY', STRANGER, 'create', post('drafting'), null],
-  ['a stranger cannot read one', 'DENY', STRANGER, 'get', null, post('drafting')],
+  ['a stranger cannot read a draft', 'DENY', STRANGER, 'get', null, post('drafting')],
   ['a stranger cannot move one along', 'DENY', STRANGER, 'update', post('posted'), post('with_denis')],
 
   // Alex keeps full control, including correcting a mistake.
@@ -155,7 +183,9 @@ const cases = [
 const testCases = cases.map(([, expectation, auth, method, data, existing]) => ({
   expectation,
   request: {
-    auth, path: P, method,
+    // auth null means signed out, which is the case the split read exists for.
+    ...(auth ? { auth } : {}),
+    path: P, method,
     ...(data ? { resource: { data } } : {})
   },
   ...(existing ? { resource: { data: existing } } : {}),

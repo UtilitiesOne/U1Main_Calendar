@@ -309,7 +309,28 @@ service cloud.firestore {
     }
 
     match /promo_posts/{postId} {
-      allow read: if isApprovedEditor();
+      /* Split read, decided 2026-09-09.
+
+         The calendar is open to read with no sign-in wall, on the ruling that a CEO
+         will not sign in to look at a board. This page held the opposite posture,
+         closed to everyone but editors, because it carries draft copy written for
+         named people before they have seen it. Both rulings stand, so the read
+         splits by state rather than one of them giving way.
+
+         'posted' is the ONLY state that opens, and the reason is precise: it is the
+         state where the words are already on that man's public LinkedIn profile, so
+         opening them here reveals nothing that is not public already.
+
+         Everything else stays shut, including 'with_denis'. At that point the drafts
+         are in flight to the men and none of them has answered yet, so it is exactly
+         the case the closed read exists for. 'declined' stays shut too: a man's no is
+         his own business.
+
+         Note for anyone reading this from the client: a collection query that COULD
+         return a denied document is refused outright, so an anonymous reader cannot
+         list this collection. They have to query where status == 'posted'. */
+      allow read: if isApprovedEditor()
+                  || promoState(resource.data) == 'posted';
 
       // A new post always starts in drafting. Nobody creates one already approved.
       allow create: if isApprovedEditor()

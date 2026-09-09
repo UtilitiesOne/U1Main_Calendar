@@ -768,7 +768,7 @@ function sendToDenis(id) {
    actually have, who is in the programme and what has gone out, and it cannot show a
    draft even if the code asked it to, because firestore.rules refuses.
 
-   The query is deliberately where('status','==','posted'). A collection read that
+   The query asks for exactly PUBLIC_STATES, and it must. A collection read that
    COULD return a denied document is refused outright, so a plain .get() here would
    fail for a signed-out reader and the page would look broken rather than empty. */
 function loadPublic() {
@@ -777,7 +777,7 @@ function loadPublic() {
     const chip = el('chip-' + p.id);
     if (chip) { chip.textContent = 'checking...'; chip.className = 'chip'; }
   });
-  db.collection('promo_posts').where('status', '==', 'posted').get()
+  db.collection('promo_posts').where('status', 'in', PUBLIC_STATES).get()
     .then(snap => {
       const live = {};
       snap.forEach(d => {
@@ -808,10 +808,13 @@ function publicPanel(p, posts) {
     return '<div class="hint">Nothing published yet for ' + esc(p.name) + '. ' +
       'Drafts are not shown here: they are written for him and he has not seen them. ' + link + '</div>';
   }
-  return posts.map(x =>
-    '<div class="voice" style="margin-bottom:10px;"><b>Week of ' + esc(x.weekOf || '') + '</b><br />' +
-    esc(x.body || '').replace(/\n/g, '<br />') + '</div>').join('') +
-    '<div class="hint">Live on his profile. ' + link + '</div>';
+  return posts.map(function (x) {
+    const up = x.status === 'posted' || x.status === 'posted_claimed';
+    return '<div class="voice" style="margin-bottom:10px;">' +
+      '<b>Week of ' + esc(x.weekOf || '') + '</b> &middot; ' +
+      (up ? 'on his profile' : 'he has approved this, not up yet') + '<br />' +
+      esc(x.body || '').replace(/\n/g, '<br />') + '</div>';
+  }).join('') + '<div class="hint">' + link + '</div>';
 }
 
 function resolveRole(u) {

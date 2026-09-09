@@ -77,7 +77,7 @@ t('the calendar links to the programme',
 t('the programme links back to the calendar',
   /href="u1_calendar_interactive\.html"/.test(PAGE));
 t('the public path queries only what the rules allow',
-  /where\('status', '==', 'posted'\)/.test(PAGE));
+  /where\('status', 'in', PUBLIC_STATES\)/.test(PAGE) && /PUBLIC_STATES = \['approved', 'posted_claimed', 'posted'\]/.test(PAGE));
 t('a signed-out visitor gets the public view rather than a dead page',
   /loadPublic\(\)/.test(PAGE) && /Signed out\.'\); loadPublic/.test(PAGE));
 t('a signed-in non-editor gets it too',

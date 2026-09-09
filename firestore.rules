@@ -355,8 +355,22 @@ service cloud.firestore {
        The honest limit: anyone holding the link can answer as Denis. That is inherent
        to a no-login link and it was accepted knowingly. It is bounded to one post. */
     match /review_links/{token} {
-      // Knowing the unguessable id is the credential.
-      allow read: if true;
+      /* get and list are split, and the split is the whole security of this.
+
+         `allow read` covers BOTH, so a single open read let anyone enumerate the
+         collection with no credential at all and lift every outstanding review: the
+         post body, the man's name and title, and the image URL. Verified against
+         production 2026-09-09, HTTP 200 on an unauthenticated list.
+
+         That is the same get-versus-list distinction this file already applies to
+         promo_posts, written into the commit that created this block and then not
+         applied to the block itself. Caught by the second read.
+
+         get stays open, because knowing the unguessable id is the credential and that
+         is the entire mechanism. list is the owner's, which matches actual use:
+         watchVerdicts only ever runs for the owner. */
+      allow get:  if true;
+      allow list: if isOwnerEmail();
 
       // Only Alex mints or revokes a link.
       allow create, delete: if isOwnerEmail();
@@ -381,9 +395,9 @@ service cloud.firestore {
          named people before they have seen it. Both rulings stand, so the read
          splits by state rather than one of them giving way.
 
-         'posted' is the ONLY state that opens, and the reason is precise: it is the
-         state where the words are already on that man's public LinkedIn profile, so
-         opening them here reveals nothing that is not public already.
+         Three states open, and each for its own reason. 'approved' is the man's yes,
+         so the closed read has nothing left to protect. 'posted_claimed' and 'posted'
+         mean the words are on his public profile already.
 
          Everything else stays shut, including 'with_denis'. At that point the drafts
          are in flight to the men and none of them has answered yet, so it is exactly
@@ -392,7 +406,7 @@ service cloud.firestore {
 
          Note for anyone reading this from the client: a collection query that COULD
          return a denied document is refused outright, so an anonymous reader cannot
-         list this collection. They have to query where status == 'posted'. */
+       They have to query where status is in promoPublicStates(). */
       allow read: if isApprovedEditor()
                   || promoState(resource.data) in promoPublicStates();
 

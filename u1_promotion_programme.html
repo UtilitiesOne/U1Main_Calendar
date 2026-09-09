@@ -763,9 +763,10 @@ function sendToDenis(id) {
    it carries draft copy written for named men before they have seen it. Both rulings
    stand, so the read splits by state.
 
-   Only 'posted' opens, and only because those words are already on that man's public
-   profile. So this view answers the questions a reader outside the team would
-   actually have, who is in the programme and what has gone out, and it cannot show a
+   Three states open. 'approved' is the man's yes, so the closed read has nothing
+   left to protect. 'posted_claimed' and 'posted' mean the words are on his public
+   profile already. So this view answers what a reader outside the team would
+   actually ask, who is in the programme and what has gone out, and it cannot show a
    draft even if the code asked it to, because firestore.rules refuses.
 
    The query asks for exactly PUBLIC_STATES, and it must. A collection read that

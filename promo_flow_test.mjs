@@ -284,6 +284,18 @@ const link = (extra = {}) => ({ postId: 'stoica_2026-09-14', personId: 'stoica',
 
 const linkCases = [
   ['anyone holding the link may read it', 'ALLOW', null, 'get', null, link()],
+  // VERIFYING THIS AGAINST PRODUCTION NEEDS A REAL DOCUMENT. An anonymous list on an
+// EMPTY collection returns HTTP 200 whether the rule permits it or not, so the first
+// probe after the fix looked like the hole was still open. It was not; the rule was
+// never exercised. Minting one throwaway document turned the same request into a 403.
+// If anyone re-checks this by hand, put a document in first.
+//
+// get and list are separate permissions and `allow read` grants both. One open read
+  // let anyone enumerate every outstanding review with no credential. Verified live
+  // 2026-09-09 before the fix: HTTP 200 on an unauthenticated list.
+  ['but cannot enumerate the collection to find links they were never sent', 'DENY', null, 'list', null, null],
+  ['nor can an editor', 'DENY', EDITOR, 'list', null, null],
+  ['the owner can, which is what watchVerdicts needs', 'ALLOW', ALEX, 'list', null, null],
   ['only Alex mints one', 'DENY', EDITOR, 'create', link(), null],
   ['Alex mints one', 'ALLOW', ALEX, 'create', link(), null],
   ['only Alex revokes one', 'DENY', EDITOR, 'delete', null, link()],

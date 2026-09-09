@@ -448,6 +448,22 @@ t('the board shows every answered review, not the newest per person',
 t('and no longer keeps only the highest week',
   !/String\(x\.weekOf \|\| ''\) >= String\(prev\.weekOf/.test(PAGE));
 
+
+/* The link was invisible for a day and no test saw it.
+
+   header.top sets background: var(--accent), and the link was styled
+   color: var(--accent). Orange on orange. It rendered, it was in the DOM, it was
+   clickable, and nobody could see it. Alex found it by looking at the page.
+
+   Worse, I had 'verified' it by calling element.click() in a headless browser, which
+   works perfectly on an invisible element. A programmatic click is not a click-through;
+   it bypasses the exact thing a person would notice. */
+t('the calendar link is not the same colour as the header it sits on',
+  !/id="promo-link"[\s\S]{0,240}?color:var\(--accent\)/.test(CAL));
+t('and it matches the styling of the other link in that header',
+  /id="promo-link"[\s\S]{0,240}?color:#ffffff/.test(CAL)
+  && /id="promo-link"[\s\S]{0,240}?border:1px solid rgba\(255,255,255/.test(CAL));
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 
 process.exit(fail ? 1 : 0);

@@ -214,20 +214,47 @@ const PEOPLE = [
    The same states are enforced in firestore.rules. What follows only decides
    what to OFFER; the server decides what is allowed. The calendar learned in
    August that a client-side gate on its own is decoration. */
+/* Two states at the end, not one, decided 2026-09-09.
+
+   'approved' is the man's yes. 'posted' is us having checked his profile and seen it
+   live. They are different facts and the gap between them is real: a post can sit
+   approved for days before it goes up.
+
+   The read opens at 'approved' rather than at 'posted', because that is the moment
+   the thing the closed read protects against stops applying. He has read it and
+   agreed. Before that, at with_denis, it is in flight and nobody has answered. */
 const STATES = [
-  { v: 'drafting',   label: 'Drafting',                     cls: '' },
-  { v: 'with_alex',  label: 'Sent to Alex',                 cls: 'wait' },
-  { v: 'with_denis', label: 'With Denis',                   cls: 'wait' },
-  { v: 'posted',     label: 'Posted',                       cls: 'on' },
-  { v: 'declined',   label: 'Denis said no',                cls: 'hold' }
+  { v: 'drafting',       label: 'Drafting',                 cls: '' },
+  { v: 'with_alex',      label: 'Sent to Alex',             cls: 'wait' },
+  { v: 'with_denis',     label: 'With Denis',               cls: 'wait' },
+  { v: 'needs_edits',    label: 'Denis wants changes',      cls: 'hold' },
+  { v: 'approved',       label: 'Approved, not up yet',     cls: 'on' },
+  { v: 'posted_claimed', label: 'Editors say it is live',   cls: 'wait' },
+  { v: 'posted',         label: 'Confirmed live',           cls: 'on' },
+  { v: 'declined',       label: 'Declined',                 cls: 'hold' }
 ];
+
+/* Which states are readable by anyone with the link. Kept next to STATES so the two
+   never drift, and named rather than inlined so the page and the rules can be read
+   against each other. Must match firestore.rules promo_posts. */
+const PUBLIC_STATES = ['approved', 'posted_claimed', 'posted'];
 
 /* Which moves this person may make from where they are. Editors hand work up and
    nothing more. Everything past that is the owner's, because he is the one who
    speaks to Denis and records what came back. */
+/* Which moves this person may make from where they are. Mirrors firestore.rules,
+   which is what actually enforces it; this only keeps the dropdown from offering a
+   move that would be refused.
+
+   An editor has two jobs. From drafting or needs_edits they keep working or hand it
+   up. From approved, and only from approved, they report that it has gone live. They
+   can never reach with_denis, posted or declined; those are Alex's. */
 function allowedNext(from, owner) {
   if (owner) return STATES.map(s => s.v);
-  if (from === 'drafting' || !from) return ['drafting', 'with_alex'];
+  if (from === 'drafting' || from === 'needs_edits' || !from) {
+    return ['drafting', 'needs_edits', 'with_alex'];
+  }
+  if (from === 'approved') return ['approved', 'posted_claimed'];
   return [from];
 }
 
@@ -273,14 +300,17 @@ function render() {
             <input type="file" id="imgfile-${p.id}" accept="image/*" />
             <button type="button" id="imgclear-${p.id}" onclick="clearImage('${p.id}')">Remove</button>
             <div class="hint" id="imgstat-${p.id}">PNG or JPG up to 10MB. Uploads to promo-images,
-              which only signed-in editors can read, so a draft visual is not public before he
-              has seen it.</div>
+              which needs a signed-in Google account to read. That is looser than the editor
+              allowlist, so treat it as not-public rather than as private.</div>
             <input type="hidden" id="img-${p.id}" />
 
             <div class="row">
               <div class="col">
                 <label>Where it stands</label>
                 <select id="state-${p.id}"></select>
+                <div class="hint">Approved onwards is readable by anyone with the link, because
+                  from that point he has agreed to the words or they are already on his page.
+                  Everything before it is closed.</div>
                 <div class="hint" id="statehint-${p.id}"></div>
               </div>
               <div class="col">
@@ -294,8 +324,19 @@ function render() {
 
             <div class="btnrow">
               <button class="primary" onclick="savePost('${p.id}')">Save</button>
+              <button id="denis-${p.id}" onclick="sendToDenis('${p.id}')" style="display:none;">Send to Denis</button>
               <a href="${esc(p.url)}" target="_blank" rel="noopener">His profile</a>
             </div>
+
+            <div id="linkbox-${p.id}" style="display:none; margin-top:10px;">
+              <label>Link for Denis</label>
+              <input type="text" id="linkurl-${p.id}" readonly onclick="this.select();" />
+              <div class="hint">Send him this. He opens it, reads the post, and either approves
+                it or sends it back with a note. He does not sign in to anything. Anyone holding
+                this link can answer, so send it to him and nobody else.</div>
+            </div>
+
+            <div id="verdict-${p.id}" style="display:none; margin-top:10px;"></div>
 
             <div class="gate-off">No brand gate runs on this page. Nothing here checks the U1
               signature, U1 hashtags or the body-activation rule, and that is deliberate. The
@@ -339,6 +380,11 @@ function fillStates(id, current) {
   sel.value = allowed.indexOf(cur) !== -1 ? cur : allowed[0];
 
   syncImageControls(id, sel.value);
+
+  /* Sending to Denis is Alex's, and only from with_alex, which is where a submitted
+     post lands. Offering it earlier would let a draft nobody has read go out. */
+  const dn = el('denis-' + id);
+  if (dn) dn.style.display = (isOwner && cur === 'with_alex') ? '' : 'none';
 
   const hint = el('statehint-' + id);
   if (!hint) return;
@@ -593,6 +639,120 @@ function saveAbout(id) {
     .catch(e => { if (stat) stat.textContent = 'About save failed: ' + e.message; });
 }
 
+/* Send it to Denis.
+
+   Minting the link and setting with_denis happen together, so the state can never
+   claim it is with Denis when no link exists. That coupling is the point
+   [SOURCE: user 2026-09-09].
+
+   The link document carries a SNAPSHOT of the post rather than a pointer into
+   promo_posts, so the real record stays closed and a leaked link exposes one post.
+   Alex only; firestore.rules refuses a create from anyone else. */
+/* Denis's answers, surfaced so Alex can act on them.
+
+   His click records a verdict and moves nothing [SOURCE: user 2026-09-09, "records
+   it"]. This is the other half of that decision: without it his answer would sit in a
+   collection nobody looks at. Accepting it is one click, and the state change is made
+   by an authenticated owner rather than by a token.
+
+   Only the owner listens here. Editors see the resulting state on the post, which is
+   what they need; the raw link documents are Alex's. */
+function watchVerdicts() {
+  if (!db || !isOwner) return;
+  db.collection('review_links').onSnapshot(snap => {
+    const byPerson = {};
+    snap.forEach(d => {
+      const x = d.data() || {};
+      if (!x.response || !x.personId) return;
+      const prev = byPerson[x.personId];
+      if (!prev || String(x.weekOf || '') >= String(prev.weekOf || '')) {
+        byPerson[x.personId] = Object.assign({ token: d.id }, x);
+      }
+    });
+    PEOPLE.forEach(p => {
+      const box = el('verdict-' + p.id);
+      if (!box) return;
+      const v = byPerson[p.id];
+      if (!v) { box.style.display = 'none'; box.innerHTML = ''; return; }
+      const yes = v.response === 'approved';
+      box.style.display = '';
+      box.innerHTML =
+        '<div class="voice" style="border-left:3px solid var(--' + (yes ? 'ok' : 'hold') + ');">' +
+          '<b>Denis ' + (yes ? 'approved this' : 'asked for changes') + '</b>' +
+          ' &middot; week of ' + esc(v.weekOf || '') +
+          (v.comment ? '<br />' + esc(v.comment) : '') +
+          '<div class="btnrow" style="margin-top:8px;">' +
+            '<button onclick="acceptVerdict(' + "'" + esc(p.id) + "','" + esc(v.token) + "'" + ')">' +
+              (yes ? 'Record it as approved' : 'Send it back to the editor') +
+            '</button>' +
+          '</div>' +
+        '</div>';
+    });
+  }, e => setStatus('Could not watch review answers: ' + e.message));
+}
+
+/* Alex accepting what Denis said. This is the state change, made by him.
+   The link is deleted afterwards: it has done its job, and leaving a live answer-once
+   URL lying around serves nobody. */
+function acceptVerdict(id, token) {
+  if (!db || !isOwner) return;
+  db.collection('review_links').doc(token).get()
+    .then(doc => {
+      const v = doc.exists ? doc.data() : null;
+      if (!v || !v.postId) throw new Error('That link is gone.');
+      const next = v.response === 'approved' ? 'approved' : 'needs_edits';
+      return db.collection('promo_posts').doc(v.postId).set({
+        status: next,
+        denisComment: v.comment || '',
+        updatedBy: user.email,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true })
+        .then(() => db.collection('review_links').doc(token).delete())
+        .then(() => {
+          setStatus(next === 'approved'
+            ? 'Recorded. It is approved and readable by anyone with the link.'
+            : "Sent back. The editor who submitted it can work on it again.");
+          fillStates(id, next);
+        });
+    })
+    .catch(e => setStatus('Could not record that: ' + e.message));
+}
+
+function sendToDenis(id) {
+  if (!db || !isOwner) { setStatus('Only the owner sends a post to Denis.'); return; }
+  const week = (el('week-' + id).value || '').trim();
+  if (!week) { setStatus('Set the week first, so the link names the right post.'); return; }
+  const person = PEOPLE.find(p => p.id === id) || {};
+  const postId = id + '_' + week;
+  const token = 'r' + Date.now().toString(36) + '_' +
+    Array.from(crypto.getRandomValues(new Uint8Array(16)))
+      .map(b => b.toString(16).padStart(2, '0')).join('');
+
+  db.collection('review_links').doc(token).set({
+    postId: postId,
+    personId: id,
+    personName: person.name || id,
+    personTitle: person.title || '',
+    body: el('text-' + id).value,
+    visual: el('img-' + id).value.trim(),
+    weekOf: week,
+    mintedBy: user.email,
+    mintedAt: firebase.firestore.FieldValue.serverTimestamp()
+  })
+    .then(() => db.collection('promo_posts').doc(postId)
+      .set({ status: 'with_denis', reviewToken: token,
+             updatedBy: user.email,
+             updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true }))
+    .then(() => {
+      const url = location.href.replace(/[^/]*$/, '') + 'u1_promo_review.html?t=' + token;
+      el('linkbox-' + id).style.display = '';
+      el('linkurl-' + id).value = url;
+      setStatus('Link ready for ' + (person.name || id) + '. Copy it and send it to Denis.');
+      fillStates(id, 'with_denis');
+    })
+    .catch(e => setStatus('Could not create the link: ' + e.message));
+}
+
 /* Editor access is the calendar's allowlist, read from config/roles, so there is
    one list to maintain. The owner is hardcoded in the rules and cannot be locked
    out by a broken list. */
@@ -656,7 +816,7 @@ function publicPanel(p, posts) {
 
 function resolveRole(u) {
   if (!u) { isEditor = false; isOwner = false; refreshStates(); setStatus('Signed out.'); loadPublic(); return; }
-  if (u.email === OWNER) { isEditor = true; isOwner = true; setStatus('Signed in as owner. You are the only one who can move a post past Alex.'); refreshStates(); loadPosts(); return; }
+  if (u.email === OWNER) { isEditor = true; isOwner = true; setStatus('Signed in as owner. You are the only one who can move a post past Alex.'); refreshStates(); loadPosts(); watchVerdicts(); return; }
   db.collection('config').doc('roles').get()
     .then(doc => {
       const list = (doc.exists && doc.data() && doc.data().editors) || [];

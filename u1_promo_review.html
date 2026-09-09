@@ -1,0 +1,194 @@
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- Never indexed. A private review surface reached by an unguessable link. -->
+<meta name="robots" content="noindex, nofollow, noarchive" />
+<title>A post written for you</title>
+
+<!--
+  THE REVIEW LINK, built 2026-09-09.
+
+  Denis Mezheretskov has no account on this system and will not sign in. That is the
+  same premise the calendar's open read was built on. So this page authenticates
+  nobody: the unguessable id in the URL is the credential, and holding it is what
+  grants access.
+
+  WHAT THIS PAGE CAN REACH. One review_links document, carrying a SNAPSHOT of one
+  post. It never touches promo_posts, which stays closed throughout. A leaked link
+  shows one post and lets someone answer on that one post.
+
+  WHAT AN ANSWER DOES. It records a verdict and nothing else. It does not move the
+  post. Alex sees the answer on his board and changes the state himself, so the state
+  change on a man's profile copy is always made by an authenticated owner rather than
+  by a token [SOURCE: user 2026-09-09, "records it"].
+
+  THE HONEST LIMIT. Anyone holding this link can answer as Denis. That is inherent to
+  a no-login link and it was accepted knowingly. It is bounded to one post, it can be
+  answered only once, and Alex revokes it by deleting the document.
+-->
+
+<style>
+  :root {
+    --ink: #14181d; --mute: #6b7480; --rule: #dfe3e8; --paper: #f7f8fa;
+    --card: #ffffff; --accent: #EB4B28; --ok: #1a7f4b; --warn: #b26a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #e8eaed; --mute: #9aa4b0; --rule: #2c333c; --paper: #11151a;
+      --card: #171c22; --accent: #ff6a45; --ok: #4ec585; --warn: #e0a33c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font: 15px/1.6 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 30px 20px 80px; }
+  h1 { font-size: 16px; margin: 0 0 4px; letter-spacing: .02em; }
+  .sub { font-size: 12.5px; color: var(--mute); margin-bottom: 22px; }
+  .card {
+    background: var(--card); border: 1px solid var(--rule); border-radius: 8px;
+    padding: 20px 22px; margin-bottom: 16px;
+  }
+  .who { font-weight: 650; font-size: 15px; }
+  .role { font-size: 12.5px; color: var(--mute); margin-bottom: 16px; }
+  .post {
+    white-space: pre-wrap; font-size: 15.5px; line-height: 1.65;
+    border-left: 3px solid var(--accent); padding-left: 16px; margin: 4px 0 6px;
+  }
+  img { max-width: 100%; border-radius: 6px; margin-top: 14px; display: block; }
+  label {
+    display: block; font-size: 10.5px; text-transform: uppercase;
+    letter-spacing: .07em; color: var(--mute); margin: 18px 0 6px;
+  }
+  textarea {
+    width: 100%; min-height: 110px; padding: 10px 12px; font: inherit; font-size: 14px;
+    border: 1.5px solid var(--rule); border-radius: 5px; resize: vertical;
+    background: var(--paper); color: var(--ink);
+  }
+  .btnrow { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+  button {
+    font: inherit; font-size: 14px; font-weight: 600; padding: 11px 20px;
+    border-radius: 6px; border: 1.5px solid var(--rule);
+    background: var(--card); color: var(--ink); cursor: pointer;
+  }
+  button.yes { border-color: var(--ok); background: var(--ok); color: #fff; }
+  button:disabled { opacity: .45; cursor: default; }
+  .note { font-size: 12.5px; color: var(--mute); line-height: 1.6; }
+  .done {
+    border-color: var(--ok); border-left: 3px solid var(--ok); font-size: 14px;
+  }
+</style>
+
+<div class="wrap">
+  <h1>A post written for you</h1>
+  <div class="sub">Utilities One, Marketing</div>
+  <div id="root"><div class="card note">Loading...</div></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAw4OdzDsO_3CWa6wTWsPyNSIrQEARVr1w",
+  authDomain: "u1-calendar.firebaseapp.com",
+  projectId: "u1-calendar",
+  storageBucket: "u1-calendar.firebasestorage.app",
+  appId: "1:784693618571:web:0b67641886d0de0a83f18e"
+};
+
+const el = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const token = new URLSearchParams(location.search).get('t') || '';
+
+function panel(html, cls) {
+  el('root').innerHTML = '<div class="card ' + (cls || 'note') + '">' + html + '</div>';
+}
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+if (!token) {
+  panel('This link is incomplete. Ask Marketing to send it again.');
+} else {
+  db.collection('review_links').doc(token).get()
+    .then((doc) => {
+      /* Deleting the document is how a link is revoked and also what happens once
+         Alex has recorded the answer, so a missing one is the normal end of a link's
+         life rather than an error to apologise for. */
+      if (!doc.exists) {
+        panel('This link is no longer active. If you still need to see the post, ask Marketing.');
+        return;
+      }
+      render(doc.data() || {});
+    })
+    .catch((e) => panel('Could not open this link (' + esc(e.code || e.message) + ').'));
+}
+
+function render(d) {
+  if (d.response) { alreadyAnswered(d); return; }
+
+  const img = d.visual
+    ? '<img src="' + esc(d.visual) + '" alt="The picture that goes with this post" />' : '';
+
+  el('root').innerHTML =
+    '<div class="card">' +
+      '<div class="who">' + esc(d.personName || d.personId || '') + '</div>' +
+      '<div class="role">' + esc(d.personTitle || '') + '</div>' +
+      '<div class="post">' + esc(d.body || '') + '</div>' + img +
+    '</div>' +
+    '<div class="card">' +
+      '<div class="note">Marketing wrote this for his page. Nothing goes up until he says yes. ' +
+        'If anything is wrong, or it does not sound like him, say so and we will rewrite it. ' +
+        'A no needs no reason.</div>' +
+      '<label for="comment">Anything to change</label>' +
+      '<textarea id="comment" placeholder="Leave this empty if you are happy with it."></textarea>' +
+      '<div class="btnrow">' +
+        '<button class="yes" id="approve">Approve it</button>' +
+        '<button id="edits">Send back for changes</button>' +
+      '</div>' +
+      '<div class="note" id="err" style="margin-top:12px;"></div>' +
+    '</div>';
+
+  el('approve').onclick = function () { answer('approved'); };
+  el('edits').onclick = function () { answer('edits'); };
+}
+
+/* An answer records a verdict. It does not move the post. */
+function answer(verdict) {
+  const comment = (el('comment').value || '').trim();
+  if (verdict === 'edits' && !comment) {
+    el('err').textContent = 'Tell us what to change, then send it back.';
+    el('comment').focus();
+    return;
+  }
+  el('approve').disabled = true;
+  el('edits').disabled = true;
+  el('err').textContent = 'Sending...';
+
+  db.collection('review_links').doc(token).update({
+    response: verdict,
+    comment: comment,
+    respondedAt: firebase.firestore.FieldValue.serverTimestamp()
+  })
+    .then(function () {
+      panel(verdict === 'approved'
+        ? '<b>Approved.</b> Thanks. We will put it up and let you know when it is live.'
+        : '<b>Sent back.</b> Thanks. We will rewrite it and send it to you again.', 'done');
+    })
+    .catch(function (e) {
+      el('approve').disabled = false;
+      el('edits').disabled = false;
+      el('err').textContent = 'That did not save (' + esc(e.code || e.message) + '). ' +
+        'A link can only be answered once, so if it has already been answered this is expected.';
+    });
+}
+
+function alreadyAnswered(d) {
+  panel(d.response === 'approved'
+    ? '<b>Already approved.</b> Nothing more to do here.'
+    : '<b>Already sent back for changes.</b> Marketing has your note.', 'done');
+}
+</script>

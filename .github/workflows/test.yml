@@ -109,10 +109,11 @@ jobs:
         run: |
           for f in u1_calendar_interactive.html u1_utility_guidance.html \
                    u1_voice_conservative_one.html u1_voice_flamboyant_one.html \
-                   u1_voice_marketing_one.html u1_promotion_programme.html; do
+                   u1_voice_marketing_one.html u1_promotion_programme.html \
+                   u1_promo_review.html; do
             grep -q 'name="robots"' "$f" || { echo "$f lost its noindex"; exit 1; }
           done
-          echo "all six pages carry noindex"
+          echo "all seven pages carry noindex"
 
       # The approval flow: team drafts, Alex approves for sending, Denis
       # coordinates and returns one verdict, then we post. The cases that must
@@ -130,6 +131,20 @@ jobs:
       # here without credentials; the behavioural tier needs a login and skips.
       - name: Storage rules
         run: node storage_rules_test.mjs
+
+      # The review page is reached by an unguessable link and authenticates nobody.
+      # Two things must stay true of it: it never reads the closed collection, and it
+      # never grows a sign-in. Either change would widen what a leaked link exposes,
+      # and both would look harmless in a diff.
+      - name: The review link stays narrow
+        run: |
+          if grep -q "collection(.promo_posts.)" u1_promo_review.html; then
+            echo "review page now reads promo_posts; it must only read its own link"; exit 1
+          fi
+          if grep -q "firebase-auth-compat" u1_promo_review.html; then
+            echo "review page now loads auth; the link is meant to be the credential"; exit 1
+          fi
+          echo "review page reads only its own link and authenticates nobody"
 
       # The promotion programme publishes to people's PERSONAL profiles, so the
       # U1 brand gate must never govern it. Six of the gate's rules would fire

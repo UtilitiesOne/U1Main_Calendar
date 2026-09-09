@@ -50,10 +50,16 @@ t('structural: the flow states are written down',
   /drafting[\s\S]{0,500}with_alex[\s\S]{0,500}with_denis/.test(SRC));
 t('structural: a new post must start in drafting',
   /allow create:[\s\S]{0,220}?promoState\(request\.resource\.data\) == 'drafting'/.test(SRC));
-t('structural: an editor can only ever hand it up, never further',
-  /promoState\(request\.resource\.data\) in \['drafting', 'with_alex'\]/.test(SRC));
-t('structural: an editor can only edit while it is still in drafting',
-  /promoState\(resource\.data\) in promoEditableStates\(\)/.test(SRC));
+// Pinned to the invariant, not to the literal rule text. The rule's shape has changed
+// twice; what must never change is that an editor cannot reach a state past Alex.
+const EDITOR_BRANCH = (SRC.match(/isApprovedEditor\(\)[\s\S]*?\n {23}\);/) || [''])[0];
+t('structural: an editor can never reach a state past Alex',
+  EDITOR_BRANCH.length > 0
+  && !/'with_denis'/.test(EDITOR_BRANCH.split('posted_claimed')[0])
+  && !/'approved'[\s,]*\]/.test(EDITOR_BRANCH)
+  && !/'declined'/.test(EDITOR_BRANCH));
+t('structural: an editor may work while drafting or after Denis sent it back',
+  /promoEditableStates\(\)[\s\S]{0,400}?return \['drafting', 'needs_edits'\]/.test(SRC));
 
 const PAGE = readFileSync(join(here, 'u1_promotion_programme.html'), 'utf8');
 t('the page turns Remove off once a post leaves drafting',
@@ -163,6 +169,27 @@ const cases = [
   // The split read, decided 2026-09-09. 'posted' is the only state that opens, because
   // those words are already on the man's public profile. Everything else stays shut,
   // including with_denis, where the drafts are in flight and nobody has answered yet.
+  // The needs_edits loop, added 2026-09-09. Denis asks for changes, it goes back to
+  // the editor who submitted it, they fix it and it runs the same road again.
+  ['an editor may work on one Denis sent back', 'ALLOW', EDITOR, 'update', post('needs_edits', { body: 'fixed' }), post('needs_edits')],
+  ['and hand it up again', 'ALLOW', EDITOR, 'update', post('with_alex'), post('needs_edits')],
+  ['what Denis sent back is not public, it is back in the loop', 'DENY', null, 'get', null, post('needs_edits')],
+
+  // Reporting it live. Only from approved, and the words cannot move with it.
+  ['an editor may report an approved post as live', 'ALLOW', EDITOR, 'update', post('posted_claimed'), post('approved')],
+  ['but not change the words while doing it', 'DENY', EDITOR, 'update', post('posted_claimed', { body: 'switched' }), post('approved')],
+  ['and cannot jump a draft straight to live, which would publish it', 'DENY', EDITOR, 'update', post('posted_claimed'), post('drafting')],
+  ['nor one Denis has not seen', 'DENY', EDITOR, 'update', post('posted_claimed'), post('with_denis')],
+  ['an editor cannot confirm it themselves', 'DENY', EDITOR, 'update', post('posted'), post('posted_claimed')],
+  ['Alex confirms it', 'ALLOW', ALEX, 'update', post('posted'), post('posted_claimed')],
+  ['a claimed-live post is public, since it is on his page', 'ALLOW', null, 'get', null, post('posted_claimed')],
+
+  // Collection reads, which Firestore judges differently from a single-document get.
+  // The public view depends on this and nothing covered it until 2026-09-09.
+  ['a signed-out visitor cannot list the collection', 'DENY', null, 'list', null, null],
+  ['an editor can', 'ALLOW', EDITOR, 'list', null, null],
+
+  ['anyone may read a post the man has approved', 'ALLOW', null, 'get', null, post('approved')],
   ['anyone may read a post that is already live on his profile', 'ALLOW', null, 'get', null, post('posted')],
   ['a draft stays shut to the public', 'DENY', null, 'get', null, post('drafting')],
   ['one Alex has approved stays shut, he has not sent it yet', 'DENY', null, 'get', null, post('with_alex')],
@@ -247,5 +274,101 @@ t('a refusal distinguishes an unsaved post from a frozen one',
 t('and says plainly when a drafting post was refused, which means a broken config',
   /configuration problem rather than anything you did/.test(PAGE));
 
+
+/* Review links. Denis has no account, so the unguessable document id is the
+   credential. These cases are the security of that arrangement, so they are the ones
+   to read hardest. Run against the real rules API, not a mock. */
+const RL = DB + '/review_links/tok_abcdef123456';
+const link = (extra = {}) => ({ postId: 'stoica_2026-09-14', personId: 'stoica',
+  personName: 'Stefan Stoica', body: 'his post', weekOf: '2026-09-14', ...extra });
+
+const linkCases = [
+  ['anyone holding the link may read it', 'ALLOW', null, 'get', null, link()],
+  ['only Alex mints one', 'DENY', EDITOR, 'create', link(), null],
+  ['Alex mints one', 'ALLOW', ALEX, 'create', link(), null],
+  ['only Alex revokes one', 'DENY', EDITOR, 'delete', null, link()],
+
+  // Denis answering, with no account at all.
+  ['Denis approves from the link', 'ALLOW', null, 'update',
+   link({ response: 'approved', comment: '', respondedAt: 'x' }), link()],
+  ['Denis asks for edits from the link', 'ALLOW', null, 'update',
+   link({ response: 'edits', comment: 'change the second line', respondedAt: 'x' }), link()],
+
+  // The cases that must fail. Each is a way the link could be turned into more
+  // than one man answering one question.
+  ['he cannot answer twice', 'DENY', null, 'update',
+   link({ response: 'approved', respondedAt: 'y' }), link({ response: 'edits' })],
+  ['he cannot rewrite the post he was shown', 'DENY', null, 'update',
+   link({ body: 'different words', response: 'approved', respondedAt: 'x' }), link()],
+  ['he cannot repoint the link at another post', 'DENY', null, 'update',
+   link({ postId: 'denis_2026-09-14', response: 'approved', respondedAt: 'x' }), link()],
+  ['he cannot invent a verdict we do not recognise', 'DENY', null, 'update',
+   link({ response: 'posted', respondedAt: 'x' }), link()],
+  ['he cannot delete the record of what he was asked', 'DENY', null, 'delete', null, link()],
+];
+
+const linkTests = linkCases.map(([, expectation, auth, method, data, existing]) => ({
+  expectation,
+  request: { ...(auth ? { auth } : {}), path: RL, method,
+    ...(data ? { resource: { data } } : {}) },
+  ...(existing ? { resource: { data: existing } } : {}),
+  functionMocks: mocks
+}));
+
+const rl = await fetch(`https://firebaserules.googleapis.com/v1/projects/${PROJECT}:test`, {
+  method: 'POST',
+  headers: { Authorization: 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ source: { files: [{ name: 'firestore.rules', content: SRC }] },
+    testSuite: { testCases: linkTests } })
+});
+const rlOut = await rl.json();
+if (rlOut.error) { console.error('review-link API error: ' + rlOut.error.message); process.exit(1); }
+(rlOut.testResults || []).forEach((r, i) => t(linkCases[i][0], r.state === 'SUCCESS'));
+
+
+// The review page and the wiring around it. Structural, so CI runs them without a login.
+const REVIEW = readFileSync(join(here, 'u1_promo_review.html'), 'utf8');
+t('the review page exists and is never indexed',
+  /name="robots"/.test(REVIEW));
+t('it authenticates nobody, the link is the credential',
+  !/firebase-auth-compat/.test(REVIEW) && /URLSearchParams/.test(REVIEW));
+t('it reads only the link document, never promo_posts',
+  /collection\('review_links'\)/.test(REVIEW) && !/collection\('promo_posts'\)/.test(REVIEW));
+t('it writes only a verdict, a comment and a time',
+  /response: verdict/.test(REVIEW) && /comment: comment/.test(REVIEW)
+  && /respondedAt:/.test(REVIEW));
+t('an answered link cannot be answered again',
+  /if \(d\.response\) { alreadyAnswered/.test(REVIEW));
+t('sending back needs a reason, approving does not',
+  /verdict === 'edits' && !comment/.test(REVIEW));
+
+// Minting the link and setting with_denis are one action, so the state cannot claim
+// it is with Denis when no link exists.
+t('minting the link sets with_denis in the same action',
+  /function sendToDenis/.test(PAGE)
+  && /status: 'with_denis', reviewToken: token/.test(PAGE));
+t('the link carries a snapshot, not a pointer into the closed record',
+  /body: el\('text-' \+ id\)\.value,/.test(PAGE.split('function sendToDenis')[1] || ''));
+t('only the owner is offered the send button, and only from with_alex',
+  /isOwner && cur === 'with_alex'/.test(PAGE));
+
+// The other half of 'records it': his answer has to reach Alex or it sits unseen.
+t("Denis's answers are surfaced for the owner",
+  /function watchVerdicts/.test(PAGE) && /if \(!db || !isOwner\) return;/.test(PAGE));
+t('accepting an answer is what moves the post, and the owner does it',
+  /function acceptVerdict/.test(PAGE)
+  && /response === 'approved' \? 'approved' : 'needs_edits'/.test(PAGE));
+t('the link is deleted once its answer has been recorded',
+  /\.delete\(\)\)/.test(PAGE.split('function acceptVerdict')[1] || ''));
+
+
+// Three findings from the second read of 2026-09-09.
+t('the page no longer claims promo-images is editors-only, which it is not',
+  !/only signed-in editors can read/.test(PAGE)
+  && /signed-in Google account to read/.test(PAGE));
+t('the state control says which states are world-readable',
+  /readable by anyone with the link/.test(PAGE));
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
+
 process.exit(fail ? 1 : 0);

@@ -298,14 +298,78 @@ service cloud.firestore {
     // Four states plus a terminal branch:
     //   drafting    the team is writing it. Editors may edit freely here.
     //   with_alex   sent up for approval. Only Alex moves it on.
-    //   with_denis  sent to Denis. Only Alex records what came back.
-    //   posted      it went up.
-    //   declined    Denis said no, from either stage. No reason required.
+    //   with_denis  a review link exists and it is with Denis. The link is minted
+    //               and this state is set in one action, so the state cannot claim
+    //               it is with Denis when no link exists.
+    //   needs_edits Denis wants changes. Goes back to the editor who submitted it,
+    //               who may edit again from here. Added 2026-09-09.
+    //   approved    the man said yes. Not up on his profile yet. Added 2026-09-09.
+    //   posted_claimed  an editor says it is live on his page. Not yet checked by
+    //               Alex. Added 2026-09-09.
+    //   posted      Alex checked the profile and it is live.
+    //   declined    an outright no. No reason required.
     function promoState(d) {
       return ('status' in d) ? d.status : 'drafting';
     }
+    /* Where an editor may still change the words. needs_edits is here because Denis
+       asked for changes and the post goes back to the person who submitted it; if
+       they could not edit from that state the loop would need Alex for every round
+       trip [SOURCE: user 2026-09-09]. */
     function promoEditableStates() {
-      return ['drafting'];
+      return ['drafting', 'needs_edits'];
+    }
+    /* Readable by anyone with the link. 'approved' is the man's yes, so from that
+       moment the closed read has nothing left to protect: he has read the words and
+       agreed to them. 'posted' means we have seen them live on his profile, so they
+       are public already.
+
+       with_denis is deliberately NOT here. At that point the post is in flight and
+       nobody has answered, which is exactly what the closed read exists for.
+       'declined' is not here either; a man's no is his own business.
+
+       Mirrors PUBLIC_STATES in u1_promotion_programme.html. */
+    function promoPublicStates() {
+      return ['approved', 'posted_claimed', 'posted'];
+    }
+
+    /* Review links, added 2026-09-09.
+
+       Denis has no account and will not sign in. That is the same premise the split
+       read was built on. So the only way he reviews a post is a link whose secret IS
+       the credential: the document id is random and unguessable, and holding it is
+       what grants access.
+
+       WHAT IS EXPOSED, and it is deliberately small. This document carries a SNAPSHOT
+       of one post, not a pointer into promo_posts. The real record stays closed the
+       whole time. A leaked link therefore reveals one post and lets someone answer on
+       that one post, rather than opening the collection.
+
+       WHAT DENIS MAY WRITE. Only his answer, and only once. He sets response, comment
+       and respondedAt, and he cannot touch the snapshot, the post id, or a response
+       he has already given. Alex reads the answer on the board and moves the real
+       post himself, so the state change on a man's profile copy is always made by an
+       authenticated owner rather than by a token [SOURCE: user 2026-09-09].
+
+       REVOCATION is deleting the document, which only the owner can do.
+
+       The honest limit: anyone holding the link can answer as Denis. That is inherent
+       to a no-login link and it was accepted knowingly. It is bounded to one post. */
+    match /review_links/{token} {
+      // Knowing the unguessable id is the credential.
+      allow read: if true;
+
+      // Only Alex mints or revokes a link.
+      allow create, delete: if isOwnerEmail();
+
+      // Denis answers. He may set only his answer, only on a link that has none yet,
+      // and he may not alter the snapshot he was shown.
+      allow update: if isOwnerEmail()
+                    || (
+                         !('response' in resource.data)
+                         && request.resource.data.diff(resource.data).affectedKeys()
+                              .hasOnly(['response', 'comment', 'respondedAt'])
+                         && request.resource.data.response in ['approved', 'edits']
+                       );
     }
 
     match /promo_posts/{postId} {
@@ -330,22 +394,43 @@ service cloud.firestore {
          return a denied document is refused outright, so an anonymous reader cannot
          list this collection. They have to query where status == 'posted'. */
       allow read: if isApprovedEditor()
-                  || promoState(resource.data) == 'posted';
+                  || promoState(resource.data) in promoPublicStates();
 
       // A new post always starts in drafting. Nobody creates one already approved.
       allow create: if isApprovedEditor()
                     && promoState(request.resource.data) == 'drafting';
 
+      /* An editor has exactly two jobs here, and they are separated on purpose.
+
+         WRITING. From drafting or needs_edits they may keep working or hand it up to
+         Alex. Once Alex has it, or Denis has it, the body freezes, so an approval can
+         never be attached to different words than the ones that were approved.
+
+         REPORTING IT LIVE. From approved, and only from approved, they may say it has
+         gone up. Only the status moves; the words cannot change in the same write.
+
+         Keeping those separate matters more than it looks. posted_claimed is a public
+         state. If an editor could reach it from drafting, they could publish a man's
+         copy to anyone with the link without Denis ever seeing it. */
       allow update: if isOwnerEmail()
                     || (
                          isApprovedEditor()
-                         // An editor works only while it is still theirs to work on.
-                         // Once Alex has it, or Denis has it, the body is frozen so
-                         // an approval cannot be quietly attached to different words.
-                         && promoState(resource.data) in promoEditableStates()
-                         // An editor may hand it up, and nothing further. They cannot
-                         // approve their own draft, send it to Denis, or mark it posted.
-                         && promoState(request.resource.data) in ['drafting', 'with_alex']
+                         && (
+                              (
+                                promoState(resource.data) in promoEditableStates()
+                                // needs_edits is a target as well as a source: an editor
+                                // working through Denis's comments saves as they go, and
+                                // hands it up when it is ready.
+                                && promoState(request.resource.data) in ['drafting', 'with_alex', 'needs_edits']
+                              )
+                              ||
+                              (
+                                promoState(resource.data) == 'approved'
+                                && promoState(request.resource.data) == 'posted_claimed'
+                                && request.resource.data.diff(resource.data).affectedKeys()
+                                     .hasOnly(['status', 'updatedBy', 'updatedAt'])
+                              )
+                            )
                        );
 
       allow delete: if isOwnerEmail();

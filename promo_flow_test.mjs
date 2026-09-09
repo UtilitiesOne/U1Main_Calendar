@@ -81,7 +81,7 @@ t('the public path queries only what the rules allow',
 t('a signed-out visitor gets the public view rather than a dead page',
   /loadPublic\(\)/.test(PAGE) && /Signed out\.'\); loadPublic/.test(PAGE));
 t('a signed-in non-editor gets it too',
-  /if \(isEditor\) loadPosts\(\); else loadPublic/.test(PAGE));
+  /if \(isEditor\)[\s\S]{0,80}?else loadPublic/.test(PAGE));
 t('the public panel says why a draft is not shown',
   /he has not seen them/.test(PAGE));
 
@@ -380,6 +380,36 @@ t('the page no longer claims promo-images is editors-only, which it is not',
   && /signed-in Google account to read/.test(PAGE));
 t('the state control says which states are world-readable',
   /readable by anyone with the link/.test(PAGE));
+
+
+// Who submitted it, and getting the post back to them. Alex's words: the needs_edits
+// 'goes to the editor that created and submitted the post'. updatedBy is the last
+// person who touched it, which is a different fact and is wrong exactly when it
+// matters: send a post back, a second editor opens it, and the trail is gone.
+t('who submitted is recorded, at submit rather than on every save',
+  /payload\.status === 'with_alex'/.test(PAGE)
+  && /payload\.submittedBy = user\.email/.test(PAGE));
+t('and the uid too, because notifications are keyed by uid not email',
+  /payload\.submittedByUid = user\.uid/.test(PAGE));
+t('the card names whoever it goes back to',
+  /Back to ' \+ esc\(x\.submittedBy\)/.test(PAGE));
+t('and shows what Denis actually said, not just that he objected',
+  /Denis said: ' \+ esc\(x\.denisComment\)/.test(PAGE));
+
+// A label says whose it is. This is what puts it in front of them.
+t('accepting a needs_edits verdict notifies the editor who submitted it',
+  /next !== 'needs_edits' \|\| !post\.submittedByUid/.test(PAGE)
+  && /toUid: post\.submittedByUid/.test(PAGE));
+t('and an approval does not, since nothing is owed to anyone',
+  /next !== 'needs_edits'/.test(PAGE));
+t('the page shows notifications, or nobody would ever see one',
+  /function watchNotifications/.test(PAGE)
+  && /where\('toUid', '==', user\.uid\)/.test(PAGE));
+
+// The About is a one-off. The hint used to promise the post machine.
+t('the About no longer claims it goes through Alex and Denis',
+  !/Same path: you draft, Alex approves, Denis takes it to him/.test(PAGE)
+  && /does NOT go\s+through the post flow/.test(PAGE));
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 

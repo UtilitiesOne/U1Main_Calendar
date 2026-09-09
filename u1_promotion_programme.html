@@ -124,6 +124,9 @@
   <div id="status"></div>
 </header>
 
+<div id="notif" style="display:none; align-items:center; gap:12px; background:var(--ok);
+     color:#fff; padding:10px 16px; font-size:13px; line-height:1.45;"></div>
+
 <div class="wrap">
   <div class="note">
     <b>What this is.</b> Marketing writes the post and prepares the visual in each man's own
@@ -279,10 +282,10 @@ function render() {
           <div class="col">
             <label>His About section</label>
             <textarea id="about-${p.id}" placeholder="Two to three lines in his register. Sourced from his own posts and profile."></textarea>
-            <div class="hint">Written once, not weekly, so it lives in its own record with its
-              own approval state. It sits on his page permanently and speaks in the first
-              person, which makes it more personal than any post. Same path: you draft, Alex
-              approves, Denis takes it to him. Drafts and sourcing are in
+            <div class="hint">A one-off. Written once, changed once, done. It does NOT go
+              through the post flow: no review link, no Denis round trip. We send the seven out
+              together by mail and record the answer here. The state control below is a marker
+              of where each one stands, not a workflow. Drafts and sourcing are in
               <code>02_about_drafts.md</code>.</div>
             <div class="btnrow">
               <select id="aboutstate-${p.id}"></select>
@@ -337,6 +340,7 @@ function render() {
             </div>
 
             <div id="verdict-${p.id}" style="display:none; margin-top:10px;"></div>
+            <div class="hint" id="owner-${p.id}" style="display:none; margin-top:8px;"></div>
 
             <div class="gate-off">No brand gate runs on this page. Nothing here checks the U1
               signature, U1 hashtags or the body-activation rule, and that is deliberate. The
@@ -590,6 +594,23 @@ function loadPosts() {
       if (i && !i.value) { i.value = x.visual || ''; if (x.visual) showImage(p.id, x.visual); }
       const w = el('week-' + p.id);  if (w && !w.value) w.value = x.weekOf || '';
       const n = el('note-' + p.id);  if (n && !n.value) n.value = x.notes || '';
+      /* Whose post came back. Labelled rather than filtered: everyone still sees every
+         card, which is what a small team covering for each other needs, and it is what
+         the calendar does too. The name makes it obvious who picks it up. */
+      const owner = el('owner-' + p.id);
+      if (owner) {
+        if (x.status === 'needs_edits' && x.submittedBy) {
+          owner.style.display = '';
+          owner.innerHTML = '<b>Back to ' + esc(x.submittedBy) + '</b>' +
+            (x.denisComment ? '<br />Denis said: ' + esc(x.denisComment) : '');
+        } else if (x.submittedBy) {
+          owner.style.display = '';
+          owner.innerHTML = 'Submitted by ' + esc(x.submittedBy);
+        } else {
+          owner.style.display = 'none';
+        }
+      }
+
       const cur = x.status || 'drafting';
       fillStates(p.id, cur);
       const st = el('state-' + p.id); if (st) st.value = cur;
@@ -611,6 +632,22 @@ function savePost(id) {
     updatedBy: user.email,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
+
+  /* Who submitted it, recorded at the moment it goes up rather than on every save.
+
+     updatedBy is the last person who touched it, which is a different fact. Send a
+     post back and a second editor opens it, and updatedBy becomes them, so the trail
+     to whoever submitted it is gone exactly when it is needed.
+
+     Both forms are kept on purpose. The email is what the card shows a human. The uid
+     is what the notifications collection is keyed by, so without it Denis's changes
+     could be labelled but never actually delivered. Same shape the calendar already
+     uses for its own proposals. */
+  if (payload.status === 'with_alex') {
+    payload.submittedBy = user.email;
+    payload.submittedByUid = user.uid;
+    payload.submittedAt = firebase.firestore.FieldValue.serverTimestamp();
+  }
   db.collection('promo_posts').doc(id + '_' + week).set(payload, { merge: true })
     .then(() => setStatus('Saved ' + id + ' for week of ' + week))
     .catch(e => setStatus('Save failed: ' + e.message));
@@ -657,6 +694,31 @@ function saveAbout(id) {
 
    Only the owner listens here. Editors see the resulting state on the post, which is
    what they need; the raw link documents are Alex's. */
+/* What the editor sees when Denis asks for changes on their post.
+
+   Written to the same collection and keyed the same way as the calendar's, so there is
+   one notification mechanism in this repo rather than two. Read is scoped by the rules
+   to the addressee, so an editor sees only their own. */
+function watchNotifications() {
+  if (!db || !user) return;
+  db.collection('notifications').where('toUid', '==', user.uid)
+    .onSnapshot(snap => {
+      const items = [];
+      snap.forEach(d => { const n = d.data(); if (!n.read) items.push({ id: d.id, msg: n.message }); });
+      const box = el('notif');
+      if (!box) return;
+      if (!items.length) { box.style.display = 'none'; return; }
+      box.style.display = 'flex';
+      box.innerHTML = '<div style="flex:1;">' +
+        items.map(i => esc(i.msg)).join('<br />') + '</div>' +
+        '<button id="notif-ok" style="background:#fff; color:var(--ink); border:none;">Got it</button>';
+      el('notif-ok').onclick = () => {
+        items.forEach(i => db.collection('notifications').doc(i.id).update({ read: true }).catch(() => {}));
+        box.style.display = 'none';
+      };
+    }, e => console.warn('Could not watch notifications:', e.message));
+}
+
 function watchVerdicts() {
   if (!db || !isOwner) return;
   db.collection('review_links').onSnapshot(snap => {
@@ -701,12 +763,32 @@ function acceptVerdict(id, token) {
       const v = doc.exists ? doc.data() : null;
       if (!v || !v.postId) throw new Error('That link is gone.');
       const next = v.response === 'approved' ? 'approved' : 'needs_edits';
-      return db.collection('promo_posts').doc(v.postId).set({
-        status: next,
-        denisComment: v.comment || '',
-        updatedBy: user.email,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge: true })
+      return db.collection('promo_posts').doc(v.postId).get()
+        .then(pd => {
+          const post = pd.exists ? pd.data() : {};
+          return db.collection('promo_posts').doc(v.postId).set({
+            status: next,
+            denisComment: v.comment || '',
+            updatedBy: user.email,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true })
+            /* Telling the editor, rather than hoping they look. A label says whose post
+               it is; this is what actually puts it in front of them. Same collection and
+               the same toUid keying the calendar already uses, which is why submittedByUid
+               is recorded at submit: without it there is nobody to address. */
+            .then(() => {
+              if (next !== 'needs_edits' || !post.submittedByUid) return;
+              return db.collection('notifications').add({
+                toUid: post.submittedByUid,
+                message: 'Denis asked for changes on the ' + (post.personId || 'programme') +
+                  ' post for week of ' + (post.weekOf || '') +
+                  (v.comment ? '. He said: ' + v.comment : '') +
+                  ' It is back in your hands on the promotion programme board.',
+                at: firebase.firestore.FieldValue.serverTimestamp(),
+                read: false
+              }).catch(e => console.warn('Notification skipped:', e.message));
+            });
+        })
         .then(() => db.collection('review_links').doc(token).delete())
         .then(() => {
           setStatus(next === 'approved'
@@ -820,7 +902,7 @@ function publicPanel(p, posts) {
 
 function resolveRole(u) {
   if (!u) { isEditor = false; isOwner = false; refreshStates(); setStatus('Signed out.'); loadPublic(); return; }
-  if (u.email === OWNER) { isEditor = true; isOwner = true; setStatus('Signed in as owner. You are the only one who can move a post past Alex.'); refreshStates(); loadPosts(); watchVerdicts(); return; }
+  if (u.email === OWNER) { isEditor = true; isOwner = true; setStatus('Signed in as owner. You are the only one who can move a post past Alex.'); refreshStates(); loadPosts(); watchVerdicts(); watchNotifications(); return; }
   db.collection('config').doc('roles').get()
     .then(doc => {
       const list = (doc.exists && doc.data() && doc.data().editors) || [];
@@ -830,7 +912,7 @@ function resolveRole(u) {
       setStatus(isEditor
         ? 'Signed in as ' + u.email
         : 'Signed in as ' + u.email + ', but you are not on the editor list. Tell Alex.');
-      if (isEditor) loadPosts(); else loadPublic();
+      if (isEditor) { loadPosts(); watchNotifications(); } else loadPublic();
     })
     .catch(e => { isEditor = false; setStatus('Could not check your access: ' + e.message); });
 }

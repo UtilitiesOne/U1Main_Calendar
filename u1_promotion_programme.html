@@ -744,24 +744,30 @@ function watchNotifications() {
 function watchVerdicts() {
   if (!db || !isOwner) return;
   db.collection('review_links').onSnapshot(snap => {
+    /* Every answered review, not the newest per person.
+
+       Keying by person and keeping the latest week is what lost a verdict: a second
+       week's answer hid the first, and the post it belonged to sat at with_denis
+       unnoticed. sendToDenis now refuses a second link while one is outstanding, so
+       this should never see two. It handles two anyway, because a display that can
+       silently drop a man's answer is the wrong thing to rely on a guard for. */
     const byPerson = {};
     snap.forEach(d => {
       const x = d.data() || {};
       if (!x.response || !x.personId) return;
-      const prev = byPerson[x.personId];
-      if (!prev || String(x.weekOf || '') >= String(prev.weekOf || '')) {
-        byPerson[x.personId] = Object.assign({ token: d.id }, x);
-      }
+      (byPerson[x.personId] = byPerson[x.personId] || []).push(Object.assign({ token: d.id }, x));
     });
+    Object.keys(byPerson).forEach(k => byPerson[k].sort(
+      (a, b) => String(a.weekOf || '').localeCompare(String(b.weekOf || ''))));
     PEOPLE.forEach(p => {
       const box = el('verdict-' + p.id);
       if (!box) return;
-      const v = byPerson[p.id];
-      if (!v) { box.style.display = 'none'; box.innerHTML = ''; return; }
-      const yes = v.response === 'approved';
+      const vs = byPerson[p.id];
+      if (!vs || !vs.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
       box.style.display = '';
-      box.innerHTML =
-        '<div class="voice" style="border-left:3px solid var(--' + (yes ? 'ok' : 'hold') + ');">' +
+      box.innerHTML = vs.map(function (v) {
+        const yes = v.response === 'approved';
+        return '<div class="voice" style="border-left:3px solid var(--' + (yes ? 'ok' : 'hold') + '); margin-bottom:8px;">' +
           '<b>Denis ' + (yes ? 'approved this' : 'asked for changes') + '</b>' +
           ' &middot; week of ' + esc(v.weekOf || '') +
           (v.comment ? '<br />' + esc(v.comment) : '') +
@@ -771,6 +777,7 @@ function watchVerdicts() {
             '</button>' +
           '</div>' +
         '</div>';
+      }).join('');
     });
   }, e => setStatus('Could not watch review answers: ' + e.message));
 }
@@ -828,12 +835,42 @@ function sendToDenis(id) {
   const week = (el('week-' + id).value || '').trim();
   if (!week) { setStatus('Set the week first, so the link names the right post.'); return; }
   const person = PEOPLE.find(p => p.id === id) || {};
+
+  /* One outstanding review per man at a time [SOURCE: user 2026-09-09].
+
+     Two links for the same person was the case that lost a verdict: the board keyed
+     its answered-review box by person, so a second week's answer hid the first, and
+     that post sat at with_denis with nobody looking for it.
+
+     Refusing the second link removes the case. It is a guard on this page rather than
+     in the rules, because Firestore rules can only read a document at a known path and
+     cannot ask whether another one exists for this person. That is a smaller gap than
+     it sounds: only the owner can mint a link at all, so the only person who could
+     work around this guard is the one it is protecting. The display below was also
+     made lossless, so even if two ever existed neither would disappear. */
+  db.collection('review_links').where('personId', '==', id).get()
+    .then(snap => {
+      if (!snap.empty) {
+        const open = snap.docs[0].data();
+        setStatus((person.name || id) + ' already has a review out for week of ' +
+          (open.weekOf || 'an earlier week') +
+          (open.response ? ', and Denis has answered it. Record that first.'
+                         : ', still unanswered. Wait for it or revoke it before sending another.'));
+        return null;
+      }
+      return mintDenisLink(id, week, person);
+    })
+    .catch(e => setStatus('Could not check for an open review: ' + e.message));
+}
+
+function mintDenisLink(id, week, person) {
   const postId = id + '_' + week;
+  // Returned so the caller's chain waits on it rather than resolving early.
   const token = 'r' + Date.now().toString(36) + '_' +
     Array.from(crypto.getRandomValues(new Uint8Array(16)))
       .map(b => b.toString(16).padStart(2, '0')).join('');
 
-  db.collection('review_links').doc(token).set({
+  return db.collection('review_links').doc(token).set({
     postId: postId,
     personId: id,
     personName: person.name || id,

@@ -427,6 +427,27 @@ t('the post comes before the About on the card',
 t('and the About is folded away rather than dominating it',
   /<details[\s\S]{0,400}?His About section/.test(PAGE));
 
+
+// One outstanding review per man. Two links for the same person was the case that
+// lost a verdict: the board keyed its answered box by person and kept the latest
+// week, so a second week's answer hid the first and that post sat at with_denis with
+// nobody looking for it.
+t('a second link is refused while one is outstanding',
+  /where\('personId', '==', id\)/.test(PAGE)
+  && /if \(!snap\.empty\)/.test(PAGE));
+t('and it says which week is already out, rather than just refusing',
+  /already has a review out for week of/.test(PAGE));
+t('it distinguishes unanswered from answered-but-not-recorded',
+  /still unanswered/.test(PAGE) && /Denis has answered it/.test(PAGE));
+
+// The guard removes the case. The display is made lossless anyway, because a board
+// that can silently drop a man's answer is the wrong thing to rely on a guard for.
+t('the board shows every answered review, not the newest per person',
+  /\(byPerson\[x\.personId\] = byPerson\[x\.personId\] \|\| \[\]\)\.push/.test(PAGE)
+  && /vs\.map\(function \(v\)/.test(PAGE));
+t('and no longer keeps only the highest week',
+  !/String\(x\.weekOf \|\| ''\) >= String\(prev\.weekOf/.test(PAGE));
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 
 process.exit(fail ? 1 : 0);

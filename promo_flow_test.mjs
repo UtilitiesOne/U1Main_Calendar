@@ -392,7 +392,7 @@ t('who submitted is recorded, at submit rather than on every save',
 t('and the uid too, because notifications are keyed by uid not email',
   /payload\.submittedByUid = user\.uid/.test(PAGE));
 t('the card names whoever it goes back to',
-  /Back to ' \+ esc\(x\.submittedBy\)/.test(PAGE));
+  /Back to ' \+ esc\(displayName/.test(PAGE));
 t('and shows what Denis actually said, not just that he objected',
   /Denis said: ' \+ esc\(x\.denisComment\)/.test(PAGE));
 
@@ -408,8 +408,24 @@ t('the page shows notifications, or nobody would ever see one',
 
 // The About is a one-off. The hint used to promise the post machine.
 t('the About no longer claims it goes through Alex and Denis',
-  !/Same path: you draft, Alex approves, Denis takes it to him/.test(PAGE)
-  && /does NOT go\s+through the post flow/.test(PAGE));
+  !/Same path: you draft, Alex approves, Denis takes it to him/.test(PAGE) && /does NOT go through the post/.test(PAGE));
+
+
+// Names on screen, not addresses. This repo already had to scrub five colleagues'
+// emails out of a public file once; a card is the same exposure by another door.
+t('the card shows a name rather than an email address',
+  /function displayName/.test(PAGE)
+  && /esc\(displayName\(x\.submittedBy\)\)/.test(PAGE)
+  && !/esc\(x\.submittedBy\)/.test(PAGE));
+t('and the notification names the man rather than his record id',
+  !/'Denis asked for changes on the ' \+ \(post\.personId/.test(PAGE)
+  && /PEOPLE\.find\(pp => pp\.id === post\.personId\)/.test(PAGE));
+
+// The About is a one-off and the posts are weekly, so the weekly work comes first.
+t('the post comes before the About on the card',
+  PAGE.indexOf('The post Marketing supplies') < PAGE.indexOf('His About section'));
+t('and the About is folded away rather than dominating it',
+  /<details[\s\S]{0,400}?His About section/.test(PAGE));
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 

@@ -280,19 +280,6 @@ function render() {
       <div class="pbody" id="body-${p.id}">
         <div class="row">
           <div class="col">
-            <label>His About section</label>
-            <textarea id="about-${p.id}" placeholder="Two to three lines in his register. Sourced from his own posts and profile."></textarea>
-            <div class="hint">A one-off. Written once, changed once, done. It does NOT go
-              through the post flow: no review link, no Denis round trip. We send the seven out
-              together by mail and record the answer here. The state control below is a marker
-              of where each one stands, not a workflow. Drafts and sourcing are in
-              <code>02_about_drafts.md</code>.</div>
-            <div class="btnrow">
-              <select id="aboutstate-${p.id}"></select>
-              <button onclick="saveAbout('${p.id}')">Save About</button>
-              <span class="hint" id="aboutstat-${p.id}"></span>
-            </div>
-
             <label>The post Marketing supplies</label>
             <textarea id="text-${p.id}" placeholder="Written in his voice, from ${esc(p.voice)}."></textarea>
             <div class="hint">His words, his punctuation. Keep habits that break our brand-copy
@@ -341,6 +328,22 @@ function render() {
 
             <div id="verdict-${p.id}" style="display:none; margin-top:10px;"></div>
             <div class="hint" id="owner-${p.id}" style="display:none; margin-top:8px;"></div>
+
+            <details style="margin-top:16px;">
+              <summary style="cursor:pointer; font-size:11px; text-transform:uppercase;
+                letter-spacing:.07em; color:var(--mute);">His About section, a one-off</summary>
+              <textarea id="about-${p.id}" placeholder="Two to three lines in his register. Sourced from his own posts and profile."></textarea>
+              <div class="hint">Written once, changed once, done. It does NOT go through the post
+                flow: no review link, no Denis round trip. We send the seven out together by mail
+                and record the answer here, so the control below is a marker of where each one
+                stands rather than a workflow. Drafts and sourcing are in
+                <code>02_about_drafts.md</code>.</div>
+              <div class="btnrow">
+                <select id="aboutstate-${p.id}"></select>
+                <button onclick="saveAbout('${p.id}')">Save About</button>
+                <span class="hint" id="aboutstat-${p.id}"></span>
+              </div>
+            </details>
 
             <div class="gate-off">No brand gate runs on this page. Nothing here checks the U1
               signature, U1 hashtags or the body-activation rule, and that is deliberate. The
@@ -560,6 +563,25 @@ function clearImage(id) {
     });
 }
 
+/* A person's name for the screen, derived from their sign-in rather than stored.
+
+   Emails do not belong on a card. This repo already had to scrub five colleagues'
+   addresses out of a public file once, and rendering one here is the same exposure
+   through a different door.
+
+   Derivation is crude on purpose: no name map exists and inventing one would mean
+   guessing at people's names. A local part like cristina.costin becomes Cristina
+   Costin; a single-token one stays a single token, which is ugly but is still not an
+   address. If a real name map is wanted, config/roles is where it belongs. */
+function displayName(email) {
+  if (!email) return 'someone';
+  if (email === OWNER) return 'Alex';
+  const local = String(email).split('@')[0];
+  return local.split(/[._-]+/).filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
 function chipFor(state) {
   return STATES.find(s => s.v === state) || { label: state, cls: '' };
 }
@@ -601,11 +623,11 @@ function loadPosts() {
       if (owner) {
         if (x.status === 'needs_edits' && x.submittedBy) {
           owner.style.display = '';
-          owner.innerHTML = '<b>Back to ' + esc(x.submittedBy) + '</b>' +
+          owner.innerHTML = '<b>Back to ' + esc(displayName(x.submittedBy)) + '</b>' +
             (x.denisComment ? '<br />Denis said: ' + esc(x.denisComment) : '');
         } else if (x.submittedBy) {
           owner.style.display = '';
-          owner.innerHTML = 'Submitted by ' + esc(x.submittedBy);
+          owner.innerHTML = 'Submitted by ' + esc(displayName(x.submittedBy));
         } else {
           owner.style.display = 'none';
         }
@@ -780,7 +802,8 @@ function acceptVerdict(id, token) {
               if (next !== 'needs_edits' || !post.submittedByUid) return;
               return db.collection('notifications').add({
                 toUid: post.submittedByUid,
-                message: 'Denis asked for changes on the ' + (post.personId || 'programme') +
+                message: 'Denis asked for changes on the ' +
+                  ((PEOPLE.find(pp => pp.id === post.personId) || {}).name || 'programme') +
                   ' post for week of ' + (post.weekOf || '') +
                   (v.comment ? '. He said: ' + v.comment : '') +
                   ' It is back in your hands on the promotion programme board.',

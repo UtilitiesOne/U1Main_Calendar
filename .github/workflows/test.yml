@@ -132,6 +132,17 @@ jobs:
       - name: Storage rules
         run: node storage_rules_test.mjs
 
+      # Nothing we publish names our folder layout or our working filenames. The page
+      # source is readable by anyone holding the link, and part of the programme page
+      # is deliberately open, so a path in it tells a stranger how we are organised and
+      # what else exists. Caught 2026-09-11 on a hint that named the repo folder.
+      - name: No internal paths on a published page
+        run: |
+          if grep -lE "output/2026|voice_dna|_about_drafts|capture_log|00_program_spec" *.html; then
+            echo "the files above carry an internal path or working filename"; exit 1
+          fi
+          echo "no internal paths in any published page"
+
       # The review page is reached by an unguessable link and authenticates nobody.
       # Two things must stay true of it: it never reads the closed collection, and it
       # never grows a sign-in. Either change would widen what a leaked link exposes,

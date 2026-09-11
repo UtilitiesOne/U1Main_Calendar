@@ -162,41 +162,46 @@ const firebaseConfig = {
 };
 const OWNER = "wakroz@gmail.com";
 
-/* The roster, from output/2026-09-03_u1_foremen_program/01_capture_log.md,
-   verified against live profiles 2026-09-03 and re-captured 2026-09-04. Titles
-   are as they appear on each man's own profile. Voice files sit beside the
-   capture log in the same folder.
+/* The roster. Verified against live profiles 2026-09-03 and re-captured
+   2026-09-04. Titles are as they appear on each man's own profile.
 
    Seeded here rather than in Firestore so the page works before anyone has
-   written a post, and so this list is reviewable in git. */
+   written a post, and so this list is reviewable in git.
+
+   NO INTERNAL PATHS OR FILENAMES ON THIS PAGE, corrected 2026-09-11 after Alex
+   found one. The page source is readable by anyone holding the link, and since
+   2026-09-09 part of it is deliberately open. Naming our folder layout and our
+   working filenames in it tells a stranger how we are organised and what else
+   exists, for no gain: the people who need those files already know where they
+   are. */
 const PEOPLE = [
   { id: 'denis',    name: 'Denis Mezheretskov',  title: 'Senior Director of Construction Field Services',
     where: 'Fort Lauderdale, Florida', url: 'https://www.linkedin.com/in/denis-mezheretskov-1346b4140/',
-    voice: 'voice_dna_denis_mezheretskov.md', originals: 7,
-    reads: 'Longest original about 150 words. Heavy hashtag sets, 8 to 20.' },
+    originals: 7,
+    reads: 'Longest captured original 108 words. NO hashtags at all: his eight originals carry zero.' },
   { id: 'stoica',   name: 'Stefan Stoica',       title: 'Field Foreman',
     where: 'Pasco, Washington', url: 'https://www.linkedin.com/in/stefan-stoica-576076a7/',
-    voice: 'voice_dna_stefan_stoica.md', originals: 4,
+    originals: 4,
     reads: 'Short stacked fragments. 40 to 73 words, 4 to 8 hashtags. Spaced hyphen, never a long dash.' },
   { id: 'jalol',    name: 'Jalol Murzakhmetov',  title: 'Splicing Director',
     where: 'Cherry Hill, New Jersey', url: 'https://www.linkedin.com/in/jalol-murzakhmetov-6077a9264/',
-    voice: 'voice_dna_jalol_murzakhmetov.md', originals: 6,
+    originals: 6,
     reads: 'Longest and most technical. Writes "I". 45 to 104 words. His not-only-X opener is his and stays.' },
   { id: 'puiu',     name: 'Veaceslav Puiu',      title: 'Construction Foreman',
     where: 'Homestead, Pennsylvania', url: 'https://www.linkedin.com/in/veaceslav-puiu/',
-    voice: 'voice_dna_veaceslav_puiu.md', originals: 3,
+    originals: 3,
     reads: 'Warm and plain, crew scale. 40 to 90 words. His growth arc needs his own confirmation first.' },
   { id: 'valasnykh', name: 'Dzmitry Valasnykh',  title: 'Foreman',
     where: 'Littleton, Colorado', url: 'https://www.linkedin.com/in/dzmitry-valasnykh-4254a231a/',
-    voice: 'voice_dna_dzmitry_valasnykh.md', originals: 2,
+    originals: 2,
     reads: '30 to 90 words, light hashtags. Keep his simple hyphens.' },
   { id: 'zubarev',  name: 'Evghenii Zubarev',    title: 'Manager of Construction Field Services',
     where: 'United States', url: 'https://www.linkedin.com/in/evghenii-zubarev-762a941a6/',
-    voice: 'voice_dna_evghenii_zubarev.md', originals: 1,
+    originals: 1,
     reads: 'Hold lifted 2026-09-03. Confirmed theme: mentoring and structured learning.' },
   { id: 'galkin',   name: 'Ivan Galkin',         title: 'Vice President of Fulfillment Services',
     where: 'United States', url: 'https://www.linkedin.com/in/ivan-galkin-656895244/',
-    voice: 'voice_dna_ivan_galkin.md', originals: 3,
+    originals: 3,
     reads: 'Executive register, events only. 34 to 76 words. No field detail he has never written. Technician-to-VP arc is UNVERIFIED and must not appear.' }
 ];
 
@@ -281,7 +286,7 @@ function render() {
         <div class="row">
           <div class="col">
             <label>The post Marketing supplies</label>
-            <textarea id="text-${p.id}" placeholder="Written in his voice, from ${esc(p.voice)}."></textarea>
+            <textarea id="text-${p.id}" placeholder="Written in his voice. Read his voice file first."></textarea>
             <div class="hint">His words, his punctuation. Keep habits that break our brand-copy
               rules; on his page they are his.</div>
 
@@ -336,8 +341,8 @@ function render() {
               <div class="hint">Written once, changed once, done. It does NOT go through the post
                 flow: no review link, no Denis round trip. We send the seven out together by mail
                 and record the answer here, so the control below is a marker of where each one
-                stands rather than a workflow. Drafts and sourcing are in
-                <code>02_about_drafts.md</code>.</div>
+                stands rather than a workflow. The drafts and the sourcing behind every line live with
+                the programme files.</div>
               <div class="btnrow">
                 <select id="aboutstate-${p.id}"></select>
                 <button onclick="saveAbout('${p.id}')">Save About</button>
@@ -353,10 +358,9 @@ function render() {
 
           <div class="col">
             <label>How he sounds</label>
-            <div class="voice"><b>${esc(p.voice)}</b><br />${esc(p.reads)}</div>
-            <div class="hint">Read the full voice file before drafting. It sits in
-              <code>output/2026-09-03_u1_foremen_program/</code> beside the capture log holding
-              his posts verbatim.</div>
+            <div class="voice"><b>${esc(p.name)}</b><br />${esc(p.reads)}</div>
+            <div class="hint">Read his full voice file before drafting. It carries his register,
+              his watch-outs, and his own posts verbatim.</div>
           </div>
         </div>
       </div>

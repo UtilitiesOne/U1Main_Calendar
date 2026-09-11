@@ -464,6 +464,29 @@ t('and it matches the styling of the other link in that header',
   /id="promo-link"[\s\S]{0,240}?color:#ffffff/.test(CAL)
   && /id="promo-link"[\s\S]{0,240}?border:1px solid rgba\(255,255,255/.test(CAL));
 
+
+/* No internal paths or filenames on a published page.
+
+   The programme page named our repo folder, every man's voice-DNA filename, and the
+   drafts file. Alex found it on 2026-09-11. The page source is readable by anyone
+   holding the link, and since 2026-09-09 part of that page is deliberately open, so
+   naming our folder layout told a stranger how we are organised and what else exists.
+   The people who need those files already know where they are.
+
+   Swept across every page rather than fixed where he pointed. */
+const PUBLISHED = ['u1_promotion_programme.html', 'u1_promo_review.html',
+                   'u1_calendar_interactive.html', 'u1_utility_guidance.html'];
+const LEAKS = /output\/2026|voice_dna|_about_drafts|capture_log|00_program_spec|C:\\|\/c\/tmp\//;
+PUBLISHED.forEach(function (f) {
+  const src = readFileSync(join(here, f), 'utf8');
+  t(f + ': no internal path or working filename in the source', !LEAKS.test(src));
+});
+
+// The same claim was fabricated in his voice file and corrected there on 2026-09-08.
+// It survived here because I fixed the file I was looking at and not the roster.
+t('Denis is not described as using heavy hashtag sets, which he has never done',
+  !/Heavy hashtag sets/.test(PAGE) && /NO hashtags at all/.test(PAGE));
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 
 process.exit(fail ? 1 : 0);

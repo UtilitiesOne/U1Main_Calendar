@@ -170,7 +170,7 @@
        submits it once, while this page holds one record per man per week, so Save
        stays per card. What transfers is the mode, its labels, and its placement. -->
   <button id="edit-mode-btn" style="display:none;" class="primary">Propose changes</button>
-  <button id="view-live-btn" style="display:none;">&larr; Back to read-only</button>
+  <button id="view-live-btn" style="display:none;">&larr; Back to live view</button>
   <div id="status"></div>
 </header>
 
@@ -330,7 +330,7 @@ function setEditMode(on) {
   if (vb) vb.style.display = (isEditor && editing) ? '' : 'none';
   setStatus(editing
     ? 'Editing. Changes save per person when you press Save.'
-    : (isEditor ? 'Read-only. Press Propose changes to edit.' : ''));
+    : (isEditor ? 'Viewing the live board. Click "Propose changes" to edit.' : ''));
   refreshStates();
 }
 const el = id => document.getElementById(id);
@@ -712,7 +712,7 @@ function loadPosts() {
 
 function savePost(id) {
   if (!db || !isEditor) { setStatus('Sign in as an editor first.'); return; }
-  if (!editing) { setStatus('You are in read-only. Press Propose changes first; nothing was saved.'); return; }
+  if (!editing) { setStatus('You are viewing the live board. Enter Propose changes first; nothing was saved.'); return; }
   const week = (el('week-' + id).value || '').trim();
   if (!week) { setStatus('Set the week before saving, so posts stay in order.'); return; }
   const payload = {
@@ -756,7 +756,7 @@ function savePost(id) {
    and this week's post are two different things to say yes to. */
 function saveAbout(id) {
   if (!db || !isEditor) { setStatus('Sign in as an editor first.'); return; }
-  if (!editing) { setStatus('You are in read-only. Press Propose changes first; nothing was saved.'); return; }
+  if (!editing) { setStatus('You are viewing the live board. Enter Propose changes first; nothing was saved.'); return; }
   const stat = el('aboutstat-' + id);
   db.collection('promo_posts').doc(id + '_about').set({
     personId: id,

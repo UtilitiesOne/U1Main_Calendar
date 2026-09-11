@@ -525,6 +525,15 @@ t('it uses the calendar name for the mode, not a second one',
   /viewer-locked/.test(PAGE) && !/\.viewing[\s{]/.test(PAGE)
   && /viewer-locked/.test(CALSRC));
 
+// Naming convention, which is where Alex started. The same control on two pages should
+// say the same words, so somebody who learns one page has not learned only that page.
+['Propose changes', 'Back to live view', 'Enter Propose changes first'].forEach(function (phrase) {
+  t('"' + phrase + '" is the calendar wording, used here too',
+    PAGE.indexOf(phrase) > -1 && CALSRC.indexOf(phrase) > -1);
+});
+t('and the old private vocabulary is gone',
+  !/Back to read-only|Read-only\. Press|You are in read-only/.test(PAGE));
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 
 process.exit(fail ? 1 : 0);

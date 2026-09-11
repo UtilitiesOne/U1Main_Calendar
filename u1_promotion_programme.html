@@ -32,32 +32,58 @@
 -->
 
 <style>
+  /* Tokens copied from u1_calendar_interactive.html, 2026-09-11 [SOURCE: user].
+
+     This page had invented its own set. Worst of it: --accent was #EB4B28 here and
+     #1B1C26 on the calendar, so the same variable name meant the brand orange on one
+     page and the dark header band on the other, and the brand itself rendered as two
+     different oranges a click apart.
+
+     Names and values now match the calendar exactly. When that file's palette moves,
+     copy it again rather than approximating it. */
   :root {
-    --ink: #14181d; --mute: #6b7480; --rule: #dfe3e8; --paper: #f7f8fa;
-    --card: #ffffff; --accent: #EB4B28; --ok: #1a7f4b; --warn: #b26a00;
+    --ink: #14181C;
+    --ink-soft: #3B434B;
+    --mute: #6A737B;
+    --rule: #E2E5E8;
+    --rule-soft: #EEF0F2;
+    --paper: #FFFFFF;
+    --panel: #F6F7F8;
+    --panel-2: #FAFBFC;
+    --accent: #1B1C26;
+    --u1-orange: #E0621E;
+    --u1-orange-soft: #FBF1E8;
+    --u1-orange-hover: #C3571D;
+    --amber: #B86E00;
+    --amber-soft: #FFF4E0;
+    --ok: #1f7a4d;
     --hold: #8a2e1c;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --ink: #e8eaed; --mute: #9aa4b0; --rule: #2c333c; --paper: #11151a;
-      --card: #171c22; --accent: #ff6a45; --ok: #4ec585; --warn: #e0a33c;
-      --hold: #e07a63;
-    }
+    /* The page used --card for the surface a person reads on. The calendar calls the
+       same thing --paper and uses --panel behind it. Kept as an alias so the markup
+       need not change in the same pass as the palette. */
+    --card: var(--paper);
+    --warn: var(--amber);
   }
   * { box-sizing: border-box; }
   body {
     margin: 0; background: var(--paper); color: var(--ink);
     font: 14px/1.55 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
+  /* The calendar's header, copied rather than approximated: dark band, white text,
+     a 3px orange rule under it, sticky. Somebody moving between the two pages should
+     meet one product. */
   header {
-    background: var(--card); border-bottom: 2px solid var(--accent);
-    padding: 14px 20px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    background: var(--accent); color: #fff;
+    padding: 14px 28px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    border-bottom: 3px solid var(--u1-orange);
+    position: sticky; top: 0; z-index: 50;
   }
-  h1 { font-size: 15px; margin: 0; letter-spacing: .02em; }
-  .sub { font-size: 11.5px; color: var(--mute); }
+  h1 { font-size: 15px; margin: 0; letter-spacing: .02em; color: #fff; }
+  .sub { font-size: 11.5px; color: rgba(255,255,255,0.7); }
+  header a { color: #fff; }
   .wrap { max-width: 1180px; margin: 0 auto; padding: 18px 20px 60px; }
   .note {
-    background: var(--card); border: 1px solid var(--rule); border-left: 3px solid var(--accent);
+    background: var(--panel); border: 1px solid var(--rule); border-left: 3px solid var(--u1-orange);
     border-radius: 5px; padding: 11px 14px; font-size: 12.5px; color: var(--mute);
     margin-bottom: 18px; line-height: 1.6;
   }
@@ -93,12 +119,17 @@
   }
   textarea { min-height: 190px; resize: vertical; line-height: 1.6; }
   .hint { font-size: 11px; color: var(--mute); margin-top: 4px; line-height: 1.5; }
+  /* One button language, matching the calendar's button.reset: transparent ground,
+     muted text, colour applied per role rather than a separate .primary class. */
   button {
     font: inherit; font-size: 12.5px; font-weight: 600; padding: 8px 14px;
-    border-radius: 5px; border: 1.5px solid var(--rule);
-    background: var(--card); color: var(--ink); cursor: pointer;
+    border-radius: 5px; border: 1px solid var(--rule);
+    background: transparent; color: var(--mute); cursor: pointer;
+    transition: border-color .12s, color .12s;
   }
-  button.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
+  button:hover:not(:disabled) { border-color: var(--u1-orange); color: var(--u1-orange); }
+  button.primary { border-color: var(--u1-orange); color: var(--u1-orange); }
+  button.go { border-color: var(--ok); color: var(--ok); }
   button:disabled { opacity: .45; cursor: default; }
   .btnrow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; align-items: center; }
   .voice {
@@ -106,8 +137,13 @@
     padding: 11px 13px; font-size: 12px; line-height: 1.6; color: var(--mute);
   }
   .voice b { color: var(--ink); }
-  a { color: var(--accent); }
+  a { color: var(--u1-orange); }
   #status { font-size: 12px; color: var(--mute); min-height: 18px; margin-left: auto; }
+  /* What read-only means on screen. The calendar greys its inputs the same way, so a
+     person can see they are looking rather than editing without reading a label. */
+  body.viewing textarea, body.viewing input, body.viewing select { opacity: .6; }
+  body.viewing .pbody button:not(.always) { display: none; }
+
   .gate-off {
     font-size: 11px; color: var(--mute); border: 1px dashed var(--rule);
     border-radius: 4px; padding: 7px 10px; margin-top: 10px; line-height: 1.55;
@@ -121,6 +157,18 @@
   </div>
   <a href="u1_calendar_interactive.html" style="font-size:12px;">&larr; Posting calendar</a>
   <button id="signin">Sign in with Google</button>
+  <!-- The calendar's action grammar, adopted 2026-09-11 [SOURCE: user].
+
+       That page opens read-only and you press Propose changes to edit, so nobody
+       edits a shared board by accident and the state you are in is always on screen.
+       This page had you permanently in edit mode with a Save on every card, which is
+       a second way of doing the same job in the same product.
+
+       Where the two differ by necessity: the calendar batches one shared document and
+       submits it once, while this page holds one record per man per week, so Save
+       stays per card. What transfers is the mode, its labels, and its placement. -->
+  <button id="edit-mode-btn" style="display:none;" class="primary">Propose changes</button>
+  <button id="view-live-btn" style="display:none;">&larr; Back to read-only</button>
   <div id="status"></div>
 </header>
 
@@ -267,6 +315,22 @@ function allowedNext(from, owner) {
 }
 
 let db = null, user = null, isEditor = false, isOwner = false;
+
+/* Read-only until you ask to edit, matching the calendar. An editor who opens this
+   board to look at it cannot change a man's post by tabbing through a field. */
+let editing = false;
+
+function setEditMode(on) {
+  editing = !!on && isEditor;
+  document.body.classList.toggle('viewing', !editing);
+  const eb = el('edit-mode-btn'), vb = el('view-live-btn');
+  if (eb) eb.style.display = (isEditor && !editing) ? '' : 'none';
+  if (vb) vb.style.display = (isEditor && editing) ? '' : 'none';
+  setStatus(editing
+    ? 'Editing. Changes save per person when you press Save.'
+    : (isEditor ? 'Read-only. Press Propose changes to edit.' : ''));
+  refreshStates();
+}
 const el = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -646,6 +710,7 @@ function loadPosts() {
 
 function savePost(id) {
   if (!db || !isEditor) { setStatus('Sign in as an editor first.'); return; }
+  if (!editing) { setStatus('You are in read-only. Press Propose changes first; nothing was saved.'); return; }
   const week = (el('week-' + id).value || '').trim();
   if (!week) { setStatus('Set the week before saving, so posts stay in order.'); return; }
   const payload = {
@@ -689,6 +754,7 @@ function savePost(id) {
    and this week's post are two different things to say yes to. */
 function saveAbout(id) {
   if (!db || !isEditor) { setStatus('Sign in as an editor first.'); return; }
+  if (!editing) { setStatus('You are in read-only. Press Propose changes first; nothing was saved.'); return; }
   const stat = el('aboutstat-' + id);
   db.collection('promo_posts').doc(id + '_about').set({
     personId: id,
@@ -966,7 +1032,7 @@ function publicPanel(p, posts) {
 
 function resolveRole(u) {
   if (!u) { isEditor = false; isOwner = false; refreshStates(); setStatus('Signed out.'); loadPublic(); return; }
-  if (u.email === OWNER) { isEditor = true; isOwner = true; setStatus('Signed in as owner. You are the only one who can move a post past Alex.'); refreshStates(); loadPosts(); watchVerdicts(); watchNotifications(); return; }
+  if (u.email === OWNER) { isEditor = true; isOwner = true; setStatus('Signed in as owner. You are the only one who can move a post past Alex.'); loadPosts(); watchVerdicts(); watchNotifications(); setEditMode(false); return; }
   db.collection('config').doc('roles').get()
     .then(doc => {
       const list = (doc.exists && doc.data() && doc.data().editors) || [];
@@ -976,7 +1042,7 @@ function resolveRole(u) {
       setStatus(isEditor
         ? 'Signed in as ' + u.email
         : 'Signed in as ' + u.email + ', but you are not on the editor list. Tell Alex.');
-      if (isEditor) { loadPosts(); watchNotifications(); } else loadPublic();
+      if (isEditor) { loadPosts(); watchNotifications(); setEditMode(false); } else loadPublic();
     })
     .catch(e => { isEditor = false; setStatus('Could not check your access: ' + e.message); });
 }
@@ -986,6 +1052,8 @@ wireUploads();
 refreshStates();
 firebase.initializeApp(firebaseConfig);
 db = firebase.firestore();
+el('edit-mode-btn').onclick = () => setEditMode(true);
+el('view-live-btn').onclick = () => setEditMode(false);
 el('signin').onclick = () =>
   firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider())
     .catch(e => setStatus('Sign-in failed: ' + e.message));

@@ -487,6 +487,37 @@ PUBLISHED.forEach(function (f) {
 t('Denis is not described as using heavy hashtag sets, which he has never done',
   !/Heavy hashtag sets/.test(PAGE) && /NO hashtags at all/.test(PAGE));
 
+
+/* One product, not two. Alex 2026-09-11: the programme page mirrors the calendar
+   visually and in its actions, rather than carrying a second way of doing the same
+   job. The clearest symptom was the brand rendering as two different oranges a click
+   apart, because --accent meant the orange on one page and the dark header on the
+   other. */
+const CALSRC = readFileSync(join(here, 'u1_calendar_interactive.html'), 'utf8');
+function tokenOf(src, name) {
+  const m = src.match(new RegExp('--' + name + ':\s*([^;]+);'));
+  return m ? m[1].trim() : null;
+}
+['u1-orange', 'accent', 'ink', 'mute', 'rule', 'paper', 'panel'].forEach(function (n) {
+  t('token --' + n + ' matches the calendar',
+    tokenOf(PAGE, n) !== null && tokenOf(PAGE, n) === tokenOf(CALSRC, n));
+});
+t('the brand orange is the calendar value, not a second one',
+  tokenOf(PAGE, 'u1-orange') === '#E0621E' && !/(--[a-z-]+|color|background):\s*#EB4B28/i.test(PAGE));
+t('the header is the dark band with the orange rule, like the calendar',
+  /header {[\s\S]{0,300}?background: var\(--accent\)/.test(PAGE)
+  && /border-bottom: 3px solid var\(--u1-orange\)/.test(PAGE));
+
+// The calendar opens read-only and you press Propose changes. This page used to have
+// you permanently editing, which is a second grammar for the same job.
+t('the page opens read-only and offers Propose changes',
+  /id="edit-mode-btn"/.test(PAGE) && /Propose changes/.test(PAGE)
+  && /setEditMode\(false\)/.test(PAGE));
+t('and read-only is enforced at the write, not just in the UI',
+  (PAGE.match(/if \(!editing\)/g) || []).length >= 2);
+t('the mode is visible without reading a label',
+  /body\.viewing textarea/.test(PAGE));
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 
 process.exit(fail ? 1 : 0);

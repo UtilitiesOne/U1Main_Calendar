@@ -141,8 +141,10 @@
   #status { font-size: 12px; color: var(--mute); min-height: 18px; margin-left: auto; }
   /* What read-only means on screen. The calendar greys its inputs the same way, so a
      person can see they are looking rather than editing without reading a label. */
-  body.viewing textarea, body.viewing input, body.viewing select { opacity: .6; }
-  body.viewing .pbody button:not(.always) { display: none; }
+  body.viewer-locked textarea,
+  body.viewer-locked input,
+  body.viewer-locked select { pointer-events: none; opacity: .55; }
+  body.viewer-locked .pbody button:not(.always) { display: none !important; }
 
   .gate-off {
     font-size: 11px; color: var(--mute); border: 1px dashed var(--rule);
@@ -322,7 +324,7 @@ let editing = false;
 
 function setEditMode(on) {
   editing = !!on && isEditor;
-  document.body.classList.toggle('viewing', !editing);
+  document.body.classList.toggle('viewer-locked', !editing);
   const eb = el('edit-mode-btn'), vb = el('view-live-btn');
   if (eb) eb.style.display = (isEditor && !editing) ? '' : 'none';
   if (vb) vb.style.display = (isEditor && editing) ? '' : 'none';

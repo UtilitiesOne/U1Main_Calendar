@@ -516,7 +516,14 @@ t('the page opens read-only and offers Propose changes',
 t('and read-only is enforced at the write, not just in the UI',
   (PAGE.match(/if \(!editing\)/g) || []).length >= 2);
 t('the mode is visible without reading a label',
-  /body\.viewing textarea/.test(PAGE));
+  /body\.viewer-locked textarea/.test(PAGE));
+// Greying is the cosmetic half. Without pointer-events a reader clicks into a field,
+// types a paragraph, and no save path will ever take it. The calendar's own rule.
+t('and read-only actually holds, rather than only looking held',
+  /body\.viewer-locked[\s\S]{0,160}?pointer-events: none/.test(PAGE));
+t('it uses the calendar name for the mode, not a second one',
+  /viewer-locked/.test(PAGE) && !/\.viewing[\s{]/.test(PAGE)
+  && /viewer-locked/.test(CALSRC));
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 

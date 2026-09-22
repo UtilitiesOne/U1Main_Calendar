@@ -1,0 +1,33 @@
+/* U1 shared design tokens.
+
+   One definition, linked by every page in this repo that needs it. Before this
+   file the palette was copy-pasted between surfaces with a comment telling the
+   next person to copy it again, and that copy had already gone wrong once:
+   --accent meant the brand orange on the promotion board and the dark header
+   band on the calendar, so the same variable name rendered two different things
+   a click apart.
+
+   What belongs here: values both surfaces share. What does not: anything only
+   one page uses. The calendar keeps its per-theme accents (--t1 to --t7) and the
+   promotion board keeps its status colours, each in a local :root AFTER this
+   file loads, so a page can still override without editing everyone else.
+
+   Linked with ?v= like the scripts. Change a value here and bump it, or
+   returning browsers keep the old palette from cache. */
+
+:root {
+  --ink: #14181C;
+  --ink-soft: #3B434B;
+  --mute: #6A737B;
+  --rule: #E2E5E8;
+  --rule-soft: #EEF0F2;
+  --paper: #FFFFFF;
+  --panel: #F6F7F8;
+  --panel-2: #FAFBFC;
+  --accent: #1B1C26;
+  --u1-orange: #E0621E;
+  --u1-orange-soft: #FBF1E8;
+  --u1-orange-hover: #C3571D;
+  --amber: #B86E00;
+  --amber-soft: #FFF4E0;
+}

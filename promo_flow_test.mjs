@@ -494,16 +494,35 @@ t('Denis is not described as using heavy hashtag sets, which he has never done',
    apart, because --accent meant the orange on one page and the dark header on the
    other. */
 const CALSRC = readFileSync(join(here, 'u1_calendar_interactive.html'), 'utf8');
+let TOKENS = '';
+try { TOKENS = readFileSync(join(here, 'u1_tokens.css'), 'utf8'); } catch (e) { TOKENS = ''; }
 function tokenOf(src, name) {
-  const m = src.match(new RegExp('--' + name + ':\s*([^;]+);'));
+  const m = src.match(new RegExp('--' + name + ':\\s*([^;]+);'));
   return m ? m[1].trim() : null;
 }
+
+/* This used to compare two hand-copies of the palette line by line, which is the
+   check you write when two copies exist. They drifted anyway, because comparing
+   copies catches divergence after it happens and nothing stops it happening.
+
+   There is now one file both pages link, so the property worth testing changed.
+   Not "do the copies agree" but "is there still only one copy". A page that
+   redefines a shared token has quietly reopened the hole this test exists for,
+   and that is what these cases refuse. */
+t('the shared token file exists', TOKENS.length > 0);
+t('the calendar links the shared tokens',
+  /<link rel="stylesheet" href="u1_tokens\.css\?v=[0-9.]+"/.test(CALSRC));
+t('the programme page links the shared tokens',
+  /<link rel="stylesheet" href="u1_tokens\.css\?v=[0-9.]+"/.test(PAGE));
 ['u1-orange', 'accent', 'ink', 'mute', 'rule', 'paper', 'panel'].forEach(function (n) {
-  t('token --' + n + ' matches the calendar',
-    tokenOf(PAGE, n) !== null && tokenOf(PAGE, n) === tokenOf(CALSRC, n));
+  t('--' + n + ' is defined once, in the shared file',
+    tokenOf(TOKENS, n) !== null
+    && tokenOf(PAGE, n) === null
+    && tokenOf(CALSRC, n) === null);
 });
 t('the brand orange is the calendar value, not a second one',
-  tokenOf(PAGE, 'u1-orange') === '#E0621E' && !/(--[a-z-]+|color|background):\s*#EB4B28/i.test(PAGE));
+  tokenOf(TOKENS, 'u1-orange') === '#E0621E'
+  && !/(--[a-z-]+|color|background):\s*#EB4B28/i.test(PAGE));
 t('the header is the dark band with the orange rule, like the calendar',
   /header {[\s\S]{0,300}?background: var\(--accent\)/.test(PAGE)
   && /border-bottom: 3px solid var\(--u1-orange\)/.test(PAGE));

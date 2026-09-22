@@ -31,31 +31,13 @@
   status flow below exists to make that visible rather than assumed.
 -->
 
+<!-- Shared palette, one definition for every surface in this repo. The hand-copy
+     that used to live here is gone, and so is the instruction to copy it again.
+     Local :root below carries only what this page alone uses. -->
+<link rel="stylesheet" href="u1_tokens.css?v=1.0">
+
 <style>
-  /* Tokens copied from u1_calendar_interactive.html, 2026-09-11 [SOURCE: user].
-
-     This page had invented its own set. Worst of it: --accent was #EB4B28 here and
-     #1B1C26 on the calendar, so the same variable name meant the brand orange on one
-     page and the dark header band on the other, and the brand itself rendered as two
-     different oranges a click apart.
-
-     Names and values now match the calendar exactly. When that file's palette moves,
-     copy it again rather than approximating it. */
   :root {
-    --ink: #14181C;
-    --ink-soft: #3B434B;
-    --mute: #6A737B;
-    --rule: #E2E5E8;
-    --rule-soft: #EEF0F2;
-    --paper: #FFFFFF;
-    --panel: #F6F7F8;
-    --panel-2: #FAFBFC;
-    --accent: #1B1C26;
-    --u1-orange: #E0621E;
-    --u1-orange-soft: #FBF1E8;
-    --u1-orange-hover: #C3571D;
-    --amber: #B86E00;
-    --amber-soft: #FFF4E0;
     --ok: #1f7a4d;
     --hold: #8a2e1c;
     /* The page used --card for the surface a person reads on. The calendar calls the

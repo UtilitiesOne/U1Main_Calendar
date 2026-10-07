@@ -50,10 +50,21 @@ t('structural: the programme path exists and is keyed by post',
   /match \/promo-images\/\{postId\}\/\{file\}/.test(SRC));
 t('structural: the programme path is NOT world-readable',
   !/match \/promo-images[\s\S]{0,140}?allow read:\s*if true/.test(SRC));
-t('structural: both paths keep the 10MB ceiling',
+/* These two said "both paths" until 2026-10-07, when the calendar path gained
+   video and the programme path deliberately did not. Counting occurrences passed
+   either way, because the image arm still carries both strings, so the assertion
+   went on reading true while describing something that had stopped being true.
+   They now name which path holds what. */
+t('structural: the image ceiling is still 10MB on both paths',
   (SRC.match(/request\.resource\.size < 10 \* 1024 \* 1024/g) || []).length === 2);
-t('structural: both paths keep the image-only content type',
+t('structural: the calendar path carries a separate 200MB video ceiling',
+  /request\.resource\.size < 200 \* 1024 \* 1024/.test(SRC));
+t('structural: both paths still accept images',
   (SRC.match(/contentType\.matches\('image\/\.\*'\)/g) || []).length === 2);
+t('structural: only the calendar path names video types, and only three of them',
+  (SRC.match(/contentType\.matches\('video\/\(mp4\|quicktime\|webm\)'\)/g) || []).length === 1);
+t('structural: the programme path is still image-only',
+  !/match \/promo-images[\s\S]{0,700}?contentType\.matches\('video/.test(SRC));
 t('structural: programme images are deletable while drafting',
   /allow delete:[\s\S]{0,320}?status == 'drafting'/.test(SRC));
 t('structural: the delete rule requires the post to exist',
@@ -75,6 +86,16 @@ const img = { size: 1024 * 500, contentType: 'image/png' };
 const big = { size: 11 * 1024 * 1024, contentType: 'image/png' };
 const pdf = { size: 1024, contentType: 'application/pdf' };
 
+/* Video on the calendar path only (2026-10-07). The programme path was left
+   image-only deliberately, so the cases below assert that difference rather than
+   assuming it: a change that widens promo-images by accident fails here. */
+const mp4   = { size: 50 * 1024 * 1024,  contentType: 'video/mp4' };
+const mov   = { size: 50 * 1024 * 1024,  contentType: 'video/quicktime' };
+const webm  = { size: 50 * 1024 * 1024,  contentType: 'video/webm' };
+const bigVid = { size: 250 * 1024 * 1024, contentType: 'video/mp4' };
+const vidAtImgSize = { size: 11 * 1024 * 1024, contentType: 'video/mp4' };
+const avi   = { size: 1024 * 500, contentType: 'video/x-msvideo' };
+
 const cases = [
   // The regression guard: the calendar must keep working exactly as before.
   ['calendar images stay public to read', 'ALLOW', null, O + '/post-images/u1/x.png', 'get', null],
@@ -82,6 +103,19 @@ const cases = [
   ['a signed-out user still cannot upload one', 'DENY', null, O + '/post-images/u1/x.png', 'create', img],
   ['the 10MB ceiling still holds on the calendar path', 'DENY', auth, O + '/post-images/u1/x.png', 'create', big],
   ['non-images are still refused on the calendar path', 'DENY', auth, O + '/post-images/u1/x.pdf', 'create', pdf],
+
+  // Video, calendar path. The size arms are separate, which is the whole point of
+  // the two-arm rule: 11MB is over the image ceiling and well under the video one.
+  ['an MP4 can be uploaded to the calendar path', 'ALLOW', auth, O + '/post-images/u1/c.mp4', 'create', mp4],
+  ['a MOV can too', 'ALLOW', auth, O + '/post-images/u1/c.mov', 'create', mov],
+  ['a WebM can too', 'ALLOW', auth, O + '/post-images/u1/c.webm', 'create', webm],
+  ['a video at 11MB is fine, where an image that size is not', 'ALLOW', auth, O + '/post-images/u1/c.mp4', 'create', vidAtImgSize],
+  ['a video over 200MB is refused', 'DENY', auth, O + '/post-images/u1/c.mp4', 'create', bigVid],
+  ['an unlisted video format is refused', 'DENY', auth, O + '/post-images/u1/c.avi', 'create', avi],
+  ['a signed-out user cannot upload video either', 'DENY', null, O + '/post-images/u1/c.mp4', 'create', mp4],
+
+  // The programme path was NOT widened. If someone widens it later, this fails.
+  ['video is still refused on the programme path', 'DENY', auth, O + '/promo-images/p_1/c.mp4', 'create', mp4],
 
   // The new path, and its one real difference.
   ['a signed-in editor can upload a programme visual', 'ALLOW', auth, O + '/promo-images/u1/x.png', 'create', img],

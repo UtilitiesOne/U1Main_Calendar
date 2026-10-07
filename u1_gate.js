@@ -71,6 +71,25 @@
   var OWN_BUCKET = /^https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/u1-calendar\.firebasestorage\.app\//i;
   var MIN_IMAGE_WIDTH = 1080;
 
+  /* A visual is an image or a video (2026-10-07). Presence and our-library are the
+     same test for both, because a post is incomplete without artwork whatever kind
+     it is, and an asset we do not host is not an asset either way.
+
+     What differs is the shape test. The image numbers stay exactly as they were.
+
+     Provenance of the video numbers, because they are not all the same kind of
+     thing. The 256x144 floor and the 1:2.4 to 2.4:1 crop band are LinkedIn's,
+     taken from third-party specs guides that agree with each other rather than
+     from LinkedIn's own documentation, checked 2026-10-07; treat them as working
+     numbers and re-check them if a clip is ever refused at the platform.
+     MIN_VIDEO_WIDTH and MAX_VIDEO_SECONDS are OURS. LinkedIn allows ten minutes;
+     three is our cap because it bounds what the upload accepts and what the
+     safety review has to watch. */
+  var MIN_VIDEO_WIDTH = 720;
+  var MIN_VIDEO_FLOOR_W = 256;
+  var MIN_VIDEO_FLOOR_H = 144;
+  var MAX_VIDEO_SECONDS = 180;
+
   function checkVisual(out, post) {
     var img = String(post.image || '').trim();
     if (!img) {
@@ -81,23 +100,48 @@
     }
     if (!OWN_BUCKET.test(img)) {
       out.push(item('BLOCK', 'Visual is not in our library',
-        'This image points somewhere we do not control, so it can move or disappear after publication.',
+        'This visual points somewhere we do not control, so it can move or disappear after publication.',
         'Upload the file through the post editor so it lands in the shared library.',
         img.slice(0, 60)));
     }
     var m = post.imageMeta;
-    if (m && m.w && m.h) {
-      if (m.w < MIN_IMAGE_WIDTH) {
-        out.push(item('WARN', 'Visual is small for the feed',
-          'This image is ' + m.w + 'px wide. Below about ' + MIN_IMAGE_WIDTH + 'px it renders soft on a retina feed.',
-          'Export it at 1200px wide or more.'));
+    if (!(m && m.w && m.h)) return;
+
+    if (m.kind === 'video') {
+      if (m.w < MIN_VIDEO_FLOOR_W || m.h < MIN_VIDEO_FLOOR_H) {
+        out.push(item('BLOCK', 'Video is below the feed minimum',
+          'This video is ' + m.w + ' by ' + m.h + '. The published floor is '
+            + MIN_VIDEO_FLOOR_W + ' by ' + MIN_VIDEO_FLOOR_H + '.',
+          'Re-export at 1080x1080 or 1920x1080.'));
+      } else if (m.w < MIN_VIDEO_WIDTH) {
+        out.push(item('WARN', 'Video is small for the feed',
+          'This video is ' + m.w + 'px wide. Below about ' + MIN_VIDEO_WIDTH + 'px it renders soft once the feed scales it.',
+          'Re-export at 1080px wide or more.'));
       }
-      var ratio = m.w / m.h;
-      if (ratio < 0.5 || ratio > 2.0) {
+      var vr = m.w / m.h;
+      if (vr < 1 / 2.4 || vr > 2.4) {
         out.push(item('WARN', 'Unusual aspect ratio',
-          'This image is ' + m.w + ' by ' + m.h + '. The feed crops hard outside roughly 1:2 to 2:1.',
-          'Re-crop to square, 4:5 portrait, or 1.91:1 landscape.'));
+          'This video is ' + m.w + ' by ' + m.h + '. LinkedIn crops outside roughly 1:2.4 to 2.4:1.',
+          'Re-crop to 1:1, 4:5 portrait, or 16:9 landscape.'));
       }
+      if (m.seconds && m.seconds > MAX_VIDEO_SECONDS) {
+        out.push(item('BLOCK', 'Video is longer than we allow',
+          'This video runs ' + m.seconds + ' seconds. Our cap is ' + MAX_VIDEO_SECONDS + '.',
+          'Cut it to three minutes or less.'));
+      }
+      return;
+    }
+
+    if (m.w < MIN_IMAGE_WIDTH) {
+      out.push(item('WARN', 'Visual is small for the feed',
+        'This image is ' + m.w + 'px wide. Below about ' + MIN_IMAGE_WIDTH + 'px it renders soft on a retina feed.',
+        'Export it at 1200px wide or more.'));
+    }
+    var ratio = m.w / m.h;
+    if (ratio < 0.5 || ratio > 2.0) {
+      out.push(item('WARN', 'Unusual aspect ratio',
+        'This image is ' + m.w + ' by ' + m.h + '. The feed crops hard outside roughly 1:2 to 2:1.',
+        'Re-crop to square, 4:5 portrait, or 1.91:1 landscape.'));
     }
   }
 
@@ -347,7 +391,7 @@
   // uses this to tell someone their list came from an older rulebook rather
   // than leaving them staring at findings the gate no longer produces
   // (caught 2026-08-25: rules changed under a stored, unrefreshed review).
-  var RULES_VERSION = '2026-08-28';
+  var RULES_VERSION = '2026-10-07';
 
   root.U1Gate = { checkPost: checkPost, verdict: verdict, RULES_VERSION: RULES_VERSION,
                   SIGNATURE: SIGNATURE, TAX: TAX, BANNED_TAGS: BANNED_TAGS };

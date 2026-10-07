@@ -2754,11 +2754,11 @@ function openPostEditor(slot) {
     <div class="pe-field"><label class="pe-fl">Division</label><select id="pe-div">${divOpts}</select></div>
     <div class="pe-field"><label class="pe-fl">Visual tagline</label><select id="pe-tag">${tagOpts}</select>
       <div class="pe-hint">Approved brand lines only. Pick the one that fits this post, or signature only.</div></div>
-    <div class="pe-field"><label class="pe-fl">Visual image</label>
-      <div id="pe-img-wrap">${buf.image ? `<img src="${escapeHtml(buf.image)}" style="max-width:100%; max-height:300px; border:1.5px solid var(--rule); border-radius:4px; display:block; margin-bottom:8px;">` : ''}</div>
-      <input type="file" id="pe-img-file" accept="image/*">
-      <button type="button" id="pe-img-clear" style="margin-left:10px; font-family:inherit; font-size:12px; padding:6px 12px; border:1.5px solid var(--rule); border-radius:5px; background:white; cursor:pointer;">Remove image</button>
-      <div class="pe-hint" id="pe-img-status">PNG or JPG up to 10MB. It uploads to the shared library and the link saves with the post.</div></div>
+    <div class="pe-field"><label class="pe-fl">Visual</label>
+      <div id="pe-img-wrap">${visualPreviewHtml(buf.image, buf.imageMeta, 300)}</div>
+      <input type="file" id="pe-img-file" accept="${VISUAL_LIMITS.accept}">
+      <button type="button" id="pe-img-clear" style="margin-left:10px; font-family:inherit; font-size:12px; padding:6px 12px; border:1.5px solid var(--rule); border-radius:5px; background:white; cursor:pointer;">Remove visual</button>
+      <div class="pe-hint" id="pe-img-status">PNG or JPG up to 10MB, or MP4, MOV or WebM up to 200MB and 3 minutes. It uploads to the shared library and the link saves with the post.</div></div>
     <div class="pe-field"><label class="pe-fl">Post body · what this post says</label>
       <textarea id="pe-note" placeholder="Write the post body here.">${escapeHtml(buf.note)}</textarea></div>
     <div class="pe-field"><label class="pe-fl">Layer 2 · TRUST line (writer-authored)</label>
@@ -2780,23 +2780,24 @@ function openPostEditor(slot) {
     var wrap = document.getElementById('pe-img-wrap');
     var statusEl = document.getElementById('pe-img-status');
     var setStatus = function (t) { if (statusEl) statusEl.textContent = t; };
-    var setPreview = function (url) { if (wrap) wrap.innerHTML = url ? '<img src="' + escapeHtml(url) + '" style="max-width:100%; max-height:300px; border:1.5px solid var(--rule); border-radius:4px; display:block; margin-bottom:8px;">' : ''; };
+    var setPreview = function (url, meta) { if (wrap) wrap.innerHTML = visualPreviewHtml(url, meta, 300); };
     var fileEl = document.getElementById('pe-img-file');
     if (fileEl) fileEl.addEventListener('change', function (e) {
       var f = e.target.files && e.target.files[0]; if (!f) return;
-      if (f.size > 10 * 1024 * 1024) { setStatus('That image is over 10MB. Pick a smaller file.'); return; }
-      if ((typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON) || !fb.user) { setStatus('Sign in to upload an image.'); return; }
+      var bad = visualRejectReason(f);
+      if (bad) { setStatus(bad); return; }
+      if ((typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON) || !fb.user) { setStatus('Sign in to upload a visual.'); return; }
       setStatus('Uploading...');
       var path = 'post-images/' + fb.user.uid + '/' + Date.now() + '_' + f.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      readImageMeta(f).then(function (meta) {
+      readVisualMeta(f).then(function (meta) {
         return firebase.storage().ref().child(path).put(f).then(function (snap) { return snap.ref.getDownloadURL(); }).then(function (url) {
-          buf.image = url; buf.imageMeta = meta; setPreview(url);
-          setStatus('Uploaded.' + (meta && meta.w ? ' ' + meta.w + ' by ' + meta.h + '.' : ''));
+          buf.image = url; buf.imageMeta = meta; setPreview(url, meta);
+          setStatus('Uploaded.' + visualMetaSummary(meta));
         });
       }).catch(function (err) { setStatus('Upload failed: ' + err.message); });
     });
     var clearEl = document.getElementById('pe-img-clear');
-    if (clearEl) clearEl.onclick = function () { buf.image = ''; buf.imageMeta = null; setPreview(''); setStatus('Image removed. Save to apply.'); };
+    if (clearEl) clearEl.onclick = function () { buf.image = ''; buf.imageMeta = null; setPreview('', null); setStatus('Visual removed. Save to apply.'); };
   })();
 
   const closePE = () => { pe.classList.remove('open'); };
@@ -3076,11 +3077,11 @@ function renderModalBody() {
       </select>
     </div>
     <div class="field">
-      <label class="fl">Visual image</label>
-      <div id="m-img-wrap">${modalState.image ? `<img src="${escapeHtml(modalState.image)}" style="max-width:100%; max-height:220px; border:1.5px solid var(--rule); border-radius:4px; display:block; margin-bottom:8px;">` : ''}</div>
-      <input type="file" id="m-img-file" accept="image/*">
-      <button type="button" id="m-img-clear" style="margin-left:10px; font-family:inherit; font-size:12px; padding:6px 12px; border:1.5px solid var(--rule); border-radius:5px; background:white; cursor:pointer;">Remove image</button>
-      <div style="font-size:11px; color:var(--mute); margin-top:4px;" id="m-img-status">PNG or JPG up to 10MB. Uploads to the shared library; the gate requires a visual before submission.</div>
+      <label class="fl">Visual</label>
+      <div id="m-img-wrap">${visualPreviewHtml(modalState.image, modalState.imageMeta, 220)}</div>
+      <input type="file" id="m-img-file" accept="${VISUAL_LIMITS.accept}">
+      <button type="button" id="m-img-clear" style="margin-left:10px; font-family:inherit; font-size:12px; padding:6px 12px; border:1.5px solid var(--rule); border-radius:5px; background:white; cursor:pointer;">Remove visual</button>
+      <div style="font-size:11px; color:var(--mute); margin-top:4px;" id="m-img-status">PNG or JPG up to 10MB, or MP4, MOV or WebM up to 200MB and 3 minutes. Uploads to the shared library; the gate requires a visual before submission.</div>
     </div>
     <div class="field">
       <label class="fl" for="m-trustline">${modalMode === 'companyevent' ? 'TRUST line (optional here)' : 'TRUST line (Layer 2) · surfaces in the body before the brand-heart close'}</label>
@@ -3120,23 +3121,24 @@ function renderModalBody() {
     var wrap = document.getElementById('m-img-wrap');
     var statusEl = document.getElementById('m-img-status');
     var setStatus = function (t) { if (statusEl) statusEl.textContent = t; };
-    var setPreview = function (url) { if (wrap) wrap.innerHTML = url ? '<img src="' + escapeHtml(url) + '" style="max-width:100%; max-height:220px; border:1.5px solid var(--rule); border-radius:4px; display:block; margin-bottom:8px;">' : ''; };
+    var setPreview = function (url, meta) { if (wrap) wrap.innerHTML = visualPreviewHtml(url, meta, 220); };
     var fileEl = document.getElementById('m-img-file');
     if (fileEl) fileEl.addEventListener('change', function (e) {
       var f = e.target.files && e.target.files[0]; if (!f) return;
-      if (f.size > 10 * 1024 * 1024) { setStatus('That image is over 10MB. Pick a smaller file.'); return; }
-      if ((typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON) || !fb.user) { setStatus('Sign in to upload an image.'); return; }
+      var bad = visualRejectReason(f);
+      if (bad) { setStatus(bad); return; }
+      if ((typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON) || !fb.user) { setStatus('Sign in to upload a visual.'); return; }
       setStatus('Uploading...');
       var path = 'post-images/' + fb.user.uid + '/' + Date.now() + '_' + f.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      readImageMeta(f).then(function (meta) {
+      readVisualMeta(f).then(function (meta) {
         return firebase.storage().ref().child(path).put(f).then(function (snap) { return snap.ref.getDownloadURL(); }).then(function (url) {
-          modalState.image = url; modalState.imageMeta = meta; modalState.imageCleared = false; setPreview(url);
-          setStatus('Uploaded.' + (meta && meta.w ? ' ' + meta.w + ' by ' + meta.h + '.' : ''));
+          modalState.image = url; modalState.imageMeta = meta; modalState.imageCleared = false; setPreview(url, meta);
+          setStatus('Uploaded.' + visualMetaSummary(meta));
         });
       }).catch(function (err) { setStatus('Upload failed: ' + err.message); });
     });
     var clearEl = document.getElementById('m-img-clear');
-    if (clearEl) clearEl.onclick = function () { modalState.image = ''; modalState.imageMeta = null; modalState.imageCleared = true; setPreview(''); setStatus('Image removed.'); };
+    if (clearEl) clearEl.onclick = function () { modalState.image = ''; modalState.imageMeta = null; modalState.imageCleared = true; setPreview('', null); setStatus('Visual removed.'); };
   })();
   if (document.getElementById('m-ptype')) {
     document.getElementById('m-ptype').addEventListener('change', e => {
@@ -3488,22 +3490,101 @@ function renderLaneTabs() {
   });
 }
 
-// Reads the real pixel dimensions before upload so the gate can judge the asset,
-// not just its presence (2026-08-11). Resolves null on any failure: metadata is a
-// nice-to-have, never a reason to lose an upload.
-function readImageMeta(file) {
+/* A visual is an image OR a video (2026-10-07). Both ride the same field, the same
+   upload path and the same gate check; only the limits and the way you read the
+   dimensions differ.
+
+   Limits are ours, not LinkedIn's. LinkedIn accepts up to 5GB and ten minutes,
+   which is far past anything a feed clip needs and well past what we want to pay
+   Storage for. The duration cap also bounds what the safety review has to watch.
+   Change a number here and it changes everywhere, which is the point of it being
+   here rather than in three upload handlers. */
+var VISUAL_LIMITS = {
+  imageBytes: 10 * 1024 * 1024,
+  videoBytes: 200 * 1024 * 1024,
+  videoSeconds: 180,
+  imageAccept: 'image/*',
+  videoAccept: 'video/mp4,video/quicktime,video/webm',
+  videoTypes: /^video\/(mp4|quicktime|webm)$/i
+};
+VISUAL_LIMITS.accept = VISUAL_LIMITS.imageAccept + ',' + VISUAL_LIMITS.videoAccept;
+
+function isVideoFile(file) {
+  return !!(file && VISUAL_LIMITS.videoTypes.test(String(file.type || '')));
+}
+/* A stored visual is judged by what its metadata says it is, because a Storage
+   download URL carries no extension to read. kind is written at upload time and
+   anything without one is an image, which is every visual uploaded before today. */
+function isVideoMeta(meta) { return !!(meta && meta.kind === 'video'); }
+
+/* Reads the real dimensions before upload so the gate can judge the asset rather
+   than its presence (2026-08-11), now for either kind. Resolves null on any
+   failure: metadata is a nice-to-have and never a reason to lose an upload. */
+function readVisualMeta(file) {
   return new Promise(function (resolve) {
     try {
       var url = URL.createObjectURL(file);
+      if (isVideoFile(file)) {
+        var vid = document.createElement('video');
+        vid.preload = 'metadata';
+        vid.onloadedmetadata = function () {
+          var m = { kind: 'video', w: vid.videoWidth, h: vid.videoHeight,
+                    seconds: Math.round(vid.duration || 0), bytes: file.size };
+          URL.revokeObjectURL(url); resolve(m);
+        };
+        vid.onerror = function () { URL.revokeObjectURL(url); resolve(null); };
+        vid.src = url;
+        return;
+      }
       var img = new Image();
       img.onload = function () {
-        var m = { w: img.naturalWidth, h: img.naturalHeight, bytes: file.size };
+        var m = { kind: 'image', w: img.naturalWidth, h: img.naturalHeight, bytes: file.size };
         URL.revokeObjectURL(url); resolve(m);
       };
       img.onerror = function () { URL.revokeObjectURL(url); resolve(null); };
       img.src = url;
     } catch (e) { resolve(null); }
   });
+}
+/* Kept so any caller added later that still asks for image metadata gets the
+   dual reader rather than a missing function. */
+function readImageMeta(file) { return readVisualMeta(file); }
+
+/* One preview builder for all three editors, so a video never renders into an
+   <img> that silently shows nothing. */
+function visualPreviewHtml(url, meta, maxHeight) {
+  if (!url) return '';
+  var box = 'max-width:100%; max-height:' + (maxHeight || 300) + 'px; border:1.5px solid var(--rule); border-radius:4px; display:block; margin-bottom:8px;';
+  return isVideoMeta(meta)
+    ? '<video src="' + escapeHtml(url) + '" controls preload="metadata" style="' + box + '"></video>'
+    : '<img src="' + escapeHtml(url) + '" style="' + box + '">';
+}
+
+/* The one place that decides whether a chosen file is allowed up. Returns null
+   when it is fine, or the sentence to show the editor when it is not. */
+function visualRejectReason(file) {
+  if (isVideoFile(file)) {
+    if (file.size > VISUAL_LIMITS.videoBytes) {
+      return 'That video is over ' + Math.round(VISUAL_LIMITS.videoBytes / 1048576) + 'MB. Pick a smaller file.';
+    }
+    return null;
+  }
+  if (/^image\//i.test(String(file.type || ''))) {
+    if (file.size > VISUAL_LIMITS.imageBytes) {
+      return 'That image is over ' + Math.round(VISUAL_LIMITS.imageBytes / 1048576) + 'MB. Pick a smaller file.';
+    }
+    return null;
+  }
+  return 'That file type is not supported. Images, or MP4, MOV and WebM video.';
+}
+
+/* What the editor sees after a successful upload. A video says its length because
+   that is the number that decides whether the gate will accept it. */
+function visualMetaSummary(meta) {
+  if (!meta || !meta.w) return '';
+  var s = ' ' + meta.w + ' by ' + meta.h;
+  if (isVideoMeta(meta) && meta.seconds) s += ', ' + meta.seconds + 's';
+  return s + '.';
 }
 
 function laneCanEdit() {
@@ -3669,11 +3750,11 @@ function openLanePostEditor(laneId, postId) {
     '<div class="pe-field"><label class="pe-fl">Date</label><input type="date" id="lpe-date" value="' + escapeHtml(buf.date) + '"></div>' +
     '<div class="pe-field"><label class="pe-fl">Category (mix rule per 4 posts: 1 people, 2 named-site, 1 capability)</label><select id="lpe-cat">' + catOpts + '</select></div>' +
     '<div class="pe-field"><label class="pe-fl">Visual</label><div class="pe-locked">Signature only. Parent brand lines never appear on division visuals.</div></div>' +
-    '<div class="pe-field"><label class="pe-fl">Visual image</label>' +
-    '<div id="lpe-img-wrap">' + (buf.image ? '<img src="' + escapeHtml(buf.image) + '" style="max-width:100%; max-height:300px; border:1.5px solid var(--rule); border-radius:4px; display:block; margin-bottom:8px;">' : '') + '</div>' +
-    '<input type="file" id="lpe-img-file" accept="image/*">' +
-    '<button type="button" id="lpe-img-clear" style="margin-left:10px; font-family:inherit; font-size:12px; padding:6px 12px; border:1.5px solid var(--rule); border-radius:5px; background:white; cursor:pointer;">Remove image</button>' +
-    '<div class="pe-hint" id="lpe-img-status">PNG or JPG up to 10MB. Uploads to the shared library.</div></div>' +
+    '<div class="pe-field"><label class="pe-fl">Visual</label>' +
+    '<div id="lpe-img-wrap">' + visualPreviewHtml(buf.image, buf.imageMeta, 300) + '</div>' +
+    '<input type="file" id="lpe-img-file" accept="' + VISUAL_LIMITS.accept + '">' +
+    '<button type="button" id="lpe-img-clear" style="margin-left:10px; font-family:inherit; font-size:12px; padding:6px 12px; border:1.5px solid var(--rule); border-radius:5px; background:white; cursor:pointer;">Remove visual</button>' +
+    '<div class="pe-hint" id="lpe-img-status">PNG or JPG up to 10MB, or MP4, MOV or WebM up to 200MB and 3 minutes. Uploads to the shared library.</div></div>' +
     '<div class="pe-field"><label class="pe-fl">Post body · the division speaks, collective we</label>' +
     '<textarea id="lpe-note" placeholder="Write the post body here. Close on the signature.">' + escapeHtml(buf.note) + '</textarea></div>' +
     '<div class="pe-field"><label class="pe-fl">Layer 2 · TRUST line (writer-authored)</label>' +
@@ -3697,15 +3778,16 @@ function openLanePostEditor(laneId, postId) {
     const f = fileEl.files && fileEl.files[0];
     if (!f) return;
     const st = document.getElementById('lpe-img-status');
-    if (typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON || !fb.user) { st.textContent = 'Sign in to upload images.'; return; }
-    if (f.size > 10 * 1024 * 1024) { st.textContent = 'That file is over 10MB.'; return; }
+    if (typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON || !fb.user) { st.textContent = 'Sign in to upload a visual.'; return; }
+    const bad = visualRejectReason(f);
+    if (bad) { st.textContent = bad; return; }
     st.textContent = 'Uploading...';
     const path = 'post-images/' + fb.user.uid + '/' + Date.now() + '_' + f.name.replace(/[^A-Za-z0-9._-]/g, '_');
-    readImageMeta(f).then(function (meta) {
+    readVisualMeta(f).then(function (meta) {
       return firebase.storage().ref().child(path).put(f).then(function (snap) { return snap.ref.getDownloadURL(); }).then(function (url) {
         buf.image = url; buf.imageMeta = meta;
-        document.getElementById('lpe-img-wrap').innerHTML = '<img src="' + escapeHtml(url) + '" style="max-width:100%; max-height:300px; border:1.5px solid var(--rule); border-radius:4px; display:block; margin-bottom:8px;">';
-        st.textContent = 'Uploaded.' + (meta && meta.w ? ' ' + meta.w + ' by ' + meta.h + '.' : '');
+        document.getElementById('lpe-img-wrap').innerHTML = visualPreviewHtml(url, meta, 300);
+        st.textContent = 'Uploaded.' + visualMetaSummary(meta);
       });
     }).catch(function (e) { st.textContent = 'Upload failed: ' + e.message; });
   });
@@ -3713,7 +3795,7 @@ function openLanePostEditor(laneId, postId) {
   if (clearLPEImg) clearLPEImg.onclick = function () {
     buf.image = ''; buf.imageMeta = null;
     document.getElementById('lpe-img-wrap').innerHTML = '';
-    document.getElementById('lpe-img-status').textContent = 'Image removed. Save to apply. A post needs a visual before it can be submitted.';
+    document.getElementById('lpe-img-status').textContent = 'Visual removed. Save to apply. A post needs a visual before it can be submitted.';
   };
 
   const closeLPE = () => { pe.classList.remove('open'); };
@@ -4707,7 +4789,7 @@ initFirebaseSync();
 </script>
 
 <script src="u1_baseline.js?v=4.2"></script>
-<script src="u1_gate.js?v=5.4"></script>
+<script src="u1_gate.js?v=5.5"></script>
 <script src="u1_scope.js?v=5.1"></script>
 <script src="u1_review_ui.js?v=5.5"></script>
 <script src="u1_review_panel.js?v=4.4"></script>

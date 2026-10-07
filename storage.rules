@@ -1,21 +1,40 @@
 rules_version = '2';
 
-// Brought into the repo 2026-09-07. These rules were console-only until now, so
+// Brought into the repo 2026-09-07. These rules were console-only until then, so
 // nothing reviewed them, nothing tested them, and the only copy lived in a web UI.
 //
-// The post-images block below is reproduced from the live ruleset
-// 346cd647-8175-431f-8076-0623bbfc818a (created 2026-06-23), character for
-// character including its comment and spacing. Deploying this file must not
-// change the calendar's uploads at all. If that block ever needs editing, diff it
-// against that ruleset first.
+// The post-images block was originally reproduced character for character from
+// live ruleset 346cd647 (created 2026-06-23), with an instruction to diff against
+// that ruleset before ever editing it.
+//
+// That diff was run on 2026-10-07, and the instruction had gone stale. The live
+// storage ruleset is 8e272523-562d-464f-8139-3885002a3b0e, created 2026-09-07 by
+// the deploy of this very file, and it is byte-identical to what was in the repo.
+// So the repo file IS production, 346cd647 is two rulesets back, and the thing to
+// diff against is whatever `releases` currently points at rather than a hardcoded
+// id. The post-images block was then edited deliberately for video, below.
 
 service firebase.storage {
   match /b/{bucket}/o {
+    // Images and video both land here (2026-10-07). The block below was reproduced
+    // character for character from live ruleset 346cd647 until today; this is the
+    // first deliberate edit to it, and it widens the type and size test rather than
+    // touching the auth or read rules. An image still faces exactly the limit it
+    // faced before, so nothing that uploaded yesterday stops uploading now.
+    //
+    // Video types are named rather than matched as video/.* so an editor cannot push
+    // a 200MB format the feed will not play. The size split is the whole reason the
+    // two arms exist: 10MB is right for a still and absurd for a clip, 200MB is right
+    // for a clip and far too loose for a still.
     match /post-images/{allPaths=**} {
       allow read: if true;                                   // public calendar => public images
       allow write: if request.auth != null
-                   && request.resource.size < 10 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
+                   && (
+                        (request.resource.contentType.matches('image/.*')
+                         && request.resource.size < 10 * 1024 * 1024)
+                     || (request.resource.contentType.matches('video/(mp4|quicktime|webm)')
+                         && request.resource.size < 200 * 1024 * 1024)
+                      );
     }
 
     // U1 LinkedIn Promotion Programme visuals.

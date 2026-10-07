@@ -85,6 +85,54 @@ t('visual: extreme ratio warns', levels(r, 'Unusual aspect ratio').join() === 'W
 r = run({ ...laneMeta, text: 'Our crews replaced the main. ' + SIG + ' #UtilitiesOne #Water', trustLine: 'x', tagline: '' });
 t('visual: lane post also requires an image', has(r, 'Visual missing', 'BLOCK'));
 
+/* Video visuals (2026-10-07). A video rides the same field as an image, so the
+   presence and our-library rules must not care which kind it is, and the shape
+   rules must stop applying the stills thresholds to a clip. The 16:9 case is the
+   one that matters most: 1920x1080 is ratio 1.78, which the image rule passes and
+   would have gone on passing, but a 2.2 ratio clip is fine for video and would
+   have warned under the old 2.0 ceiling. */
+const VID = 'https://firebasestorage.googleapis.com/v0/b/u1-calendar.firebasestorage.app/o/post-images%2Fx%2Fclip.mp4?alt=media';
+const vidBody = { text: goodBody, trustLine: 'Safety', tagline: '' };
+
+r = run({ ...vidBody, image: VID, imageMeta: { kind: 'video', w: 1920, h: 1080, seconds: 45, bytes: 9000000 } });
+t('video: a clean 16:9 clip raises nothing on the visual', !has(r, 'Visual missing') && !has(r, 'Video is small for the feed') && !has(r, 'Unusual aspect ratio') && !has(r, 'Video is longer than we allow'));
+
+r = run({ ...vidBody, image: VID, imageMeta: { kind: 'video', w: 640, h: 360, seconds: 20, bytes: 2000000 } });
+t('video: small clip warns, never blocks', levels(r, 'Video is small for the feed').join() === 'WARN');
+
+r = run({ ...vidBody, image: VID, imageMeta: { kind: 'video', w: 200, h: 120, seconds: 20, bytes: 500000 } });
+t('video: under the published floor on both sides is a BLOCK', has(r, 'Video is below the feed minimum', 'BLOCK'));
+
+r = run({ ...vidBody, image: VID, imageMeta: { kind: 'video', w: 200, h: 120, seconds: 20, bytes: 500000 } });
+t('video: a blocked-size clip does not also warn about being small', !has(r, 'Video is small for the feed'));
+
+/* The floor is 256 wide by 144 high, not 144 square. A 200x150 clip clears a
+   144-on-both-sides test and is still under the published width floor, which is
+   exactly what the first version of this check let through. */
+r = run({ ...vidBody, image: VID, imageMeta: { kind: 'video', w: 200, h: 150, seconds: 20, bytes: 500000 } });
+t('video: 200x150 is under the width floor and blocks', has(r, 'Video is below the feed minimum', 'BLOCK'));
+
+r = run({ ...vidBody, image: VID, imageMeta: { kind: 'video', w: 300, h: 160, seconds: 20, bytes: 500000 } });
+t('video: 300x160 clears the floor and only warns on size', !has(r, 'Video is below the feed minimum') && levels(r, 'Video is small for the feed').join() === 'WARN');
+
+r = run({ ...vidBody, image: VID, imageMeta: { kind: 'video', w: 1080, h: 1080, seconds: 240, bytes: 50000000 } });
+t('video: over three minutes is a BLOCK', has(r, 'Video is longer than we allow', 'BLOCK'));
+
+r = run({ ...vidBody, image: VID, imageMeta: { kind: 'video', w: 2200, h: 1000, seconds: 30, bytes: 9000000 } });
+t('video: 2.2 ratio passes where the stills rule would have warned', !has(r, 'Unusual aspect ratio'));
+
+r = run({ ...vidBody, image: VID, imageMeta: { kind: 'video', w: 3000, h: 500, seconds: 30, bytes: 9000000 } });
+t('video: past 2.4:1 still warns', levels(r, 'Unusual aspect ratio').join() === 'WARN');
+
+r = run({ ...vidBody, image: '', imageMeta: { kind: 'video', w: 1920, h: 1080, seconds: 30, bytes: 9000000 } });
+t('video: metadata without a file is still Visual missing', has(r, 'Visual missing', 'BLOCK'));
+
+r = run({ ...vidBody, image: 'https://cdn.example.com/clip.mp4', imageMeta: { kind: 'video', w: 1920, h: 1080, seconds: 30, bytes: 9000000 } });
+t('video: an outside-host clip is not in our library', has(r, 'Visual is not in our library', 'BLOCK'));
+
+r = run({ ...vidBody, image: OWN, imageMeta: { w: 600, h: 600, bytes: 90000 } });
+t('video change did not alter the image path', levels(r, 'Visual is small for the feed').join() === 'WARN');
+
 // Career promotion line (added 2026-08-13): recognized on the parent, echo advisory, blocked on lanes.
 const RISE = 'Talent is the entry. Hard work is the rise.';
 r = run({ text: 'Promoted to foreman after four years on the crew. ' + SIG + ' #UtilitiesOne #Wireline #HardWorkIsTheRise', trustLine: 'Training', tagline: RISE, image: IMG });

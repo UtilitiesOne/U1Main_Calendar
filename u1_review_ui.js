@@ -413,7 +413,15 @@
     try {
       if (typeof FIREBASE_ON === 'undefined' || !FIREBASE_ON || !fb.user) return;
       // l2 is server-owned since 2026-08-18 night; the client stamps l1 only.
-      var patch = { l1: clean ? 'clean' : 'blocked', l1At: firebase.firestore.FieldValue.serverTimestamp() };
+      // l1Rules records WHICH rulebook produced this verdict (2026-10-16). A
+      // long-open tab keeps running the gate it loaded, so a verdict can be
+      // stamped by rules that have since changed: a review written on
+      // 2026-10-15 carried rulesVersion 2026-08-28, eight days after the
+      // rulebook moved. Without this field a stale verdict and a current one
+      // are the same two words on the proposal.
+      var patch = { l1: clean ? 'clean' : 'blocked',
+                    l1Rules: (window.U1Gate && window.U1Gate.RULES_VERSION) || '',
+                    l1At: firebase.firestore.FieldValue.serverTimestamp() };
       // merge, not update: the proposal doc may still be mid-write from the
       // app's own save when this runs.
       firebase.firestore().collection('proposals').doc(fb.user.uid)
@@ -549,6 +557,7 @@
         state: fbClone(candidateState),
         submitted: false,
         l1: 'blocked',
+        l1Rules: (window.U1Gate && window.U1Gate.RULES_VERSION) || '',
         l1At: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true }).catch(function (e) { console.warn('proposal follow-up write skipped:', e.message); })
         .then(function () { return result; });

@@ -192,5 +192,60 @@ t('scope: lane fingerprint stable for unchanged post',
 t('scope: lane fingerprint moves when the body changes',
   lb.keys[Scope.laneKey('water', 'w1')] !== Scope.laneFingerprint({ note: 'Edited body', trustLine: 'T' }));
 
+
+/* People and moments (2026-10-16). The rebalance-surface rules stopped being
+   applied to the Career Arc and U1 Culture themes after a holiday post was
+   blocked for carrying two tags and told to add a brand line. Fixture is the
+   real post: Indigenous Peoples' Day, 2026-10-12, two tags, no signature,
+   no TRUST line. */
+const HOLIDAY = 'Today, we recognize Indigenous Peoples\u2019 Day by honoring the rich histories, '
+  + 'cultures, and contributions of Indigenous peoples across the United States. '
+  + '#IndigenousPeoplesDay #UtilitiesOne';
+r = run({ themeId: 't7', themeName: 'U1 Culture', text: HOLIDAY, trustLine: '', tagline: '', image: IMG });
+t('culture: the real holiday post does not block', r.every(i => i.level !== 'BLOCK'));
+t('culture: two tags is not a count failure', !has(r, 'Tag count out of range'));
+t('culture: no TRUST line is not flagged', !has(r, 'TRUST line not authored'));
+t('culture: no brand line is ever asked for', !r.some(i => /brand line/i.test(String(i.change))));
+
+// The ceiling holds, and even then the fix never names the brand line.
+r = run({ themeId: 't7', themeName: 'U1 Culture', image: IMG, trustLine: '', tagline: '',
+  text: 'Our teams marked the day on site. #UtilitiesOne #IndigenousPeoplesDay #Culture #Team #Field #Proud' });
+t('culture: more than five tags still blocks', has(r, 'Tag count out of range', 'BLOCK'));
+t('culture: the over-count fix names no brand line',
+  !r.filter(i => i.rule === 'Tag count out of range').some(i => /brand line/i.test(String(i.change))));
+
+// The parent tag is not optional on any surface, whatever the count does.
+r = run({ themeId: 't7', themeName: 'U1 Culture', text: 'A day to remember. #IndigenousPeoplesDay',
+  trustLine: '', tagline: '', image: IMG });
+t('culture: parent tag still required', has(r, 'Parent tag missing', 'BLOCK'));
+
+// The words the buyer-not-consumer rule catches are the subject of a
+// remembrance post (the 11 September 2026 post was flagged for "families").
+const REMEMBRANCE = 'Today, we remember the people who lost their lives and the families, '
+  + 'first responders, and communities affected. #UtilitiesOne #Remembrance';
+r = run({ themeId: 't7', themeName: 'U1 Culture', text: REMEMBRANCE, trustLine: '', tagline: '', image: IMG });
+t('culture: consumer register is not flagged on a remembrance post', !has(r, 'Consumer register'));
+t('culture: remembrance post does not block', r.every(i => i.level !== 'BLOCK'));
+
+// A caption pasted into the TRUST field is still a mistake on this class.
+r = run({ themeId: 't7', themeName: 'U1 Culture', text: HOLIDAY, tagline: '', image: IMG,
+  trustLine: 'x'.repeat(401) });
+t('culture: caption in the TRUST field still blocks', has(r, 'Wrong field used', 'BLOCK'));
+
+/* The rebalance surface is untouched by all of the above. */
+r = run({ themeId: 't6', themeName: 'One Company, Every Utility', image: IMG, trustLine: '', tagline: '',
+  text: 'A route proves its utility on day one, for the families we serve. ' + SIG + ' #UtilitiesOne #Water' });
+t('parent: two tags still blocks', has(r, 'Tag count out of range', 'BLOCK'));
+t('parent: the count fix still names the missing layer',
+  r.some(i => i.rule === 'Tag count out of range' && /brand line/i.test(String(i.change))));
+t('parent: TRUST line still flagged', has(r, 'TRUST line not authored', 'WARN'));
+t('parent: consumer register still flagged', has(r, 'Consumer register', 'WARN'));
+
+// A division lane post is not a people-and-moments post: it has no theme.
+r = run({ ...laneMeta, text: 'Good work by the team. ' + SIG + ' #UtilitiesOne #Water', trustLine: '', tagline: '', image: IMG });
+t('lane: TRUST line still flagged on a lane post', has(r, 'TRUST line not authored', 'WARN'));
+
+t('rulebook version moved with the rules', Gate.RULES_VERSION === '2026-10-16');
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

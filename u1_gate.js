@@ -62,6 +62,17 @@
     return { level: level, rule: rule, why: why, change: change, quote: quote || null };
   }
 
+  /* People and moments: the Career Arc and U1 Culture themes. Welcomes,
+     promotions, awards, expos, remembrance days, public holidays. This content
+     is not the rebalance surface, so the rules written for the rebalance
+     surface do not apply to it (Alex 2026-10-16, after a holiday post was
+     blocked for carrying two tags and told to add a brand line). The signature
+     and tag-taxonomy exemptions already keyed off these two themes; this names
+     the class so every rule that should skip it reads the same test. */
+  function isPeopleMoment(post) {
+    return !!post && (post.themeId === 't2' || post.themeId === 't7');
+  }
+
   /* Checks shared by every surface: AI tells, retired lines, production leftovers,
      TRUST line, consumer register, triadic lists. Factored out 2026-08-10 so the
      parent path and the division-lane path run one implementation. */
@@ -171,15 +182,25 @@
     });
     var trust = String(post.trustLine || '').trim();
     if (!trust) {
-      out.push(item('WARN', 'TRUST line not authored',
-        'Each post carries one short line naming one or two TRUST values, written to fit this post rather than copied from a template.',
-        'Write a single line for this post and put it in the TRUST field.'));
+      // A remembrance day or a public holiday does not carry a line of brand
+      // values, so the gate stops asking this class for one (Alex 2026-10-16).
+      // The wrong-field block below still applies: a caption pasted into the
+      // TRUST field is a mistake on any post.
+      if (!isPeopleMoment(post)) {
+        out.push(item('WARN', 'TRUST line not authored',
+          'Each post carries one short line naming one or two TRUST values, written to fit this post rather than copied from a template.',
+          'Write a single line for this post and put it in the TRUST field.'));
+      }
     } else if (trust.length > 400) {
       out.push(item('BLOCK', 'Wrong field used',
         'The TRUST field holds one short line. This field currently contains ' + trust.length + ' characters, which looks like a full caption pasted into the wrong place.',
         'Move the caption into the content note and leave one short TRUST line here.'));
     }
-    var cons = CONSUMER_WORDS.exec(body);
+    // The buyer-not-consumer rule governs the commercial surfaces. On a
+    // remembrance or holiday post the words it catches are the subject: the
+    // 11 September 2026 post was flagged for "families, first responders, and
+    // communities", which is what that post is about (Alex 2026-10-16).
+    var cons = isPeopleMoment(post) ? null : CONSUMER_WORDS.exec(body);
     if (cons) {
       out.push(item('WARN', 'Consumer register',
         'Every U1 surface is large-scale B2B and the reader is always a buyer. "' + cons[0] + '" reads consumer-facing.',
@@ -270,7 +291,7 @@
     // ---- new-hire posts must use the Career Arc theme ----
     var NEW_HIRE = /(welcome to the team|we'?re (?:pleased|excited|happy) to welcome|joins? (?:us|utilities one) as|welcoming .{0,40} as our|as our (?:new )?(?:vice president|director|senior director|manager|head of))/i;
     var hire = NEW_HIRE.exec(body);
-    var isHR = (post.themeId === 't2' || post.themeId === 't7');
+    var isHR = isPeopleMoment(post);
     if (hire && post.themeId !== 't2') {
       out.push(item('BLOCK', 'Wrong theme for a new-hire post',
         'This reads as a new-hire or welcome post. Those run on the Career Arc theme so they carry the tagline "One Way. Talent finds its lane.". This post is filed under ' + (post.themeName || post.themeId) + '.',
@@ -349,11 +370,20 @@
           'Use an approved tag, or drop it. Approved work types: ' + TAX.workType.join(', ') + '.',
           offTax.join(' ')));
       }
-      if (tags.length < 3 || tags.length > 5) {
+      // The 3-to-5 count was kept on people and event posts on 2026-08-18 when
+      // their taxonomy was relaxed. Reversed 2026-10-16: reaching a count meant
+      // adding a brand line or a division tag to a holiday post, which is the
+      // one thing this class must never be made to carry. The parent tag above
+      // still holds, and so does the ceiling: nine hashtags on a feed post is a
+      // different problem on every surface.
+      var floor = isHR ? 1 : 3;
+      if (tags.length < floor || tags.length > 5) {
         out.push(item('BLOCK', 'Tag count out of range',
-          'This post has ' + tags.length + ' tags. The rule is 3 to 5.',
-          tags.length > 5 ? 'Cut to the parent, the brand line, the division, and at most one work type.'
-                          : 'Add the missing layer: parent, brand line, division, optional work type.'));
+          'This post has ' + tags.length + ' tags. The rule is ' + floor + ' to 5.',
+          tags.length > 5
+            ? (isHR ? 'Cut it to five, keeping #UtilitiesOne and the tags that name the moment.'
+                    : 'Cut to the parent, the brand line, the division, and at most one work type.')
+            : 'Add the missing layer: parent, brand line, division, optional work type.'));
       }
     }
 
@@ -391,7 +421,7 @@
   // uses this to tell someone their list came from an older rulebook rather
   // than leaving them staring at findings the gate no longer produces
   // (caught 2026-08-25: rules changed under a stored, unrefreshed review).
-  var RULES_VERSION = '2026-10-07';
+  var RULES_VERSION = '2026-10-16';
 
   root.U1Gate = { checkPost: checkPost, verdict: verdict, RULES_VERSION: RULES_VERSION,
                   SIGNATURE: SIGNATURE, TAX: TAX, BANNED_TAGS: BANNED_TAGS };

@@ -322,18 +322,6 @@
       }
     }
 
-    // ---- brand line on a culture visual ----
-    // The editor no longer offers one on this class, so this catches what is
-    // already stored and anything written through another path. A warning, not
-    // a block: the only live case is a leadership interview filed under U1
-    // Culture, and stopping a publish over it is the owner's call to make.
-    if (isCulture(post) && String(post.tagline || '').trim()) {
-      out.push(item('WARN', 'Brand line on a culture visual',
-        'This post declares "' + post.tagline + '" on its artwork. Holidays, remembrance days and company moments do not carry a brand line.',
-        'Clear the visual tagline on this post, or refile it under the theme whose line it is.',
-        post.tagline));
-    }
-
     // ---- body activation ----
     // The locked rule of 2026-06-08 applies wherever the line is declared,
     // culture posts included. Narrowing it here was reverted the same day: it
@@ -374,7 +362,11 @@
       // Recalibrated 2026-08-10 (approved): the line lives on the ARTWORK and its
       // activation lives in the BODY; the hashtag is an echo, not the source of truth.
       // Advisory only, so a missing echo never blocks a post whose body and visual are right.
-      var wantTag = TAGLINE_TO_TAG[String(post.tagline || '').trim().toLowerCase()];
+      // Nothing about a visual tagline is raised on a culture post, not even
+      // as a note (Alex 2026-10-16). The editor offers no line on this class,
+      // so anything still carrying one is old data, and a holiday post is not
+      // the place to argue about brand-line echoes.
+      var wantTag = isCulture(post) ? null : TAGLINE_TO_TAG[String(post.tagline || '').trim().toLowerCase()];
       if (wantTag && !tags.some(function (t) { return eqi(t, wantTag); })) {
         out.push(item('WARN', 'Brand-line tag echo missing',
           'The artwork carries "' + post.tagline + '". The matching tag is the searchable echo of the line.',
@@ -422,7 +414,7 @@
     }
 
     // ---- tagline punctuation ----
-    if (post.tagline) {
+    if (post.tagline && !isCulture(post)) {
       var re = new RegExp(post.tagline.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\.$/, '') + '(?!\\.)', 'i');
       if (re.test(text) && text.indexOf(post.tagline) === -1) {
         out.push(item('WARN', 'Tagline punctuation',

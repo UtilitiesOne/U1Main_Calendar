@@ -249,12 +249,13 @@ t('lane: TRUST line still flagged on a lane post', has(r, 'TRUST line not author
 // one on this class, so this catches stored data and any other write path.
 r = run({ themeId: 't7', themeName: 'U1 Culture', text: HOLIDAY, trustLine: '', image: IMG,
   tagline: 'One Company. Every Utility.', bodyActivationRequired: true });
-t('culture: a declared brand line is flagged', has(r, 'Brand line on a culture visual', 'WARN'));
-t('culture: the brand-line finding is a warning, not a block',
-  !r.some(i => i.rule === 'Brand line on a culture visual' && i.level === 'BLOCK'));
-// The 2026-06-08 activation rule is locked and still reaches this class. The
-// open question is whether a culture post should be able to declare the line
-// at all; until Alex rules on it, declaring it carries its activation.
+// The gate raises nothing at all about a visual tagline on a culture post, not
+// even as a note (Alex 2026-10-16).
+t('culture: a declared brand line is not flagged', !has(r, 'Brand line on a culture visual'));
+t('culture: no brand-line tag echo note', !has(r, 'Brand-line tag echo missing'));
+t('culture: no tagline punctuation note', !has(r, 'Tagline punctuation'));
+// The 2026-06-08 activation rule is locked and still reaches this class. It is
+// dormant on every live culture post, and it is Alex's call to narrow.
 t('culture: the locked activation rule still applies where the line is declared',
   has(r, 'Body-activation missing', 'BLOCK'));
 

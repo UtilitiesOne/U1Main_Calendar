@@ -335,11 +335,10 @@
     }
 
     // ---- body activation ----
-    // Activation exists to earn the brand line before it lands. On a culture
-    // post the answer is to drop the line rather than to write activation into
-    // a remembrance day, so the warning above carries it and this does not
-    // fire (2026-10-16, narrowing how the 2026-06-08 rule reaches this class).
-    if (post.bodyActivationRequired && !isCulture(post)) {
+    // The locked rule of 2026-06-08 applies wherever the line is declared,
+    // culture posts included. Narrowing it here was reverted the same day: it
+    // is Alex's rule to change, and he has not been asked.
+    if (post.bodyActivationRequired) {
       var stripped = body.replace(/utilities\s+one/gi, ' ').replace(/utility\s+coordination/gi, ' ');
       if (!ACTIVATION.test(stripped)) {
         out.push(item('BLOCK', 'Body-activation missing',

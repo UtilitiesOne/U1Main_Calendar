@@ -250,8 +250,13 @@ t('lane: TRUST line still flagged on a lane post', has(r, 'TRUST line not author
 r = run({ themeId: 't7', themeName: 'U1 Culture', text: HOLIDAY, trustLine: '', image: IMG,
   tagline: 'One Company. Every Utility.', bodyActivationRequired: true });
 t('culture: a declared brand line is flagged', has(r, 'Brand line on a culture visual', 'WARN'));
-t('culture: the brand line does not block the post', r.every(i => i.level !== 'BLOCK'));
-t('culture: activation is not demanded on a culture post', !has(r, 'Body-activation missing'));
+t('culture: the brand-line finding is a warning, not a block',
+  !r.some(i => i.rule === 'Brand line on a culture visual' && i.level === 'BLOCK'));
+// The 2026-06-08 activation rule is locked and still reaches this class. The
+// open question is whether a culture post should be able to declare the line
+// at all; until Alex rules on it, declaring it carries its activation.
+t('culture: the locked activation rule still applies where the line is declared',
+  has(r, 'Body-activation missing', 'BLOCK'));
 
 // The Career Arc keeps its own line, so it draws no culture warning.
 r = run({ themeId: 't2', themeName: 'The U1 Career Arc', image: IMG, trustLine: '',

@@ -1521,6 +1521,12 @@ const BRAND_CONFIG = {
 // Aliases for readability; reflect any BRAND_CONFIG changes automatically.
 const DIVISIONS = BRAND_CONFIG.units;
 const THEMES = BRAND_CONFIG.themes;
+/* A holiday, a remembrance day, an expo, an award: U1 Culture. These posts
+   carry no brand line on the artwork and no locked signature in the body, and
+   they are not tagged to a count (Alex 2026-10-16). The Career Arc keeps its
+   own tagline, which is a real line for hiring and promotion posts, so it is
+   not in here. The gate holds the same split. */
+function isCultureTheme(themeId) { return themeId === 't7'; }
 const DIVISION_DEFAULT_THEME = BRAND_CONFIG.unitDefaultTheme;
 const DIVISION_THEME_ALTERNATIVES = BRAND_CONFIG.unitThemeAlternatives;
 const ROTATION_ORDER = BRAND_CONFIG.rotationOrder;
@@ -2534,14 +2540,16 @@ function openDetailPanel(slot) {
 
     <div class="section">
       <div class="sec-title">Visual surface tagline</div>
-      <div class="sec-content italic">${slot.tagline ? '"' + escapeHtml(slot.tagline) + '"' : 'Signature only. Pick a visual tagline per post.'}</div>
+      <div class="sec-content italic">${isCultureTheme(slot.themeId)
+        ? 'None. A holiday or culture post carries no brand line on its artwork.'
+        : (slot.tagline ? '"' + escapeHtml(slot.tagline) + '"' : 'Signature only. Pick a visual tagline per post.')}</div>
     </div>
 
     <div class="section">
       <div class="sec-title">Layer 2 · TRUST line (writer-authored, per post)</div>
       ${isEditable
         ? `<textarea id="slot-trust-input" rows="2" style="width:100%; padding:8px 10px; font-family:inherit; font-size:13px; border:1.5px solid var(--rule); border-radius:4px; resize:vertical; min-height:48px;" placeholder="Name 1 or 2 TRUST values that fit this specific post. e.g., 'Safety on every drop. Responsibility for the asset that lasts.'">${escapeHtml(slot.trustLine || '')}</textarea>
-        <div style="font-size:11px; color:var(--mute); margin-top:6px; line-height:1.45;">Writer authors per post. TRUST values: T(raining) R(esponsibility) U(nderstanding) S(afety) T(eamwork). Integrate naturally with the post content; do not stamp boilerplate.</div>`
+        <div style="font-size:11px; color:var(--mute); margin-top:6px; line-height:1.45;">${isCultureTheme(slot.themeId) ? 'Optional here. A holiday or culture post carries a TRUST line only where one genuinely belongs.' : 'Writer authors per post. TRUST values: T(raining) R(esponsibility) U(nderstanding) S(afety) T(eamwork). Integrate naturally with the post content; do not stamp boilerplate.'}</div>`
         : `<div class="body-close-quote" style="background: var(--panel-2); border-left-color: var(--accent); color: var(--ink-soft);">"${escapeHtml(slot.trustLine || '(none authored)')}"</div>
         <div style="font-size:11px; color:var(--mute); margin-top:6px; line-height:1.4;">Authored when the event was added.</div>`
       }
@@ -2557,13 +2565,15 @@ function openDetailPanel(slot) {
     </div>
 
     <div class="section">
-      <div class="sec-title">Layer 1 · Body close (locked)</div>
-      <div class="body-close-quote">"${escapeHtml(slot.signature)}"</div>
+      <div class="sec-title">Layer 1 · Body close${isCultureTheme(slot.themeId) ? '' : ' (locked)'}</div>
+      ${isCultureTheme(slot.themeId)
+        ? '<div class="sec-content">Not required. A holiday or culture post does not close on the brand signature.</div>'
+        : '<div class="body-close-quote">"' + escapeHtml(slot.signature) + '"</div>'}
     </div>
 
     <div class="section">
       <div class="sec-title">Hashtag taxonomy</div>
-      <div class="sec-content" style="font-size:12px; line-height:1.6;"><div style="color:var(--mute); margin-bottom:6px;">Pick about 3 to 5 per post: parent (always) + one brand-line tag matching the visual tagline + one division + an optional work-type or geography tag. Tags carry the brand voice; strip from the tag anything stripped from the body.</div><div style="color:var(--mute); margin-bottom:6px;">Holidays, remembrance days and culture posts (U1 Culture, The U1 Career Arc) are out of this: #UtilitiesOne plus whatever names the moment. No brand-line tag, no division tag, no count to reach.</div><div style="margin:4px 0;"><strong>Parent</strong> (always on): #UtilitiesOne</div><div style="margin:4px 0;"><strong>Brand line</strong> (match the visual tagline): #OneCompanyEveryUtility &middot; #BuiltToHold &middot; #FromPaperToField &middot; #OneWay</div><div style="margin:4px 0;"><strong>Signature / ethos</strong> (rides any post): #Overdeliver &middot; #SelfPerform</div><div style="margin:4px 0;"><strong>Division</strong> (the post's specialty): #PowerDelivery &middot; #Wireline &middot; #Wireless &middot; #Water &middot; #Renewable &middot; #DataCenters &middot; #Fulfillment &middot; #Consulting</div><div style="margin:4px 0;"><strong>Work type</strong> (1 to 2 that fit): #GridModernization &middot; #FiberDeployment &middot; #CleanEnergy &middot; #WaterInfrastructure &middot; #DataCenterPower &middot; #GridHardening &middot; #5GDensification</div><div style="margin:4px 0;"><strong>Geography</strong> (optional): a state or metro tag matching the real project location.</div></div>
+      <div class="sec-content" style="font-size:12px; line-height:1.6;">${isCultureTheme(slot.themeId) ? `<div style="color:var(--mute); margin-bottom:6px;">A holiday or culture post is tagged for the moment, not for the portfolio. No brand line, no division, no count to reach.</div><div style="margin:4px 0;"><strong>Parent</strong> (always on): #UtilitiesOne</div><div style="margin:4px 0;"><strong>The moment</strong>: the day, the event or the occasion, named in its own words.</div>` : `<div style="color:var(--mute); margin-bottom:6px;">Pick about 3 to 5 per post: parent (always) + one brand-line tag matching the visual tagline + one division + an optional work-type or geography tag. Tags carry the brand voice; strip from the tag anything stripped from the body.</div><div style="margin:4px 0;"><strong>Parent</strong> (always on): #UtilitiesOne</div><div style="margin:4px 0;"><strong>Brand line</strong> (match the visual tagline): #OneCompanyEveryUtility &middot; #BuiltToHold &middot; #FromPaperToField &middot; #OneWay</div><div style="margin:4px 0;"><strong>Signature / ethos</strong> (rides any post): #Overdeliver &middot; #SelfPerform</div><div style="margin:4px 0;"><strong>Division</strong> (the post's specialty): #PowerDelivery &middot; #Wireline &middot; #Wireless &middot; #Water &middot; #Renewable &middot; #DataCenters &middot; #Fulfillment &middot; #Consulting</div><div style="margin:4px 0;"><strong>Work type</strong> (1 to 2 that fit): #GridModernization &middot; #FiberDeployment &middot; #CleanEnergy &middot; #WaterInfrastructure &middot; #DataCenterPower &middot; #GridHardening &middot; #5GDensification</div><div style="margin:4px 0;"><strong>Geography</strong> (optional): a state or metro tag matching the real project location.</div>`}</div>
     </div>
   `;
 
@@ -2742,7 +2752,35 @@ function openPostEditor(slot) {
   const themeOpts = THEMES.map(t => `<option value="${t.id}" ${buf.themeId === t.id ? 'selected' : ''}>${escapeHtml(t.name)} (${t.behavior})</option>`).join('');
   const divOpts = `<option value="" ${!buf.divisionId ? 'selected' : ''}>U1 · company-wide / cross-divisional (no specific division)</option>`
     + DIVISIONS.map(d => `<option value="${d.id}" ${buf.divisionId === d.id ? 'selected' : ''}>${escapeHtml(d.name)}</option>`).join('');
-  const tagOpts = APPROVED_TAGLINES.map(o => `<option value="${escapeHtml(o.v)}" ${buf.tagline === o.v ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('');
+  const tagOpts = () => APPROVED_TAGLINES.map(o => `<option value="${escapeHtml(o.v)}" ${buf.tagline === o.v ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('');
+
+  /* The visual tagline and the body close are the two brand controls in this
+     editor, and both are wrong on a culture post: one offers brand lines that
+     must not go on a holiday visual, the other presents the signature as
+     locked on a post that is exempt from it. Built as functions because the
+     theme can change inside the editor, so the fields have to be rebuilt
+     rather than left showing the previous theme's controls (2026-10-16). */
+  const taglineFieldHtml = () => isCultureTheme(buf.themeId)
+    ? `<label class="pe-fl">Visual tagline</label>
+       <div class="pe-locked">No visual tagline<span class="pe-lock-note">Holiday and culture posts carry no brand line on the artwork.</span></div>`
+    : `<label class="pe-fl">Visual tagline</label><select id="pe-tag">${tagOpts()}</select>
+       <div class="pe-hint">Approved brand lines only. Pick the one that fits this post, or signature only.</div>`;
+  const bodyCloseFieldHtml = () => isCultureTheme(buf.themeId)
+    ? `<label class="pe-fl">Body close</label>
+       <div class="pe-locked">Not required<span class="pe-lock-note">A holiday or culture post does not close on the brand signature.</span></div>`
+    : `<label class="pe-fl">Body close (locked)</label>
+       <div class="pe-locked">"${escapeHtml(slot.signature)}"<span class="pe-lock-note">Sponsor-locked brand signature. Not editable.</span></div>`;
+  function wireTaglineSelect() {
+    const el = document.getElementById('pe-tag');
+    if (el) el.addEventListener('change', (e) => { buf.tagline = e.target.value; });
+  }
+  function renderBrandFields() {
+    const tw = document.getElementById('pe-tag-wrap');
+    const cw = document.getElementById('pe-close-wrap');
+    if (tw) tw.innerHTML = taglineFieldHtml();
+    if (cw) cw.innerHTML = bodyCloseFieldHtml();
+    wireTaglineSelect();
+  }
 
   const dateField = (kind === 'event')
     ? `<div class="pe-field"><label class="pe-fl">Date</label><input type="date" id="pe-date-input" value="${escapeHtml(buf.date)}"></div>`
@@ -2752,8 +2790,7 @@ function openPostEditor(slot) {
     ${dateField}
     <div class="pe-field"><label class="pe-fl">Theme</label><select id="pe-theme">${themeOpts}</select></div>
     <div class="pe-field"><label class="pe-fl">Division</label><select id="pe-div">${divOpts}</select></div>
-    <div class="pe-field"><label class="pe-fl">Visual tagline</label><select id="pe-tag">${tagOpts}</select>
-      <div class="pe-hint">Approved brand lines only. Pick the one that fits this post, or signature only.</div></div>
+    <div class="pe-field" id="pe-tag-wrap">${taglineFieldHtml()}</div>
     <div class="pe-field"><label class="pe-fl">Visual</label>
       <div id="pe-img-wrap">${visualPreviewHtml(buf.image, buf.imageMeta, 300)}</div>
       <input type="file" id="pe-img-file" accept="${VISUAL_LIMITS.accept}">
@@ -2763,17 +2800,22 @@ function openPostEditor(slot) {
       <textarea id="pe-note" placeholder="Write the post body here.">${escapeHtml(buf.note)}</textarea></div>
     <div class="pe-field"><label class="pe-fl">Layer 2 · TRUST line (writer-authored)</label>
       <textarea id="pe-trust" placeholder="Name 1 or 2 TRUST values that fit this post.">${escapeHtml(buf.trustLine)}</textarea></div>
-    <div class="pe-field"><label class="pe-fl">Body close (locked)</label>
-      <div class="pe-locked">"${escapeHtml(slot.signature)}"<span class="pe-lock-note">Sponsor-locked brand signature. Not editable.</span></div></div>
+    <div class="pe-field" id="pe-close-wrap">${bodyCloseFieldHtml()}</div>
   `;
 
   if (kind === 'event') {
     const di = document.getElementById('pe-date-input');
     if (di) di.addEventListener('change', (e) => { buf.date = e.target.value; });
   }
-  document.getElementById('pe-theme').addEventListener('change', (e) => { buf.themeId = e.target.value; });
+  document.getElementById('pe-theme').addEventListener('change', (e) => {
+    buf.themeId = e.target.value;
+    // Switching into U1 Culture drops any brand line already picked: the whole
+    // point is that this class does not carry one.
+    if (isCultureTheme(buf.themeId)) buf.tagline = '';
+    renderBrandFields();
+  });
   document.getElementById('pe-div').addEventListener('change', (e) => { buf.divisionId = e.target.value; });
-  document.getElementById('pe-tag').addEventListener('change', (e) => { buf.tagline = e.target.value; });
+  wireTaglineSelect();
   document.getElementById('pe-note').addEventListener('input', (e) => { buf.note = e.target.value; });
   document.getElementById('pe-trust').addEventListener('input', (e) => { buf.trustLine = e.target.value; });
   (function () {

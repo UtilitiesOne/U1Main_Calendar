@@ -245,6 +245,28 @@ t('parent: consumer register still flagged', has(r, 'Consumer register', 'WARN')
 r = run({ ...laneMeta, text: 'Good work by the team. ' + SIG + ' #UtilitiesOne #Water', trustLine: '', tagline: '', image: IMG });
 t('lane: TRUST line still flagged on a lane post', has(r, 'TRUST line not authored', 'WARN'));
 
+// A brand line does not belong on a holiday visual. The editor no longer offers
+// one on this class, so this catches stored data and any other write path.
+r = run({ themeId: 't7', themeName: 'U1 Culture', text: HOLIDAY, trustLine: '', image: IMG,
+  tagline: 'One Company. Every Utility.', bodyActivationRequired: true });
+t('culture: a declared brand line is flagged', has(r, 'Brand line on a culture visual', 'WARN'));
+t('culture: the brand line does not block the post', r.every(i => i.level !== 'BLOCK'));
+t('culture: activation is not demanded on a culture post', !has(r, 'Body-activation missing'));
+
+// The Career Arc keeps its own line, so it draws no culture warning.
+r = run({ themeId: 't2', themeName: 'The U1 Career Arc', image: IMG, trustLine: '',
+  tagline: 'One Way. Talent finds its lane.',
+  text: 'Welcome to the team, and good luck on the first drop. #UtilitiesOne #WelcomeToTheTeam' });
+t('career arc: its own tagline is not flagged', !has(r, 'Brand line on a culture visual'));
+t('career arc: nothing blocks this post', r.every(i => i.level !== 'BLOCK'));
+
+// The rebalance surface still has to earn the line it declares.
+r = run({ themeId: 't6', themeName: 'One Company, Every Utility', image: IMG, trustLine: 'Safety',
+  tagline: 'One Company. Every Utility.', bodyActivationRequired: true,
+  text: 'We finished the job well. ' + SIG + ' #UtilitiesOne #Water #GridHardening #OneCompanyEveryUtility' });
+t('parent: activation still blocks where the line is declared', has(r, 'Body-activation missing', 'BLOCK'));
+t('parent: no culture warning on the rebalance surface', !has(r, 'Brand line on a culture visual'));
+
 t('rulebook version moved with the rules', Gate.RULES_VERSION === '2026-10-16');
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

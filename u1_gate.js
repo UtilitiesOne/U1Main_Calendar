@@ -73,6 +73,14 @@
     return !!post && (post.themeId === 't2' || post.themeId === 't7');
   }
 
+  /* U1 Culture on its own: holidays, remembrance days, expos, awards. The
+     Career Arc is people content with a real line of its own ("One Way. Talent
+     finds its lane."), so it keeps its visual tagline and is not in here. A
+     holiday visual carries no brand line at all (Alex 2026-10-16). */
+  function isCulture(post) {
+    return !!post && post.themeId === 't7';
+  }
+
   /* Checks shared by every surface: AI tells, retired lines, production leftovers,
      TRUST line, consumer register, triadic lists. Factored out 2026-08-10 so the
      parent path and the division-lane path run one implementation. */
@@ -314,8 +322,24 @@
       }
     }
 
+    // ---- brand line on a culture visual ----
+    // The editor no longer offers one on this class, so this catches what is
+    // already stored and anything written through another path. A warning, not
+    // a block: the only live case is a leadership interview filed under U1
+    // Culture, and stopping a publish over it is the owner's call to make.
+    if (isCulture(post) && String(post.tagline || '').trim()) {
+      out.push(item('WARN', 'Brand line on a culture visual',
+        'This post declares "' + post.tagline + '" on its artwork. Holidays, remembrance days and company moments do not carry a brand line.',
+        'Clear the visual tagline on this post, or refile it under the theme whose line it is.',
+        post.tagline));
+    }
+
     // ---- body activation ----
-    if (post.bodyActivationRequired) {
+    // Activation exists to earn the brand line before it lands. On a culture
+    // post the answer is to drop the line rather than to write activation into
+    // a remembrance day, so the warning above carries it and this does not
+    // fire (2026-10-16, narrowing how the 2026-06-08 rule reaches this class).
+    if (post.bodyActivationRequired && !isCulture(post)) {
       var stripped = body.replace(/utilities\s+one/gi, ' ').replace(/utility\s+coordination/gi, ' ');
       if (!ACTIVATION.test(stripped)) {
         out.push(item('BLOCK', 'Body-activation missing',

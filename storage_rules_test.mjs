@@ -65,6 +65,13 @@ t('structural: only the calendar path names video types, and only three of them'
   (SRC.match(/contentType\.matches\('video\/\(mp4\|quicktime\|webm\)'\)/g) || []).length === 1);
 t('structural: the programme path is still image-only',
   !/match \/promo-images[\s\S]{0,700}?contentType\.matches\('video/.test(SRC));
+// PDF carousels, calendar path only (2026-10-25).
+t('structural: the calendar path accepts PDF at LinkedIn\'s 100MB document ceiling',
+  /contentType == 'application\/pdf'\s*&& request\.resource\.size < 100 \* 1024 \* 1024/.test(SRC));
+t('structural: only one path accepts PDF',
+  (SRC.match(/application\/pdf/g) || []).length === 1);
+t('structural: the programme path does not accept PDF',
+  !/match \/promo-images[\s\S]{0,700}?application\/pdf/.test(SRC));
 t('structural: programme images are deletable while drafting',
   /allow delete:[\s\S]{0,320}?status == 'drafting'/.test(SRC));
 t('structural: the delete rule requires the post to exist',
@@ -85,6 +92,9 @@ const auth = { uid: 'someone' };
 const img = { size: 1024 * 500, contentType: 'image/png' };
 const big = { size: 11 * 1024 * 1024, contentType: 'image/png' };
 const pdf = { size: 1024, contentType: 'application/pdf' };
+const pdfMid = { size: 50 * 1024 * 1024, contentType: 'application/pdf' };
+const bigPdf = { size: 101 * 1024 * 1024, contentType: 'application/pdf' };
+const docx = { size: 1024 * 500, contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
 
 /* Video on the calendar path only (2026-10-07). The programme path was left
    image-only deliberately, so the cases below assert that difference rather than
@@ -102,7 +112,12 @@ const cases = [
   ['a signed-in user can still upload a calendar image', 'ALLOW', auth, O + '/post-images/u1/x.png', 'create', img],
   ['a signed-out user still cannot upload one', 'DENY', null, O + '/post-images/u1/x.png', 'create', img],
   ['the 10MB ceiling still holds on the calendar path', 'DENY', auth, O + '/post-images/u1/x.png', 'create', big],
-  ['non-images are still refused on the calendar path', 'DENY', auth, O + '/post-images/u1/x.pdf', 'create', pdf],
+  // PDF carousels on the calendar path (2026-10-25); other documents stay out.
+  ['a PDF carousel can be uploaded to the calendar path', 'ALLOW', auth, O + '/post-images/u1/x.pdf', 'create', pdf],
+  ['a PDF at 50MB is fine', 'ALLOW', auth, O + '/post-images/u1/x.pdf', 'create', pdfMid],
+  ['a PDF over 100MB is refused', 'DENY', auth, O + '/post-images/u1/x.pdf', 'create', bigPdf],
+  ['a Word document is still refused on the calendar path', 'DENY', auth, O + '/post-images/u1/x.docx', 'create', docx],
+  ['a signed-out user cannot upload a PDF', 'DENY', null, O + '/post-images/u1/x.pdf', 'create', pdf],
 
   // Video, calendar path. The size arms are separate, which is the whole point of
   // the two-arm rule: 11MB is over the image ceiling and well under the video one.

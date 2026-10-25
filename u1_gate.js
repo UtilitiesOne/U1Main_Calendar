@@ -109,6 +109,32 @@
   var MIN_VIDEO_FLOOR_H = 144;
   var MAX_VIDEO_SECONDS = 180;
 
+  /* A visual can also be a PDF carousel (2026-10-25). On LinkedIn a carousel is a
+     document post, so the artwork is one PDF with a page per slide. The team was
+     already posting them, and the gate had no way to accept one: Cristina's
+     Wireless carousel sat blocked as "Visual missing" because the upload took only
+     images and video.
+
+     Both numbers are LinkedIn's, from its Documents API page on Microsoft Learn,
+     checked 2026-10-25: "The file size can't exceed 100MB and 300 pages." Pages
+     are counted in the browser at upload and can come back unknown, so a missing
+     count is never a finding. */
+  var MAX_DOC_BYTES = 100 * 1024 * 1024;
+  var MAX_DOC_PAGES = 300;
+
+  function checkDocument(out, m) {
+    if (m.bytes && m.bytes > MAX_DOC_BYTES) {
+      out.push(item('BLOCK', 'Carousel is larger than LinkedIn accepts',
+        'This PDF is ' + Math.round(m.bytes / 1048576) + 'MB. LinkedIn takes documents up to 100MB.',
+        'Export the carousel again at a smaller size.'));
+    }
+    if (m.pages && m.pages > MAX_DOC_PAGES) {
+      out.push(item('BLOCK', 'Carousel has more pages than LinkedIn accepts',
+        'This PDF has ' + m.pages + ' pages. LinkedIn takes documents up to ' + MAX_DOC_PAGES + '.',
+        'Cut the carousel down to ' + MAX_DOC_PAGES + ' pages or fewer.'));
+    }
+  }
+
   function checkVisual(out, post) {
     var img = String(post.image || '').trim();
     if (!img) {
@@ -124,6 +150,7 @@
         img.slice(0, 60)));
     }
     var m = post.imageMeta;
+    if (m && m.kind === 'document') { checkDocument(out, m); return; }
     if (!(m && m.w && m.h)) return;
 
     if (m.kind === 'video') {
@@ -436,7 +463,7 @@
   // uses this to tell someone their list came from an older rulebook rather
   // than leaving them staring at findings the gate no longer produces
   // (caught 2026-08-25: rules changed under a stored, unrefreshed review).
-  var RULES_VERSION = '2026-10-16';
+  var RULES_VERSION = '2026-10-25';
 
   root.U1Gate = { checkPost: checkPost, verdict: verdict, RULES_VERSION: RULES_VERSION,
                   SIGNATURE: SIGNATURE, TAX: TAX, BANNED_TAGS: BANNED_TAGS };

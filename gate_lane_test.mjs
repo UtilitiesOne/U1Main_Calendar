@@ -118,6 +118,36 @@ t('video: 300x160 clears the floor and only warns on size', !has(r, 'Video is be
 r = run({ ...vidBody, image: VID, imageMeta: { kind: 'video', w: 1080, h: 1080, seconds: 240, bytes: 50000000 } });
 t('video: over three minutes is a BLOCK', has(r, 'Video is longer than we allow', 'BLOCK'));
 
+/* PDF carousels (2026-10-25). On LinkedIn a carousel is a document post, so the
+   visual is one PDF. It rides the same field as an image or a video, presence and
+   our-library still apply, and only LinkedIn's two document limits can block it.
+   A PDF has no width or height, so none of the image or video shape rules may
+   fire on it. */
+const DOC = 'https://firebasestorage.googleapis.com/v0/b/u1-calendar.firebasestorage.app/o/post-images%2Fx%2Fcarousel.pdf?alt=media';
+
+r = run({ ...vidBody, image: DOC, imageMeta: { kind: 'document', bytes: 4000000, pages: 8 } });
+t('carousel: a clean PDF counts as the visual', !has(r, 'Visual missing') && !has(r, 'Visual is not in our library'));
+t('carousel: no image or video shape rule fires on a PDF', !has(r, 'Visual is small for the feed') && !has(r, 'Unusual aspect ratio') && !has(r, 'Video is small for the feed'));
+t('carousel: a clean PDF raises no carousel finding', !has(r, 'Carousel is larger than LinkedIn accepts') && !has(r, 'Carousel has more pages than LinkedIn accepts'));
+
+r = run({ ...vidBody, image: DOC, imageMeta: { kind: 'document', bytes: 4000000, pages: null } });
+t('carousel: an unknown page count is not a finding', !has(r, 'Carousel has more pages than LinkedIn accepts') && !has(r, 'Visual missing'));
+
+r = run({ ...vidBody, image: DOC, imageMeta: { kind: 'document', bytes: 120 * 1024 * 1024, pages: 10 } });
+t('carousel: over 100MB is a BLOCK', has(r, 'Carousel is larger than LinkedIn accepts', 'BLOCK'));
+
+r = run({ ...vidBody, image: DOC, imageMeta: { kind: 'document', bytes: 4000000, pages: 301 } });
+t('carousel: over 300 pages is a BLOCK', has(r, 'Carousel has more pages than LinkedIn accepts', 'BLOCK'));
+
+r = run({ ...vidBody, image: DOC, imageMeta: { kind: 'document', bytes: 4000000, pages: 300 } });
+t('carousel: exactly 300 pages is fine', !has(r, 'Carousel has more pages than LinkedIn accepts'));
+
+r = run({ ...vidBody, image: 'https://example.com/deck.pdf', imageMeta: { kind: 'document', bytes: 4000000, pages: 8 } });
+t('carousel: a PDF outside our library still blocks like any visual', has(r, 'Visual is not in our library', 'BLOCK'));
+
+r = run({ ...vidBody, image: '', imageMeta: null });
+t('carousel: a carousel post with no file attached is still Visual missing', has(r, 'Visual missing', 'BLOCK'));
+
 r = run({ ...vidBody, image: VID, imageMeta: { kind: 'video', w: 2200, h: 1000, seconds: 30, bytes: 9000000 } });
 t('video: 2.2 ratio passes where the stills rule would have warned', !has(r, 'Unusual aspect ratio'));
 
@@ -273,7 +303,7 @@ r = run({ themeId: 't6', themeName: 'One Company, Every Utility', image: IMG, tr
 t('parent: activation still blocks where the line is declared', has(r, 'Body-activation missing', 'BLOCK'));
 t('parent: no culture warning on the rebalance surface', !has(r, 'Brand line on a culture visual'));
 
-t('rulebook version moved with the rules', Gate.RULES_VERSION === '2026-10-16');
+t('rulebook version moved with the rules', Gate.RULES_VERSION === '2026-10-25');
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

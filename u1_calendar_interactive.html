@@ -2511,7 +2511,7 @@ function openDetailPanel(slot) {
     : '';
 
   const imageSectionHtml = slot.image
-    ? `<div class="section"><div class="sec-title">Visual</div><img src="${escapeHtml(slot.image)}" style="max-width:100%; border:1.5px solid var(--rule); border-radius:4px; display:block;"></div>`
+    ? `<div class="section"><div class="sec-title">Visual</div>${visualPreviewHtml(slot.image, slot.imageMeta, 400)}</div>`
     : '';
 
   body.innerHTML = `${editBtnHtml}${imageSectionHtml}
@@ -3545,24 +3545,59 @@ var VISUAL_LIMITS = {
   imageBytes: 10 * 1024 * 1024,
   videoBytes: 200 * 1024 * 1024,
   videoSeconds: 180,
+  /* A PDF carousel (2026-10-25). On LinkedIn a carousel is a document post, so
+     the artwork is one PDF. 100MB is LinkedIn's own document ceiling, not ours. */
+  docBytes: 100 * 1024 * 1024,
   imageAccept: 'image/*',
   videoAccept: 'video/mp4,video/quicktime,video/webm',
-  videoTypes: /^video\/(mp4|quicktime|webm)$/i
+  docAccept: 'application/pdf',
+  videoTypes: /^video\/(mp4|quicktime|webm)$/i,
+  docTypes: /^application\/pdf$/i
 };
-VISUAL_LIMITS.accept = VISUAL_LIMITS.imageAccept + ',' + VISUAL_LIMITS.videoAccept;
+VISUAL_LIMITS.accept = VISUAL_LIMITS.imageAccept + ',' + VISUAL_LIMITS.videoAccept + ',' + VISUAL_LIMITS.docAccept;
 
 function isVideoFile(file) {
   return !!(file && VISUAL_LIMITS.videoTypes.test(String(file.type || '')));
+}
+function isDocumentFile(file) {
+  return !!(file && VISUAL_LIMITS.docTypes.test(String(file.type || '')));
 }
 /* A stored visual is judged by what its metadata says it is, because a Storage
    download URL carries no extension to read. kind is written at upload time and
    anything without one is an image, which is every visual uploaded before today. */
 function isVideoMeta(meta) { return !!(meta && meta.kind === 'video'); }
+function isDocumentMeta(meta) { return !!(meta && meta.kind === 'document'); }
+
+/* Counts the pages of a PDF in the browser so the gate can hold a carousel to
+   LinkedIn's 300-page limit. It reads the page objects in the file, which works
+   for most exports; a PDF that packs its pages into compressed object streams
+   counts as zero, and zero comes back as unknown rather than as a number. Files
+   over 30MB are not read at all, for the same reason. Unknown is never a finding. */
+function countPdfPages(file) {
+  if (!file || file.size > 30 * 1024 * 1024 || typeof file.arrayBuffer !== 'function') return Promise.resolve(null);
+  return file.arrayBuffer().then(function (buf) {
+    var text = new TextDecoder('latin1').decode(buf);
+    var n = (text.match(/\/Type\s*\/Page(?![A-Za-z])/g) || []).length;
+    return n > 0 ? n : null;
+  }).catch(function () { return null; });
+}
+
+/* What a board label calls the attached visual. */
+function visualKindLabel(meta) {
+  if (isDocumentMeta(meta)) return 'Carousel attached';
+  if (isVideoMeta(meta)) return 'Video attached';
+  return 'Image attached';
+}
 
 /* Reads the real dimensions before upload so the gate can judge the asset rather
    than its presence (2026-08-11), now for either kind. Resolves null on any
    failure: metadata is a nice-to-have and never a reason to lose an upload. */
 function readVisualMeta(file) {
+  if (isDocumentFile(file)) {
+    return countPdfPages(file).then(function (pages) {
+      return { kind: 'document', bytes: file.size, pages: pages };
+    });
+  }
   return new Promise(function (resolve) {
     try {
       var url = URL.createObjectURL(file);
@@ -3597,6 +3632,11 @@ function readImageMeta(file) { return readVisualMeta(file); }
 function visualPreviewHtml(url, meta, maxHeight) {
   if (!url) return '';
   var box = 'max-width:100%; max-height:' + (maxHeight || 300) + 'px; border:1.5px solid var(--rule); border-radius:4px; display:block; margin-bottom:8px;';
+  if (isDocumentMeta(meta)) {
+    return '<div style="' + box + ' padding:12px 14px; font-size:13px; line-height:1.5;">' +
+      '<strong>PDF carousel</strong>' + (meta.pages ? ', ' + meta.pages + ' pages' : '') + '<br>' +
+      '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">Open the carousel</a></div>';
+  }
   return isVideoMeta(meta)
     ? '<video src="' + escapeHtml(url) + '" controls preload="metadata" style="' + box + '"></video>'
     : '<img src="' + escapeHtml(url) + '" style="' + box + '">';
@@ -3611,18 +3651,25 @@ function visualRejectReason(file) {
     }
     return null;
   }
+  if (isDocumentFile(file)) {
+    if (file.size > VISUAL_LIMITS.docBytes) {
+      return 'That PDF is over ' + Math.round(VISUAL_LIMITS.docBytes / 1048576) + 'MB, which is LinkedIn\'s limit. Pick a smaller file.';
+    }
+    return null;
+  }
   if (/^image\//i.test(String(file.type || ''))) {
     if (file.size > VISUAL_LIMITS.imageBytes) {
       return 'That image is over ' + Math.round(VISUAL_LIMITS.imageBytes / 1048576) + 'MB. Pick a smaller file.';
     }
     return null;
   }
-  return 'That file type is not supported. Images, or MP4, MOV and WebM video.';
+  return 'That file type is not supported. Images, PDF carousels, or MP4, MOV and WebM video.';
 }
 
 /* What the editor sees after a successful upload. A video says its length because
    that is the number that decides whether the gate will accept it. */
 function visualMetaSummary(meta) {
+  if (isDocumentMeta(meta)) return ' PDF carousel' + (meta.pages ? ', ' + meta.pages + ' pages' : '') + '.';
   if (!meta || !meta.w) return '';
   var s = ' ' + meta.w + ' by ' + meta.h;
   if (isVideoMeta(meta) && meta.seconds) s += ', ' + meta.seconds + 's';
@@ -3745,7 +3792,7 @@ function renderLaneView() {
         (canEdit ? '<button class="lane-post-x" data-id="' + escapeHtml(p.id) + '" title="Remove this post" style="border:none; background:none; color:#b3261e; font-size:16px; font-weight:700; cursor:pointer; padding:0 2px; line-height:1;">&times;</button>' : '') +
         '</div>' +
         '<div style="font-size:12.5px; color:var(--ink-soft,#464d57); line-height:1.5; max-height:60px; overflow:hidden;">' + escapeHtml(String(p.note || '').slice(0, 220)) + '</div>' +
-        (p.image ? '<div style="font-size:10.5px; color:var(--mute,#69707a); margin-top:5px;">Image attached</div>' : '') +
+        (p.image ? '<div style="font-size:10.5px; color:var(--mute,#69707a); margin-top:5px;">' + visualKindLabel(p.imageMeta) + '</div>' : '') +
         '</div>';
     }).join('');
   }
